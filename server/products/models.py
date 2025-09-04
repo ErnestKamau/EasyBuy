@@ -18,7 +18,7 @@ class Category(models.Model):
 
 class Product(models.Model):
         name = models.CharField(max_length=120)
-        image_url = models.CharField(max_length=500, blank=True, null=True)
+        image_url = models.CharField(max_length=500, blank=True)
         category = models.ForeignKey(
             Category,
             on_delete=models.CASCADE,
