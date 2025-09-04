@@ -48,6 +48,21 @@ class Product(models.Model):
         created_at = models.DateTimeField(auto_now_add=True)
         updated_at = models.DateTimeField(auto_now=True)
         
+
+        @property
+        def profit_margin(self):
+            if self.cost_price and self.sale_price > 0:
+                return ((self.sale_price - self.cost_price) / self.cost_price) * 100
+            return 0
         
+        @property
+        def is_low_stock(self):
+            return self.in_stock <= self.minimum_stock  # Simple boolean calculation: Returns True if current stock is at or below the minimum threshold.
+        
+        def __str__(self):
+            return self.name
+
+        class Meta:
+            db_table = 'products'
         
         
