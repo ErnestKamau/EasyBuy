@@ -127,7 +127,7 @@ class SaleItem(models.Model):
         db_table = 'sale_items'
         
         
-class Payments(models.Model):
+class Payment(models.Model):
     PAYMENT_METHODS = [
         ('cash', 'Cash'),
         ('mpesa', 'M-Pesa'),
