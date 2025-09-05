@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'accounts',
     'products',
     'orders', 
-    # 'sales',
+    'sales',
     # 'mpesa',
 ]
 

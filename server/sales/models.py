@@ -24,17 +24,17 @@ class Sale(models.Model):
     total_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=MinValueValidator[Decimal(0.00)]
+        validators=[MinValueValidator(Decimal(0.00))]
     )
     cost_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=MinValueValidator[Decimal(0.00)]
+        validators=[MinValueValidator(Decimal(0.00))]
     )  
     profit_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=MinValueValidator[Decimal(0.00)]
+        validators=[MinValueValidator(Decimal(0.00))]
     )
     payment_status = models.CharField(choices=PAYMENT_STATUS_CHOICES, default='debt')
     due_date = models.DateTimeField(null=True) # set if debt/partial
