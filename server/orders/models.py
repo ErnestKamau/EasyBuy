@@ -42,7 +42,34 @@ class Order(models.Model):
         
 
 
-
+class OrderItems(models.Model):
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        related_name='order_items'
+    )
+    quantity = models.PositiveIntegerField(default=0)
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal(0.00))] # Snapshot of price per product at order time
+    )
+    notes = models.TextField(blank=True)
+    
+    @property
+    def subtotal(self):
+        return self.quantity * self.unit_price
+    
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity}"
+    
+    class Meta:
+        db_table = 'order_items'
     
     
         
