@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     'django_filters',
     'accounts',
     'products',
-    # 'orders', 
+    'orders', 
     # 'sales',
     # 'mpesa',
 ]
