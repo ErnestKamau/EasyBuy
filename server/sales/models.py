@@ -4,7 +4,7 @@ from decimal import Decimal
 from datetime import timedelta
 from django.core.validators import MinValueValidator
 
-class Sales(models.Model):
+class Sale(models.Model):
     PAYMENT_STATUS_CHOICES = [
         ('fully-paid', 'Fully Paid'),
         ('partial', 'Partial'),
@@ -73,8 +73,8 @@ class Sales(models.Model):
             self.due_date = timezone.now() + timedelta(days=days)
             self.save()
     
-    def is_near_due(self):
-       if self.payment_status in ["debt", "partial"] and self.due_date:
+    def is_near_due(self): # Returns True if payment is due within 2 days
+       if self.payment_status in ["no-payment", "partial"] and self.due_date:
            return (self.due_date - timezone.now()).days <= 2
        return False
 
@@ -83,3 +83,47 @@ class Sales(models.Model):
     
     class Meta:
         db_table = 'sales'
+        
+        
+class SaleItem(models.Model):
+    sale = models.ForeignKey(
+        Sale,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        related_name='sale_items'
+    )
+    quantity = models.PositiveIntegerField(default=0)
+    # Protects against price changes after the sale
+    unit_price = models.DecimalField(
+        # What you sold it for (at time of sale)
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal(0.00))]
+    )
+    sale_price = models.DecimalField(
+        # What you paid for it (at time of sale)
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal(0.00))]
+    )
+    
+    @property
+    def subtotal(self):
+        return self.quantity * self.unit_price
+
+    @property  
+    def profit_total(self): # Total profit for an item
+        return (self.unit_price - self.cost_price) * self.quantity
+    
+    
+    def __str__(self):
+        return f'{self.product.name} x {self.quantity}'
+    
+    class Meta:
+        db_table = 'sale_items'
+        
+        

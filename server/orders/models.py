@@ -34,7 +34,7 @@ class Order(models.Model):
         return sum(item.subtotal for item in self.items.all())
     
     def __str__(self):
-        return f"{self.user} - ({self.notes}) ({self.order_time} {self.order_date})"
+        return f"{self.user.username} - ({self.notes}) ({self.order_time} {self.order_date})"
         
     
     class Meta:
