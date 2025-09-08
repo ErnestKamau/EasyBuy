@@ -17,6 +17,19 @@ class ProductManager(models.Manager):
             models.Q(name__icontains=query) |
             models.Q(description__icontains=query)
         )
+        
+    def needs_reorder(self):
+        """Products below minimum stock that are active"""
+        return self.active().filter(
+            in_stock__lte=models.F('minimum_stock')
+        ).exclude(minimum_stock=0)  # Exclude products with no minimum set
+    
+    def by_price_range(self, min_price, max_price):
+        """Products within a price range"""
+        return self.active().filter(
+            sale_price__gte=min_price,
+            sale_price__lte=max_price
+        )
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -62,6 +75,7 @@ class Product(models.Model):
         is_active = models.BooleanField(default=True)
         created_at = models.DateTimeField(auto_now_add=True)
         updated_at = models.DateTimeField(auto_now=True)
+        objects = ProductManager()
         
 
         @property
