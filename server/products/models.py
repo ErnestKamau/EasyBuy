@@ -2,6 +2,21 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 
+class ProductManager(models.Manager):
+    def active(self):
+        return self.filter(is_active=True)
+    
+    def low_stock(self):
+        return self.filter(in_stock__lte=models.F('minimum_stock'))
+    
+    def by_category(self, category_id):
+        return self.active().filter(category_id=category_id)
+    
+    def search(self, query):
+        return self.active().filter(
+            models.Q(name__icontains=query) |
+            models.Q(description__icontains=query)
+        )
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
