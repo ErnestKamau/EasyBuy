@@ -13,4 +13,5 @@ urlpatterns = [
     path('admin/categories/', views.CategoryCreateView.as_view(), name='category-create'),
     path('admin/products/', views.ProductCreateView.as_view(), name='product-create'),
     path('admin/products/<int:pk>/', views.ProductUpdateDeleteView.as_view(), name='product-update-delete'),
+    path('admin/products/low-stock/', views.low_stock_alert, name='low-stock-alert'),
 ]
