@@ -21,6 +21,21 @@ class CategoryCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsAdmin]
     
     
+class ProductListView(generics.ListAPIView):
+    queryset = Product.objects.active()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated, IsReadOnly]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['category', 'is_low_stock']
+    
+    def get_queryset(self):
+        queryset = Product.objects.active()
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.search(search)
+        return queryset
+    
+
 
 
 
