@@ -34,8 +34,21 @@ class ProductListView(generics.ListAPIView):
         if search:
             queryset = queryset.search(search)
         return queryset
+
+class ProductDetailView(generics.RetrieveAPIView):
+    queryset = Product.objects.active()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated, IsReadOnly]
     
-
-
+class ProductCreateView(generics.CreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    
+class ProductUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView): # ADMIN/SHOPKEEPER: Can update/delete products
+    queryset = Product.objects.all    
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    
 
 
