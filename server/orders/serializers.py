@@ -13,11 +13,12 @@ class OrderSerializer(serializers.ModelSerializer):
         
 class OrderItemsSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
+    subtotal = serializers.ReadOnlyField()
     
     class Meta:
         model = OrderItems
         fields = [
-            'id', 'order', 'product', 'product_name', 'quantity', 'kilogram', 'unit_price', 'notes'
+            'id', 'order', 'product', 'product_name',
+            'quantity', 'kilogram', 'unit_price', 'notes', 'subtotal'
         ]
-        
 
