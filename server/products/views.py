@@ -29,7 +29,7 @@ class ProductListView(generics.ListAPIView):
     filterset_fields = ['category', 'is_low_stock']
     
     def get_queryset(self):
-        queryset = Product.objects.active()
+        queryset = super().get_queryset()
         search = self.request.query_params.get('search', None)
         if search:
             queryset = queryset.search(search)
