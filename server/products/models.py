@@ -25,7 +25,6 @@ class ProductManager(models.Manager):
         ).exclude(minimum_stock=0)  # Exclude products with no minimum set
     
     def by_price_range(self, min_price, max_price):
-        """Products within a price range"""
         return self.active().filter(
             sale_price__gte=min_price,
             sale_price__lte=max_price
