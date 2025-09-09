@@ -7,7 +7,7 @@ class ProductManager(models.Manager):
         return self.filter(is_active=True)
     
     def low_stock(self):
-        return self.filter(in_stock__lte=models.F('minimum_stock'))
+        return self.active().filter(in_stock__lte=models.F('minimum_stock')).exclude(minimum_stock=0)
     
     def by_category(self, category_id):
         return self.active().filter(category_id=category_id)
