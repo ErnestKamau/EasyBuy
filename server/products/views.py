@@ -52,3 +52,14 @@ class ProductUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView): # ADMIN/SH
     
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def low_stock_alert(request):
+    low_stock_products = Product.objects.needs_reorder()
+    return Response({
+        'count': low_stock_products.count(),
+        'products': ProductSerializer(low_stock_products, many=True).data
+    })
+    
+    
+    
