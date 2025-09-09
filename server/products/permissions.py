@@ -6,6 +6,10 @@ class IsReadOnly(BasePermission):
             return True
         return request.user.role in ['admin']
     
+class IsAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.role in ['admin']
+    
 
-
+            
         
