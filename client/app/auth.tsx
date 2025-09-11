@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,228 @@ import { authApi, handleApiError, RegisterData, LoginData, User } from '../servi
 interface AuthScreensProps {
   readonly onAuthSuccess: (user: User) => void;
 }
+
+// Move LoginForm to separate component to prevent re-creation
+const LoginForm = React.memo(({
+  loginData,
+  setLoginData,
+  loading,
+  handleLogin,
+  onSwitchToRegister
+}: {
+  loginData: LoginData;
+  setLoginData: (data: LoginData) => void;
+  loading: boolean;
+  handleLogin: () => void;
+  onSwitchToRegister: () => void;
+}) => (
+  <View style={styles.formContainer}>
+    <View style={styles.headerContainer}>
+      <Text style={styles.title}>Welcome Back</Text>
+      <Text style={styles.subtitle}>Sign in to your account</Text>
+    </View>
+
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={styles.input}
+        placeholder="Username"
+        placeholderTextColor="#999"
+        value={loginData.username}
+        onChangeText={(text) => setLoginData({ ...loginData, username: text })}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="username"
+      />
+    </View>
+
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        placeholderTextColor="#999"
+        value={loginData.password}
+        onChangeText={(text) => setLoginData({ ...loginData, password: text })}
+        secureTextEntry
+        autoCapitalize="none"
+        autoComplete="password"
+      />
+    </View>
+
+    <TouchableOpacity
+      style={[styles.primaryButton, loading && styles.buttonDisabled]}
+      onPress={handleLogin}
+      disabled={loading}
+      activeOpacity={0.8}
+    >
+      {loading ? (
+        <ActivityIndicator color="#fff" />
+      ) : (
+        <Text style={styles.primaryButtonText}>Sign In</Text>
+      )}
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={styles.linkContainer}
+      onPress={onSwitchToRegister}
+      activeOpacity={0.7}
+    >
+      <Text style={styles.linkText}>
+        Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text>
+      </Text>
+    </TouchableOpacity>
+  </View>
+));
+
+// Move RegisterForm to separate component to prevent re-creation
+const RegisterForm = React.memo(({
+  registerData,
+  setRegisterData,
+  confirmPassword,
+  setConfirmPassword,
+  loading,
+  handleRegister,
+  onSwitchToLogin
+}: {
+  registerData: RegisterData;
+  setRegisterData: (data: RegisterData) => void;
+  confirmPassword: string;
+  setConfirmPassword: (password: string) => void;
+  loading: boolean;
+  handleRegister: () => void;
+  onSwitchToLogin: () => void;
+}) => (
+  <View style={styles.formContainer}>
+    <View style={styles.headerContainer}>
+      <Text style={styles.title}>Create Account</Text>
+      <Text style={styles.subtitle}>Join us today</Text>
+    </View>
+
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={styles.input}
+        placeholder="Username"
+        placeholderTextColor="#999"
+        value={registerData.username}
+        onChangeText={(text) => setRegisterData({ ...registerData, username: text })}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="username"
+      />
+    </View>
+
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        placeholderTextColor="#999"
+        value={registerData.email}
+        onChangeText={(text) => setRegisterData({ ...registerData, email: text })}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+      />
+    </View>
+
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={styles.input}
+        placeholder="Phone Number (e.g., +254700123456)"
+        placeholderTextColor="#999"
+        value={registerData.phone_number}
+        onChangeText={(text) => setRegisterData({ ...registerData, phone_number: text })}
+        keyboardType="phone-pad"
+        autoComplete="tel"
+      />
+    </View>
+
+    <View style={styles.genderContainer}>
+      <Text style={styles.genderLabel}>Gender (Optional)</Text>
+      <View style={styles.genderButtonsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.genderButton,
+            registerData.gender === 'Male' && styles.genderButtonActive
+          ]}
+          onPress={() => setRegisterData({ ...registerData, gender: 'Male' })}
+          activeOpacity={0.7}
+        >
+          <Text style={[
+            styles.genderButtonText,
+            registerData.gender === 'Male' && styles.genderButtonTextActive
+          ]}>
+            Male
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.genderButton,
+            registerData.gender === 'Female' && styles.genderButtonActive
+          ]}
+          onPress={() => setRegisterData({ ...registerData, gender: 'Female' })}
+          activeOpacity={0.7}
+        >
+          <Text style={[
+            styles.genderButtonText,
+            registerData.gender === 'Female' && styles.genderButtonTextActive
+          ]}>
+            Female
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={styles.input}
+        placeholder="Password (min 8 characters)"
+        placeholderTextColor="#999"
+        value={registerData.password}
+        onChangeText={(text) => setRegisterData({ ...registerData, password: text })}
+        secureTextEntry
+        autoCapitalize="none"
+        autoComplete="password-new"
+      />
+    </View>
+
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm Password"
+        placeholderTextColor="#999"
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+        secureTextEntry
+        autoCapitalize="none"
+        autoComplete="password-new"
+      />
+    </View>
+
+    <TouchableOpacity
+      style={[styles.primaryButton, loading && styles.buttonDisabled]}
+      onPress={handleRegister}
+      disabled={loading}
+      activeOpacity={0.8}
+    >
+      {loading ? (
+        <ActivityIndicator color="#fff" />
+      ) : (
+        <Text style={styles.primaryButtonText}>Create Account</Text>
+      )}
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={styles.linkContainer}
+      onPress={onSwitchToLogin}
+      activeOpacity={0.7}
+    >
+      <Text style={styles.linkText}>
+        Already have an account? <Text style={styles.linkTextBold}>Sign In</Text>
+      </Text>
+    </TouchableOpacity>
+  </View>
+));
 
 export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
   const [isLogin, setIsLogin] = useState(true);
@@ -40,7 +262,8 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
 
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleLogin = async () => {
+  // Use useCallback to prevent function re-creation on every render
+  const handleLogin = useCallback(async () => {
     if (!loginData.username || !loginData.password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -57,9 +280,9 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loginData, onAuthSuccess]);
 
-  const handleRegister = async () => {
+  const handleRegister = useCallback(async () => {
     if (!registerData.username || !registerData.email || !registerData.phone_number || !registerData.password) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
@@ -86,199 +309,10 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [registerData, confirmPassword, onAuthSuccess]);
 
-  const LoginForm = () => (
-    <View style={styles.formContainer}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to your account</Text>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Username"
-          placeholderTextColor="#999"
-          value={loginData.username}
-          onChangeText={(text) => setLoginData({ ...loginData, username: text })}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="username"
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#999"
-          value={loginData.password}
-          onChangeText={(text) => setLoginData({ ...loginData, password: text })}
-          secureTextEntry
-          autoCapitalize="none"
-          autoComplete="password"
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.primaryButton, loading && styles.buttonDisabled]}
-        onPress={handleLogin}
-        disabled={loading}
-        activeOpacity={0.8}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.primaryButtonText}>Sign In</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.linkContainer}
-        onPress={() => setIsLogin(false)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.linkText}>
-          Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const RegisterForm = () => (
-    <View style={styles.formContainer}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join us today</Text>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Username"
-          placeholderTextColor="#999"
-          value={registerData.username}
-          onChangeText={(text) => setRegisterData({ ...registerData, username: text })}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="username"
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#999"
-          value={registerData.email}
-          onChangeText={(text) => setRegisterData({ ...registerData, email: text })}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Phone Number (e.g., +254700123456)"
-          placeholderTextColor="#999"
-          value={registerData.phone_number}
-          onChangeText={(text) => setRegisterData({ ...registerData, phone_number: text })}
-          keyboardType="phone-pad"
-          autoComplete="tel"
-        />
-      </View>
-
-      <View style={styles.genderContainer}>
-        <Text style={styles.genderLabel}>Gender (Optional)</Text>
-        <View style={styles.genderButtonsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.genderButton,
-              registerData.gender === 'Male' && styles.genderButtonActive
-            ]}
-            onPress={() => setRegisterData({ ...registerData, gender: 'Male' })}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.genderButtonText,
-              registerData.gender === 'Male' && styles.genderButtonTextActive
-            ]}>
-              Male
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.genderButton,
-              registerData.gender === 'Female' && styles.genderButtonActive
-            ]}
-            onPress={() => setRegisterData({ ...registerData, gender: 'Female' })}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.genderButtonText,
-              registerData.gender === 'Female' && styles.genderButtonTextActive
-            ]}>
-              Female
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Password (min 8 characters)"
-          placeholderTextColor="#999"
-          value={registerData.password}
-          onChangeText={(text) => setRegisterData({ ...registerData, password: text })}
-          secureTextEntry
-          autoCapitalize="none"
-          autoComplete="password-new"
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm Password"
-          placeholderTextColor="#999"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoComplete="password-new"
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.primaryButton, loading && styles.buttonDisabled]}
-        onPress={handleRegister}
-        disabled={loading}
-        activeOpacity={0.8}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.primaryButtonText}>Create Account</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.linkContainer}
-        onPress={() => setIsLogin(true)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.linkText}>
-          Already have an account? <Text style={styles.linkTextBold}>Sign In</Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const switchToRegister = useCallback(() => setIsLogin(false), []);
+  const switchToLogin = useCallback(() => setIsLogin(true), []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -289,10 +323,31 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="handled" // Changed from "always" to "handled"
           showsVerticalScrollIndicator={false}
         >
-          {isLogin ? <LoginForm /> : <RegisterForm />}
+          {/* Render both forms but show only one - prevents complete remounting */}
+          <View style={{ display: isLogin ? 'flex' : 'none' }}>
+            <LoginForm
+              loginData={loginData}
+              setLoginData={setLoginData}
+              loading={loading}
+              handleLogin={handleLogin}
+              onSwitchToRegister={switchToRegister}
+            />
+          </View>
+
+          <View style={{ display: isLogin ? 'none' : 'flex' }}>
+            <RegisterForm
+              registerData={registerData}
+              setRegisterData={setRegisterData}
+              confirmPassword={confirmPassword}
+              setConfirmPassword={setConfirmPassword}
+              loading={loading}
+              handleRegister={handleRegister}
+              onSwitchToLogin={switchToLogin}
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
