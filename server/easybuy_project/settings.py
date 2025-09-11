@@ -181,8 +181,8 @@ if DEBUG:
         "http://127.0.0.1:8081",
         "http://localhost:19000",     # Expo dev tools
         "http://127.0.0.1:19000",
-        "http://10.0.2.2:8000",      # Android emulator
-        "http://192.168.1.1:8000",   # Add your actual IP here
+        "http://10.0.2.2",      # Android emulator
+        "http://192.168.100.55",   # Add your actual IP here
     ]
 else:
     # Production settings - more restrictive
