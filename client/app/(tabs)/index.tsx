@@ -28,7 +28,6 @@ export default function HomeScreen() {
   const handleLogout = async () => {
     try {
       await authApi.logout();
-      // Navigation will be handled automatically by AuthProvider
       router.replace('/auth');
     } catch (error) {
       console.log('Logout failed:', error);

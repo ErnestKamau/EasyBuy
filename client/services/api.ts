@@ -144,8 +144,9 @@ export const authApi = {
     try {
       const refreshToken = await tokenManager.getRefreshToken();
       if (refreshToken) {
-        // Optional: Call logout endpoint if you have one
-        // await api.post("/auth/logout/", { refresh: refreshToken });
+          await api.post("/auth/logout/",{
+              refresh: refreshToken
+          });
       }
     } catch (error) {
       console.error("Logout error:", error);
