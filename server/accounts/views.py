@@ -69,7 +69,7 @@ def logout(request):
         return Response({
             'error': 'Invalid token'
         }, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
+    except Exception:
         return Response({
             'error': 'Something went wrong'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
