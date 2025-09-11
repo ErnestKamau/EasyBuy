@@ -50,7 +50,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.welcome}>Welcome, {user.username}!</Text>
+      <Text style={styles.welcome}>Welcome, {user.username} to homepage !</Text>
       <Text style={styles.info}>Email: {user.email}</Text>
       <Text style={styles.info}>Phone: {user.phone_number}</Text>
       <Text style={styles.info}>Role: {user.role}</Text>

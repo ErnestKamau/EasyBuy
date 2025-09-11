@@ -1,10 +1,10 @@
 import React from "react";
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function Search(): React.ReactElement {
+export default function Profile(): React.ReactElement {
   return (
     <View style={styles.container}>
-        <Text> welcome to search</Text>
+        <Text> welcome to settings</Text>
     </View>
   );
 }

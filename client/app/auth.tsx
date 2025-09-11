@@ -15,7 +15,7 @@ import {
 import { authApi, handleApiError, RegisterData, LoginData, User } from '../services/api';
 
 interface AuthScreensProps {
-  onAuthSuccess: (user: User) => void;
+  readonly onAuthSuccess: (user: User) => void;
 }
 
 export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
