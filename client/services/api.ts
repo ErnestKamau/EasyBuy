@@ -73,7 +73,6 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh failed, clear tokens and redirect to login
         await tokenManager.clearTokens();
         router.replace('/auth');
       }

@@ -321,6 +321,7 @@ export default function AuthScreens() {
       Alert.alert('Registration Failed', handleApiError(error));
     } finally {
       setLoading(false);
+      setIsLogin(false)
     }
   }, [registerData]);
 
