@@ -1,15 +1,64 @@
-import { StyleSheet } from 'react-native';
+// app/tabs/index.tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import AuthScreens from '../../components/AuthScreens';
+import { User, authApi, isAuthenticated } from '../../services/api';
 
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
+export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-export default function TabOneScreen() {
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      if (await isAuthenticated()) {
+        const currentUser = await authApi.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        }
+      }
+    } catch (error) {
+      console.log('Auth check failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAuthSuccess = (userData: User) => {
+    setUser(userData);
+  };
+
+  const handleLogout = async () => {
+    await authApi.logout();
+    setUser(null);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreens onAuthSuccess={handleAuthSuccess} />;
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Tab One</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <Text>Hello</Text>
-      <EditScreenInfo path="app/(tabs)/index.tsx" />
+      <Text style={styles.welcome}>Welcome, {user.username}!</Text>
+      <Text style={styles.info}>Email: {user.email}</Text>
+      <Text style={styles.info}>Phone: {user.phone_number}</Text>
+      <Text style={styles.info}>Role: {user.role}</Text>
+      {user.gender && <Text style={styles.info}>Gender: {user.gender}</Text>}
+
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -17,16 +66,35 @@ export default function TabOneScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
-  title: {
-    fontSize: 20,
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  welcome: {
+    fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 20,
   },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
+  info: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#666',
+  },
+  logoutButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  logoutText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

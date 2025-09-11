@@ -23,9 +23,11 @@ def register(request):
                 'access': str(refresh.access_token),
             }
         }, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        print(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-    
+   
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
@@ -40,8 +42,9 @@ def login(request):
             'tokens': {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
-            }
-        })
+                }
+            }, status=status.HTTP_200_OK)
+
     return Response(
         {'error': 'Invalid credentials'},
         status=status.HTTP_401_UNAUTHORIZED

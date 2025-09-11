@@ -26,7 +26,8 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
+# Update ALLOWED_HOSTS for mobile development
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,10.0.2.2,0.0.0.0').split(',')
 
 
 # Application definition
@@ -40,7 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
-    'corsheaders',
+    'corsheaders',  # Make sure this is installed
     'django_filters',
     'accounts',
     'products',
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Add this at the top
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -167,10 +169,48 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
 }
 
-# CORS Configuration (for React frontend)
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React dev server
-    "http://127.0.0.1:3000",
+# CORS Configuration (for mobile and web frontends)
+if DEBUG:
+    # Development settings - more permissive
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",      # React dev server
+        "http://127.0.0.1:3000",
+        "http://localhost:8081",      # Expo dev server
+        "http://127.0.0.1:8081",
+        "http://localhost:19000",     # Expo dev tools
+        "http://127.0.0.1:19000",
+        "http://10.0.2.2:8000",      # Android emulator
+        "http://192.168.1.1:8000",   # Add your actual IP here
+    ]
+else:
+    # Production settings - more restrictive
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        # Add your production domain here
+    ]
+
+# Additional CORS settings for mobile
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]
 
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
