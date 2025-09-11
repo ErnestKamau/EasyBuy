@@ -1,12 +1,10 @@
 // services/api.ts
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// If using Expo Secure Store for tokens:
-// import * as SecureStore from "expo-secure-store";
 
 const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
-  "http://127.0.0.1:8000/"; // sensible fallback for Android emulator
+  "http://127.0.0.1:8000/";
 
 export const api = axios.create({
   baseURL: `${BASE_URL}/api`,
@@ -17,7 +15,7 @@ export const api = axios.create({
 const ACCESS_TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 
-// Token management functions
+
 export const tokenManager = {
   async setTokens(accessToken: string, refreshToken: string) {
     await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
@@ -38,7 +36,7 @@ export const tokenManager = {
   }
 };
 
-// Attach JWT if present
+// Attach JWT
 api.interceptors.request.use(async (config) => {
   const token = await tokenManager.getAccessToken();
   if (token) {
@@ -122,12 +120,12 @@ export interface LoginData {
   password: string;
 }
 
-// Authentication functions
+
 export const authApi = {
   async register(userData: RegisterData): Promise<AuthResponse> {
     const { data } = await api.post<AuthResponse>("/auth/register/", userData);
 
-    // Store tokens
+
     await tokenManager.setTokens(data.tokens.access, data.tokens.refresh);
 
     return data;
@@ -136,7 +134,7 @@ export const authApi = {
   async login(credentials: LoginData): Promise<AuthResponse> {
     const { data } = await api.post<AuthResponse>("/auth/login/", credentials);
 
-    // Store tokens
+
     await tokenManager.setTokens(data.tokens.access, data.tokens.refresh);
 
     return data;
@@ -185,20 +183,20 @@ export const authApi = {
   },
 };
 
-// Example typed call (keeping your original ping function)
+
 export type PingResponse = { ok: boolean; message: string };
 export async function ping(): Promise<PingResponse> {
   const { data } = await api.get<PingResponse>("/ping/");
   return data;
 }
 
-// Helper function to check if user is authenticated
+
 export async function isAuthenticated(): Promise<boolean> {
   const token = await tokenManager.getAccessToken();
   return token !== null;
 }
 
-// Error handling helpers
+
 export function handleApiError(error: any): string {
   if (error.response?.data?.error) {
     return error.response.data.error;
@@ -209,7 +207,6 @@ export function handleApiError(error: any): string {
   }
 
   if (error.response?.status === 400) {
-    // Handle validation errors
     const errors = error.response.data;
     const errorMessages = Object.values(errors).flat();
     return errorMessages.join(', ');
