@@ -94,6 +94,7 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
       email: '',
       phone_number: '',
       password: '',
+      password_confirm: '',
       gender: undefined,
       role: 'customer',
     });
