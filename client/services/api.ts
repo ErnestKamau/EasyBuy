@@ -1,6 +1,7 @@
 // services/api.ts
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 
 const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
@@ -74,8 +75,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed, clear tokens and redirect to login
         await tokenManager.clearTokens();
-        // You might want to emit an event or use a navigation service here
-        console.log('Token refresh failed, user needs to login again');
+        router.replace('/auth');
       }
     }
 

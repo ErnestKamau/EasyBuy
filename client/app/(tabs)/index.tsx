@@ -53,7 +53,6 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      {/* User Info Card */}
       {user && (
         <View style={styles.userCard}>
           <Text style={styles.cardTitle}>Your Account</Text>
@@ -82,7 +81,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Quick Actions */}
       <View style={styles.actionsSection}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
 
@@ -115,7 +113,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Logout Button */}
+
       <TouchableOpacity
         style={styles.logoutButton}
         onPress={handleLogout}
