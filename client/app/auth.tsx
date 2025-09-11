@@ -12,13 +12,12 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
 import { authApi, handleApiError, RegisterData, LoginData, User } from '../services/api';
 
-interface AuthScreensProps {
-  readonly onAuthSuccess: (user: User) => void;
-}
 
-// Move LoginForm to separate component to prevent re-creation
+
+
 const LoginForm = React.memo(({
   loginData,
   setLoginData,
@@ -89,20 +88,16 @@ const LoginForm = React.memo(({
   </View>
 ));
 
-// Move RegisterForm to separate component to prevent re-creation
+
 const RegisterForm = React.memo(({
   registerData,
   setRegisterData,
-  confirmPassword,
-  setConfirmPassword,
   loading,
   handleRegister,
   onSwitchToLogin
 }: {
   registerData: RegisterData;
   setRegisterData: (data: RegisterData) => void;
-  confirmPassword: string;
-  setConfirmPassword: (password: string) => void;
   loading: boolean;
   handleRegister: () => void;
   onSwitchToLogin: () => void;
@@ -207,8 +202,10 @@ const RegisterForm = React.memo(({
         style={styles.input}
         placeholder="Confirm Password"
         placeholderTextColor="#999"
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
+        value={registerData.password_confirm}
+        onChangeText={(text) => {
+            setRegisterData({ ...registerData, password_confirm: text });
+          }}
         secureTextEntry
         autoCapitalize="none"
         autoComplete="password-new"
@@ -240,17 +237,17 @@ const RegisterForm = React.memo(({
   </View>
 ));
 
-export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
+export default function AuthScreens() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  // Login form state
+
   const [loginData, setLoginData] = useState<LoginData>({
     username: '',
     password: '',
   });
 
-  // Registration form state
+
   const [registerData, setRegisterData] = useState<RegisterData>({
     username: '',
     email: '',
@@ -260,9 +257,8 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
     gender: undefined,
   });
 
-  const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Use useCallback to prevent function re-creation on every render
+
   const handleLogin = useCallback(async () => {
     if (!loginData.username || !loginData.password) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -273,14 +269,14 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
     try {
       const response = await authApi.login(loginData);
       Alert.alert('Success', 'Login successful!', [
-        { text: 'OK', onPress: () => onAuthSuccess(response.user) }
+        { text: 'OK', onPress: () => router.replace('/(tabs)') }
       ]);
     } catch (error) {
       Alert.alert('Login Failed', handleApiError(error));
     } finally {
       setLoading(false);
     }
-  }, [loginData, onAuthSuccess]);
+  }, [loginData]);
 
   const handleRegister = useCallback(async () => {
     if (!registerData.username || !registerData.email || !registerData.phone_number || !registerData.password) {
@@ -288,7 +284,7 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
       return;
     }
 
-    if (registerData.password !== confirmPassword) {
+    if (registerData.password !== registerData.password_confirm) {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
@@ -301,15 +297,32 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
     setLoading(true);
     try {
       const response = await authApi.register(registerData);
-      Alert.alert('Success', 'Registration successful!', [
-        { text: 'OK', onPress: () => onAuthSuccess(response.user) }
+      Alert.alert('Success', 'Registration successful! Please sign in with your new account.', [
+        {
+            text: 'OK',
+            onPress: () =>{
+                setIsLogin(true);
+                setRegisterData({
+                    username: '',
+                    email: '',
+                    phone_number: '',
+                    password: '',
+                    password_confirm: '',
+                    gender: undefined,
+                });
+                setLoginData({
+                    username: registerData.username,
+                    password: '',
+                });
+            }
+        }
       ]);
     } catch (error) {
       Alert.alert('Registration Failed', handleApiError(error));
     } finally {
       setLoading(false);
     }
-  }, [registerData, confirmPassword, onAuthSuccess]);
+  }, [registerData]);
 
   const switchToRegister = useCallback(() => setIsLogin(false), []);
   const switchToLogin = useCallback(() => setIsLogin(true), []);
@@ -323,10 +336,10 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled" // Changed from "always" to "handled"
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Render both forms but show only one - prevents complete remounting */}
+
           <View style={{ display: isLogin ? 'flex' : 'none' }}>
             <LoginForm
               loginData={loginData}
@@ -341,8 +354,6 @@ export default function AuthScreens({ onAuthSuccess }: AuthScreensProps) {
             <RegisterForm
               registerData={registerData}
               setRegisterData={setRegisterData}
-              confirmPassword={confirmPassword}
-              setConfirmPassword={setConfirmPassword}
               loading={loading}
               handleRegister={handleRegister}
               onSwitchToLogin={switchToLogin}

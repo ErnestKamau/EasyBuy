@@ -27,7 +27,11 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Update ALLOWED_HOSTS for mobile development
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,10.0.2.2,0.0.0.0').split(',')
+ALLOWED_HOSTS = [h.strip() for h in config(
+    'ALLOWED_HOSTS',
+    default='192.168.100.55,10.0.2.2,0.0.0.0'
+).split(',')]
+
 
 
 # Application definition
@@ -179,10 +183,10 @@ if DEBUG:
         "http://127.0.0.1:3000",
         "http://localhost:8081",      # Expo dev server
         "http://127.0.0.1:8081",
-        "http://localhost:19000",     # Expo dev tools
-        "http://127.0.0.1:19000",
+        "http://localhost:8081",     # Expo dev tools
+        "http://127.0.0.1:8081",
         "http://10.0.2.2",      # Android emulator
-        "http://192.168.100.55",   # Add your actual IP here
+        "http://192.168.100.55:8081",   # Add your actual IP here
     ]
 else:
     # Production settings - more restrictive
