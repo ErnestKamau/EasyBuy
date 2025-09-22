@@ -186,7 +186,7 @@ export const authApi = {
       const { data } = await api.get<User>("/auth/me/");
       return data;
     } catch (error) {
-      console.error("Failed to fetch current user:", error);
+      console.log("Failed to fetch current user:", error);
       return null;
     }
   },
