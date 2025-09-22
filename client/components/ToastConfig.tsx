@@ -40,4 +40,45 @@ export const toastConfig = {
       )}
     />
   ),
+
+  error: (props: any) => (
+    <ErrorToast
+      {...props}
+      style={{
+        borderLeftColor: "#dc3545",
+        backgroundColor: "#f8d7da",
+        borderRadius: 8,
+        height: 80,
+        paddingHorizontal: 15,
+      }}
+      text1Style={{
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#721c24",
+      }}
+      text2Style={{
+        fontSize: 14,
+        color: "#721c24",
+        fontWeight: "400",
+        lineHeight: 18,
+      }}
+      renderLeadingIcon={() => (
+        <View
+          style={{
+            justifyContent: "center",
+            alignItems: "center",
+            marginLeft: 10,
+          }}
+        >
+          <MaterialIcons
+            name="error"
+            size={24}
+            color="#dc3545"
+          />
+        </View>
+      )}
+    />
+  ),
+
+  
 };
