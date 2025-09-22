@@ -4,12 +4,12 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useEffect, useState, createContext, useContext, useCallback, useMemo } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
-import { authApi, tokenManager } from '@/services/api';
+import { authApi, tokenManager, User } from '@/services/api';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -24,9 +24,9 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-// Auth Context
+
 interface AuthContextType {
-  user: string | null;
+  user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
   login: (credentials: any) => Promise<void>;
@@ -46,13 +46,7 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 
-// Define User type (adjust fields as needed)
-type User = {
-  id: string;
-  username: string;
-  email?: string;
-  // Add other fields as needed
-};
+
 
 function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -62,7 +56,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   const segments = useSegments();
 
   
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = useCallback(async () => {
     try {
       const token = await tokenManager.getAccessToken();
 
@@ -92,21 +86,22 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [])
 
   
-  const login = async (credentials: any) => {
+  const login = useCallback(async (credentials: any) => {
     try {
       const response = await authApi.login(credentials);
       setUser(response.user);
       setIsAuthenticated(true);
     } catch (error) {
-      throw error; // Re-throw so the component can handle it
+      console.error("Login failed", error)
+      throw new Error("Invalid Credentials. Please try again.")
     }
-  };
+  }, [])
 
   
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await authApi.logout();
     } catch (error) {
@@ -115,17 +110,17 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       setUser(null);
       setIsAuthenticated(false);
     }
-  };
+  }, [])
 
-  // Refresh auth state
-  const refreshAuth = async () => {
+  
+  const refreshAuth = useCallback(async () => {
     setLoading(true);
     await checkAuthStatus();
-  };
+  }, [checkAuthStatus])
 
   useEffect(() => {
     checkAuthStatus();
-  }, []);
+  }, [checkAuthStatus]);
 
   useEffect(() => {
     if (loading) return; // Still checking auth status
@@ -141,7 +136,17 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     }
   }, [isAuthenticated, loading, segments]);
 
-  // Show loading screen while checking auth
+
+  const contextValue = useMemo<AuthContextType>(() => ({
+    user,
+    isAuthenticated,
+    loading,
+    login,
+    logout,
+    refreshAuth,
+  }), [user, isAuthenticated, loading, login, logout, refreshAuth]);
+
+
   if (loading) {
     return (
       <View style={{
@@ -154,15 +159,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       </View>
     );
   }
-
-  const contextValue: AuthContextType = {
-    user,
-    isAuthenticated,
-    loading,
-    login,
-    logout,
-    refreshAuth,
-  };
+    
 
   return (
     <AuthContext.Provider value={contextValue}>
