@@ -70,11 +70,41 @@ export const toastConfig = {
             marginLeft: 10,
           }}
         >
-          <MaterialIcons
-            name="error"
-            size={24}
-            color="#dc3545"
-          />
+          <MaterialIcons name="error" size={24} color="#dc3545" />
+        </View>
+      )}
+    />
+  ),
+
+  info: (props: any) => (
+    <BaseToast
+      {...props}
+      style={{
+        borderLeftColor: "#17a2b8",
+        backgroundColor: "#d1ecf1",
+        borderRadius: 8,
+        height: 70,
+        paddingHorizontal: 15,
+      }}
+      text1Style={{
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#0c5460",
+      }}
+      text2Style={{
+        fontSize: 14,
+        color: "#0c5460",
+        fontWeight: "400",
+      }}
+      renderLeadingIcon={() => (
+        <View
+          style={{
+            justifyContent: "center",
+            alignItems: "center",
+            marginLeft: 10,
+          }}
+        >
+          <MaterialIcons name="info" size={24} color="#17a2b8" />
         </View>
       )}
     />
