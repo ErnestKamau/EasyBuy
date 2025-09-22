@@ -30,7 +30,7 @@ export class ToastService {
         });
     }
 
-    static ShowError(title: string, subtitle?: string) {
+    static showError(title: string, subtitle?: string) {
         Toast.show({
             type: 'error',
             text1: title,
@@ -143,8 +143,9 @@ export class ToastService {
         return fieldMap[fieldName] || fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
     
-
-
-
+    static showApiError(error: ApiErrorResponse, customTitle?: string) {
+        const errorMessage = this.handleApiError(error);
+        this.showError(customTitle || 'Error', errorMessage);
+    }
 
 }
