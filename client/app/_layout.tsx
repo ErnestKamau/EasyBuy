@@ -86,7 +86,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [])
+  }, []);
 
   
   const login = useCallback(async (credentials: any) => {
@@ -96,9 +96,9 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       setIsAuthenticated(true);
     } catch (error) {
       console.error("Login failed", error)
-      throw new Error("Invalid Credentials. Please try again.")
+      throw new Error("Login Failed. Please try again.")
     }
-  }, [])
+  }, []);
 
   
   const logout = useCallback(async () => {
@@ -110,13 +110,13 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       setUser(null);
       setIsAuthenticated(false);
     }
-  }, [])
+  }, []);
 
   
   const refreshAuth = useCallback(async () => {
     setLoading(true);
     await checkAuthStatus();
-  }, [checkAuthStatus])
+  }, [checkAuthStatus]);
 
   useEffect(() => {
     checkAuthStatus();

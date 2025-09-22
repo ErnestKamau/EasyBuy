@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 
 const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
-  "http://127.0.0.1:8000/";
+  "http://10.0.2.2:8000";
 
 export const api = axios.create({
   baseURL: `${BASE_URL}/api`,

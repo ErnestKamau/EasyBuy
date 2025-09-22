@@ -13,10 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {
-  FontAwesome,
-  MaterialIcons,
-  Ionicons,
-  Feather
+  MaterialIcons
 } from '@expo/vector-icons';
 import { authApi, handleApiError, RegisterData, LoginData } from '../services/api';
 import { useAuth } from './_layout';
