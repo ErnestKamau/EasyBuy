@@ -111,6 +111,25 @@ export class ToastService {
         return 'An unexpected error occurred. Please try again.';
     }
 
+    /*** Django often returns validation errors as: { field_name: ["Error message"] }*/
+    private static parseValidationErrors(data: any): string {
+        const errors: string[] = [];
+    
+        for (const [fieldName, fieldErrors] of Object.entries(data)) {
+            if (Array.isArray(fieldErrors)) {
+                const humanFieldName = this.humanizeFieldName(fieldName);
+            
+                fieldErrors.forEach((errorMsg: string) => {
+                    errors.push(`${humanFieldName}: ${errorMsg}`);
+                });
+            }
+        }
+        
+        return errors.length > 3 
+        ? `${errors.slice(0, 2).join('\n')} and ${errors.length - 2} more errors...`
+        : errors.join('\n');
+    }
+
 
 
 
