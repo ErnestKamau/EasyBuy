@@ -37,7 +37,7 @@ export const tokenManager = {
   }
 };
 
-// Attach JWT
+
 api.interceptors.request.use(async (config) => {
   const token = await tokenManager.getAccessToken();
   if (token) {

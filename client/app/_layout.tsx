@@ -95,8 +95,8 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       setUser(response.user);
       setIsAuthenticated(true);
     } catch (error) {
-      console.error("Login failed", error)
-      throw new Error("Login Failed. Please try again.")
+      console.log("Login failed", error)
+      throw Error("Login Failed. Please try again.")
     }
   }, []);
 
