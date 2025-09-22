@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { View } from "react-native";
 import { BaseToast, ErrorToast } from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -110,5 +110,37 @@ export const toastConfig = {
     />
   ),
 
-  
+  warning: (props: any) => (
+    <BaseToast
+      {...props}
+      style={{
+        borderLeftColor: "#ffc107",
+        backgroundColor: "#fff3cd",
+        borderRadius: 8,
+        height: 70,
+        paddingHorizontal: 15,
+      }}
+      text1Style={{
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#856404",
+      }}
+      text2Style={{
+        fontSize: 14,
+        color: "#856404",
+        fontWeight: "400",
+      }}
+      renderLeadingIcon={() => (
+        <View
+          style={{
+            justifyContent: "center",
+            alignItems: "center",
+            marginLeft: 10,
+          }}
+        >
+          <MaterialIcons name="warning" size={24} color="#ffc107" />
+        </View>
+      )}
+    />
+  ),
 };
