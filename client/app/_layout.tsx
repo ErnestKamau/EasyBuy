@@ -7,9 +7,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState, createContext, useContext, useCallback, useMemo } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
+import Toast from 'react-native-toast-message';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { authApi, tokenManager, User } from '@/services/api';
+import { toastConfig } from '@/components/ToastConfig';
+import { ToastService } from '@/utils/toastService';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -72,6 +75,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       if (currentUser) {
         setUser(currentUser);
         setIsAuthenticated(true);
+        ToastService.showSuccess('Welcome back!', `Hello, ${currentUser.username}`)
       } else {
         // Token is invalid, clear it
         await tokenManager.clearTokens();
@@ -94,9 +98,11 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       const response = await authApi.login(credentials);
       setUser(response.user);
       setIsAuthenticated(true);
+      ToastService.showSuccess('Login Successful!', `Welcome back, ${response.user.username}`);
     } catch (error) {
       console.log("Login failed", error)
-      throw Error("Login Failed. Please try again.")
+      ToastService.showApiError(error, 'Login Failed');
+      throw new Error("Login failed. Please try again.");
     }
   }, []);
 
@@ -192,6 +198,7 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <RootLayoutNav />
+      <Toast config={toastConfig} />
     </AuthProvider>
   );
 }
