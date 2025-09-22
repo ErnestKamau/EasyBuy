@@ -41,11 +41,8 @@ export const tokenManager = {
 api.interceptors.request.use(async (config) => {
   const token = await tokenManager.getAccessToken();
   if (token) {
-    config.headers = {
-      ...config.headers,
-      Authorization: `Bearer ${token}`,
-    };
-  }
+    config.headers.set('Authorization', `Bearer ${token}`)
+  };
   return config;
 });
 
@@ -73,12 +70,21 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
       } catch (refreshError) {
+        console.error("Token Refresh Error:", refreshError)
         await tokenManager.clearTokens();
         router.replace('/auth');
       }
     }
 
-    return Promise.reject(error);
+    let rejectionError;
+    if (error instanceof Error) {
+      rejectionError = error;
+    } else if (typeof error === 'string') {
+      rejectionError = new Error(error);
+    } else {
+      rejectionError = new Error(JSON.stringify(error));
+    }
+    return Promise.reject(rejectionError);
   }
 );
 
@@ -151,6 +157,7 @@ export const authApi = {
       console.error("Logout error:", error);
     } finally {
       await tokenManager.clearTokens();
+      router.replace('/auth')
     }
   },
 
@@ -168,6 +175,7 @@ export const authApi = {
 
       return access;
     } catch (error) {
+      console.error("Token refresh error:", error);
       await tokenManager.clearTokens();
       return null;
     }
@@ -178,6 +186,7 @@ export const authApi = {
       const { data } = await api.get<User>("/auth/me/");
       return data;
     } catch (error) {
+      console.error("Failed to fetch current user:", error);
       return null;
     }
   },

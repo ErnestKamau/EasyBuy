@@ -25,14 +25,6 @@ export default function HomeScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await authApi.logout();
-      router.replace('/auth');
-    } catch (error) {
-      console.log('Logout failed:', error);
-    }
-  };
 
   if (loading) {
     return (
@@ -114,12 +106,7 @@ export default function HomeScreen() {
       </View>
 
 
-      <TouchableOpacity
-        style={styles.logoutButton}
-        onPress={handleLogout}
-      >
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </TouchableOpacity>
+
     </ScrollView>
   );
 }

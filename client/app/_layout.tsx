@@ -4,12 +4,12 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createContext, useContext } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
-import { isAuthenticated } from '@/services/api';
+import { authApi, tokenManager } from '@/services/api';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -24,47 +24,125 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-// Authentication Provider Component
-function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authChecked, setAuthChecked] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
+// Auth Context
+interface AuthContextType {
+  user: string | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  login: (credentials: any) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshAuth: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isAuthenticated: false,
+  loading: true,
+  login: async () => {},
+  logout: async () => {},
+  refreshAuth: async () => {},
+});
+
+export const useAuth = () => useContext(AuthContext);
+
+
+// Define User type (adjust fields as needed)
+type User = {
+  id: string;
+  username: string;
+  email?: string;
+  // Add other fields as needed
+};
+
+function AuthProvider({ children }: { readonly children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const segments = useSegments();
 
+  
+  const checkAuthStatus = async () => {
+    try {
+      const token = await tokenManager.getAccessToken();
+
+      if (!token) {
+        setIsAuthenticated(false);
+        setUser(null);
+        return;
+      }
+
+      // Verify token by calling /me endpoint
+      const currentUser = await authApi.getCurrentUser();
+
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+      } else {
+        // Token is invalid, clear it
+        await tokenManager.clearTokens();
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    } catch (error) {
+      console.log('Auth check failed:', error);
+      await tokenManager.clearTokens();
+      setIsAuthenticated(false);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  
+  const login = async (credentials: any) => {
+    try {
+      const response = await authApi.login(credentials);
+      setUser(response.user);
+      setIsAuthenticated(true);
+    } catch (error) {
+      throw error; // Re-throw so the component can handle it
+    }
+  };
+
+  
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      console.log('Logout error:', error);
+    } finally {
+      setUser(null);
+      setIsAuthenticated(false);
+    }
+  };
+
+  // Refresh auth state
+  const refreshAuth = async () => {
+    setLoading(true);
+    await checkAuthStatus();
+  };
+
   useEffect(() => {
-    // Check authentication status on app load
     checkAuthStatus();
   }, []);
 
   useEffect(() => {
-    // Handle navigation based on auth status
-    if (!authChecked) return; // Still loading
+    if (loading) return; // Still checking auth status
 
     const inAuthGroup = segments[0] === 'auth';
 
-    if (!loggedIn && !inAuthGroup) {
+    if (!isAuthenticated && !inAuthGroup) {
       // User is not logged in and trying to access protected routes
       router.replace('/auth');
-    } else if (loggedIn && inAuthGroup) {
+    } else if (isAuthenticated && inAuthGroup) {
       // User is logged in but still on auth screen
       router.replace('/(tabs)');
     }
-  }, [loggedIn, authChecked, segments]);
-
-  const checkAuthStatus = async () => {
-    try {
-      const authenticated = await isAuthenticated();
-      setLoggedIn(authenticated);
-    } catch (error) {
-      console.log('Auth check failed:', error);
-      setLoggedIn(false);
-    } finally {
-      setAuthChecked(true);
-    }
-  };
+  }, [isAuthenticated, loading, segments]);
 
   // Show loading screen while checking auth
-  if (!authChecked) {
+  if (loading) {
     return (
       <View style={{
         flex: 1,
@@ -77,7 +155,20 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  const contextValue: AuthContextType = {
+    user,
+    isAuthenticated,
+    loading,
+    login,
+    logout,
+    refreshAuth,
+  };
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export default function RootLayout() {
@@ -114,7 +205,7 @@ function RootLayoutNav() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
-        {/* Auth screens - no header */}
+        
         <Stack.Screen
           name="auth"
           options={{
@@ -124,7 +215,7 @@ function RootLayoutNav() {
           }}
         />
 
-        {/* Main app tabs - no header (tabs have their own) */}
+        
         <Stack.Screen
           name="(tabs)"
           options={{
@@ -132,7 +223,7 @@ function RootLayoutNav() {
           }}
         />
 
-        {/* Other screens */}
+        
         <Stack.Screen
           name="settings"
           options={{

@@ -1,3 +1,4 @@
+// app/(tabs)/_layout.tsx
 import React from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Tabs } from 'expo-router';
@@ -28,7 +29,7 @@ export default function TabLayout() {
         },
       }}>
       
-      {/* Home Tab */}
+      
       <Tabs.Screen
         name="index"
         options={{
@@ -51,7 +52,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Categories Tab */}
+      
       <Tabs.Screen
         name="categories"
         options={{
@@ -60,7 +61,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Search Tab */}
+      
       <Tabs.Screen
         name="search"
         options={{
@@ -69,7 +70,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Cart Tab */}
+      
       <Tabs.Screen
         name="cart"
         options={{
@@ -79,7 +80,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Profile Tab */}
+      
       <Tabs.Screen
         name="profile"
         options={{

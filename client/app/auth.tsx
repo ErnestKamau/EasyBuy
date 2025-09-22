@@ -12,10 +12,14 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
-import { authApi, handleApiError, RegisterData, LoginData, User } from '../services/api';
-
-
+import {
+  FontAwesome,
+  MaterialIcons,
+  Ionicons,
+  Feather
+} from '@expo/vector-icons';
+import { authApi, handleApiError, RegisterData, LoginData } from '../services/api';
+import { useAuth } from './_layout';
 
 
 const LoginForm = React.memo(({
@@ -38,6 +42,8 @@ const LoginForm = React.memo(({
     </View>
 
     <View style={styles.inputContainer}>
+     <View style={styles.inputWithIcon}>
+      <MaterialIcons name="person" size={20} color="#999" style={styles.inputIcon} />
       <TextInput
         style={styles.input}
         placeholder="Username"
@@ -48,6 +54,8 @@ const LoginForm = React.memo(({
         autoCorrect={false}
         autoComplete="username"
       />
+     </View>
+
     </View>
 
     <View style={styles.inputContainer}>
@@ -87,7 +95,6 @@ const LoginForm = React.memo(({
     </TouchableOpacity>
   </View>
 ));
-
 
 const RegisterForm = React.memo(({
   registerData,
@@ -240,13 +247,12 @@ const RegisterForm = React.memo(({
 export default function AuthScreens() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-
+  const { login } = useAuth();
 
   const [loginData, setLoginData] = useState<LoginData>({
     username: '',
     password: '',
   });
-
 
   const [registerData, setRegisterData] = useState<RegisterData>({
     username: '',
@@ -257,8 +263,6 @@ export default function AuthScreens() {
     gender: undefined,
   });
 
-
-
   const handleLogin = useCallback(async () => {
     if (!loginData.username || !loginData.password) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -267,16 +271,14 @@ export default function AuthScreens() {
 
     setLoading(true);
     try {
-      const response = await authApi.login(loginData);
-      Alert.alert('Success', 'Login successful!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
-      ]);
+      await login(loginData);
+      Alert.alert('Success', 'Login successful!');
     } catch (error) {
       Alert.alert('Login Failed', handleApiError(error));
     } finally {
       setLoading(false);
     }
-  }, [loginData]);
+  }, [loginData, login]);
 
   const handleRegister = useCallback(async () => {
     if (!registerData.username || !registerData.email || !registerData.phone_number || !registerData.password) {
@@ -321,7 +323,6 @@ export default function AuthScreens() {
       Alert.alert('Registration Failed', handleApiError(error));
     } finally {
       setLoading(false);
-      setIsLogin(false)
     }
   }, [registerData]);
 
@@ -330,6 +331,7 @@ export default function AuthScreens() {
 
   return (
     <SafeAreaView style={styles.container}>
+
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -370,6 +372,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    marginTop: 26,
   },
   keyboardAvoid: {
     flex: 1,
@@ -444,8 +447,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   genderButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#171717',
+    borderColor: '#171717',
   },
   genderButtonText: {
     fontSize: 16,
@@ -456,7 +459,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#171717',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -483,5 +486,61 @@ const styles = StyleSheet.create({
   linkTextBold: {
     color: '#007AFF',
     fontWeight: '600',
+  },
+  // Add these new styles to your existing styles object
+  inputWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e1e5e9',
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+  },
+
+  inputIcon: {
+    marginRight: 12,
+    width: 20, // Fixed width for alignment
+  },
+
+  inputWithIconText: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  buttonIcon: {
+    marginRight: 8,
+  },
+
+  // For row-style icons (Option B)
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  rowIcon: {
+    marginRight: 12,
+    width: 24,
+  },
+
+  inputWithRowIcon: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e1e5e9',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    backgroundColor: '#ffffff',
+    color: '#1a1a1a',
   },
 });
