@@ -111,7 +111,6 @@ export class ToastService {
         return 'An unexpected error occurred. Please try again.';
     }
 
-    /*** Django often returns validation errors as: { field_name: ["Error message"] }*/
     private static parseValidationErrors(data: any): string {
         const errors: string[] = [];
     
@@ -130,6 +129,20 @@ export class ToastService {
         : errors.join('\n');
     }
 
+    private static humanizeFieldName(fieldName: string): string {
+        const fieldMap: Record<string, string> = {
+            'username': 'Username',
+            'email': 'Email',
+            'password': 'Password',
+            'password_confirm': 'Password confirmation',
+            'phone_number': 'Phone number',
+            'first_name': 'First name',
+            'last_name': 'Last name',
+        };
+        
+        return fieldMap[fieldName] || fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+    
 
 
 
