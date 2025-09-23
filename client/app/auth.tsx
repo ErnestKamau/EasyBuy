@@ -36,50 +36,46 @@ const LoginForm = React.memo(
         <Text style={styles.subtitle}>Sign in to your account</Text>
       </View>
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWithIcon}>
-          <MaterialIcons
-            name="person"
-            size={20}
-            color="#999"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="#999"
-            value={loginData.username}
-            onChangeText={(text) =>
-              setLoginData({ ...loginData, username: text })
-            }
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-          />
-        </View>
+      <View style={styles.inputWithIcon}>
+        <MaterialIcons
+          name="person"
+          size={20}
+          color="#999"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Username"
+          placeholderTextColor="#999"
+          value={loginData.username}
+          onChangeText={(text) =>
+            setLoginData({ ...loginData, username: text })
+          }
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="username"
+        />
       </View>
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWithIcon}>
-          <MaterialIcons
-            name="password"
-            size={20}
-            color="#999"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            value={loginData.password}
-            onChangeText={(text) =>
-              setLoginData({ ...loginData, password: text })
-            }
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-          />
-        </View>
+      <View style={styles.inputWithIcon}>
+        <MaterialIcons
+          name="password"
+          size={20}
+          color="#999"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#999"
+          value={loginData.password}
+          onChangeText={(text) =>
+            setLoginData({ ...loginData, password: text })
+          }
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="password"
+        />
       </View>
 
       <TouchableOpacity
@@ -129,73 +125,67 @@ const RegisterForm = React.memo(
         <Text style={styles.subtitle}>Join us today</Text>
       </View>
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWithIcon}>
-          <MaterialIcons
-            name="person"
-            size={20}
-            color="#999"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="#999"
-            value={registerData.username}
-            onChangeText={(text) =>
-              setRegisterData({ ...registerData, username: text })
-            }
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-          />
-        </View>
+      <View style={styles.inputWithIcon}>
+        <MaterialIcons
+          name="person"
+          size={20}
+          color="#999"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Username"
+          placeholderTextColor="#999"
+          value={registerData.username}
+          onChangeText={(text) =>
+            setRegisterData({ ...registerData, username: text })
+          }
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="username"
+        />
       </View>
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWithIcon}>
-          <MaterialIcons
-            name="mail"
-            size={20}
-            color="#999"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#999"
-            value={registerData.email}
-            onChangeText={(text) =>
-              setRegisterData({ ...registerData, email: text })
-            }
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-          />
-        </View>
+      <View style={styles.inputWithIcon}>
+        <MaterialIcons
+          name="mail"
+          size={20}
+          color="#999"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor="#999"
+          value={registerData.email}
+          onChangeText={(text) =>
+            setRegisterData({ ...registerData, email: text })
+          }
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+        />
       </View>
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWithIcon}>
-          <MaterialIcons
-            name="call"
-            size={20}
-            color="#999"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Phone No. (+254700123456 )"
-            placeholderTextColor="#999"
-            value={registerData.phone_number}
-            onChangeText={(text) =>
-              setRegisterData({ ...registerData, phone_number: text })
-            }
-            keyboardType="phone-pad"
-            autoComplete="tel"
-          />
-        </View>
+      <View style={styles.inputWithIcon}>
+        <MaterialIcons
+          name="call"
+          size={20}
+          color="#999"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Phone No. (+254700123456 )"
+          placeholderTextColor="#999"
+          value={registerData.phone_number}
+          onChangeText={(text) =>
+            setRegisterData({ ...registerData, phone_number: text })
+          }
+          keyboardType="phone-pad"
+          autoComplete="tel"
+        />
       </View>
 
       <View style={styles.genderContainer}>
@@ -242,50 +232,46 @@ const RegisterForm = React.memo(
         </View>
       </View>
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWithIcon}>
-          <MaterialIcons
-            name="key"
-            size={20}
-            color="#999"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password (min 8 characters)"
-            placeholderTextColor="#999"
-            value={registerData.password}
-            onChangeText={(text) =>
-              setRegisterData({ ...registerData, password: text })
-            }
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password-new"
-          />
-        </View>
+      <View style={styles.inputWithIcon}>
+        <MaterialIcons
+          name="key"
+          size={20}
+          color="#999"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password (min 8 characters)"
+          placeholderTextColor="#999"
+          value={registerData.password}
+          onChangeText={(text) =>
+            setRegisterData({ ...registerData, password: text })
+          }
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="password-new"
+        />
       </View>
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWithIcon}>
-          <MaterialIcons
-            name="key"
-            size={20}
-            color="#999"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor="#999"
-            value={registerData.password_confirm}
-            onChangeText={(text) => {
-              setRegisterData({ ...registerData, password_confirm: text });
-            }}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password-new"
-          />
-        </View>
+      <View style={styles.inputWithIcon}>
+        <MaterialIcons
+          name="key"
+          size={20}
+          color="#999"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm Password"
+          placeholderTextColor="#999"
+          value={registerData.password_confirm}
+          onChangeText={(text) => {
+            setRegisterData({ ...registerData, password_confirm: text });
+          }}
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="password-new"
+        />
       </View>
 
       <TouchableOpacity
@@ -479,17 +465,9 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   formContainer: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fefefeff",
     borderRadius: 16,
     padding: 32,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
   },
   headerContainer: {
     alignItems: "center",
@@ -508,14 +486,21 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 20,
+    borderColor: "#0f9e99",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    fontSize: 16,
+    backgroundColor: "#ffffff",
+    color: "#1a1a1a",
+    width: 325,
   },
   input: {
-    borderColor: "#e1e5e9",
+    borderColor: "#0f9e99",
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 20,
     fontSize: 16,
-    backgroundColor: "#ffffff",
     color: "#1a1a1a",
     width: 250,
   },
@@ -582,20 +567,20 @@ const styles = StyleSheet.create({
     color: "#007AFF",
     fontWeight: "600",
   },
-  // Add these new styles to your existing styles object
   inputWithIcon: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e1e5e9",
+    borderWidth: 2,
+    borderColor: "#0f9e99",
     borderRadius: 12,
     backgroundColor: "#ffffff",
     paddingHorizontal: 16,
+    marginBottom: 20,
   },
 
   inputIcon: {
     marginRight: 12,
-    width: 20, // Fixed width for alignment
+    width: 20,
   },
 
   inputWithIconText: {
@@ -614,8 +599,6 @@ const styles = StyleSheet.create({
   buttonIcon: {
     marginRight: 8,
   },
-
-  // For row-style icons (Option B)
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
