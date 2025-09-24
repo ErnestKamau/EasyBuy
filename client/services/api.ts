@@ -16,7 +16,6 @@ export const api = axios.create({
 const ACCESS_TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 
-
 export const tokenManager = {
   async setTokens(accessToken: string, refreshToken: string) {
     await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
@@ -37,7 +36,7 @@ export const tokenManager = {
   }
 };
 
-
+// Request interceptor - adds auth token to every request
 api.interceptors.request.use(async (config) => {
   const token = await tokenManager.getAccessToken();
   if (token) {
@@ -125,7 +124,7 @@ export interface Product {
   category: number;
   category_name: string;
   description: string;
-  kilograms?: number;
+  kilograms?: number | null;
   sale_price: number;
   cost_price: number;
   in_stock: number;
@@ -152,39 +151,33 @@ export interface LoginData {
   password: string;
 }
 
-
 export const authApi = {
   async register(userData: RegisterData): Promise<AuthResponse> {
     const { data } = await api.post<AuthResponse>("/auth/register/", userData);
-
-
     await tokenManager.setTokens(data.tokens.access, data.tokens.refresh);
-
     return data;
   },
 
   async login(credentials: LoginData): Promise<AuthResponse> {
     const { data } = await api.post<AuthResponse>("/auth/login/", credentials);
-
-
     await tokenManager.setTokens(data.tokens.access, data.tokens.refresh);
-
     return data;
   },
+
 
   async logout(): Promise<void> {
     try {
       const refreshToken = await tokenManager.getRefreshToken();
       if (refreshToken) {
-          await api.post("/auth/logout/",{
-              refresh: refreshToken
-          });
+        await api.post("/auth/logout/", {
+          refresh: refreshToken
+        });
       }
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("Logout API error (non-critical):", error);
     } finally {
       await tokenManager.clearTokens();
-      router.replace('/auth')
+      router.replace('/auth');
     }
   },
 
@@ -210,6 +203,12 @@ export const authApi = {
 
   async getCurrentUser(): Promise<User | null> {
     try {
+      const token = await tokenManager.getAccessToken();
+      if (!token) {
+        console.log("No access token found, skipping getCurrentUser");
+        return null;
+      }
+
       const { data } = await api.get<User>("/auth/me/");
       return data;
     } catch (error) {
@@ -221,17 +220,29 @@ export const authApi = {
 
 export const productsApi = {
   async getCategories(): Promise<Category[]> {
-    const { data } = await api.get<Category[]>("/categories/");
-    return data;
+    const token = await tokenManager.getAccessToken();
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+    
+    const { data } = await api.get<{results: Category[]} | Category[]>("/categories/");
+    // Handle both paginated and non-paginated responses
+    return Array.isArray(data) ? data : data.results;
   },
 
   async getProducts(search?: string, categoryId?: number): Promise<Product[]> {
+    const token = await tokenManager.getAccessToken();
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+    
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (categoryId) params.append('category', categoryId.toString());
     
-    const { data } = await api.get<Product[]>(`/products/?${params.toString()}`);
-    return data;
+    const { data } = await api.get<{results: Product[]} | Product[]>(`/products/?${params.toString()}`);
+    // Handle both paginated and non-paginated responses
+    return Array.isArray(data) ? data : data.results;
   },
 
   async getProduct(id: number): Promise<Product> {
@@ -242,6 +253,11 @@ export const productsApi = {
   // Admin functions
   async createCategory(name: string): Promise<Category> {
     const { data } = await api.post<Category>("/admin/categories/", { name });
+    return data;
+  },
+
+  async updateCategory(id: number, name: string): Promise<Category> {
+    const { data } = await api.put<Category>(`/admin/categories/${id}/`, { name });
     return data;
   },
 
@@ -265,19 +281,16 @@ export const productsApi = {
   }
 };
 
-
 export type PingResponse = { ok: boolean; message: string };
 export async function ping(): Promise<PingResponse> {
   const { data } = await api.get<PingResponse>("/ping/");
   return data;
 }
 
-
 export async function isAuthenticated(): Promise<boolean> {
   const token = await tokenManager.getAccessToken();
   return token !== null;
 }
-
 
 export function handleApiError(error: any): string {
   if (error.response?.data?.error) {

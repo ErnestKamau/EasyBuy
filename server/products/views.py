@@ -20,19 +20,29 @@ class CategoryCreateView(generics.CreateAPIView):
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     
+class CategoryUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    
     
 class ProductListView(generics.ListAPIView):
     queryset = Product.objects.active()
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated, IsReadOnly]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['category', 'is_low_stock']
-    
+    filterset_fields = ['category']
+
     def get_queryset(self):
         queryset = super().get_queryset()
         search = self.request.query_params.get('search', None)
         if search:
             queryset = queryset.search(search)
+            
+        is_low_stock = self.request.query_params.get('is_low_stock', None)
+        if is_low_stock and is_low_stock.lower() in ['true', '1']:
+            queryset = queryset.filter(in_stock__lte=F('minimum_stock'))
+        
         return queryset
 
 class ProductDetailView(generics.RetrieveAPIView):
@@ -45,8 +55,8 @@ class ProductCreateView(generics.CreateAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     
-class ProductUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView): # ADMIN/SHOPKEEPER: Can update/delete products
-    queryset = Product.objects.all    
+class ProductUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Product.objects.all()  
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     

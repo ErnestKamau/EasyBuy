@@ -232,6 +232,50 @@ const RegisterForm = React.memo(
         </View>
       </View>
 
+      <View style={styles.genderContainer}>
+        <Text style={styles.genderLabel}>Role (Optional)</Text>
+        <View style={styles.genderButtonsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.genderButton,
+              registerData.role === "admin" && styles.genderButtonActive,
+            ]}
+            onPress={() => setRegisterData({ ...registerData, role: "admin" })}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.genderButtonText,
+                registerData.role === "admin" && styles.genderButtonTextActive,
+              ]}
+            >
+              admin
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.genderButton,
+              registerData.role === "customer" && styles.genderButtonActive,
+            ]}
+            onPress={() =>
+              setRegisterData({ ...registerData, role: "customer" })
+            }
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.genderButtonText,
+                registerData.role === "customer" &&
+                  styles.genderButtonTextActive,
+              ]}
+            >
+              Customer
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={styles.inputWithIcon}>
         <MaterialIcons
           name="key"
