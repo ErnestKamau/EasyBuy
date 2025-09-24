@@ -110,6 +110,33 @@ export interface AuthResponse {
   };
 }
 
+export interface Category {
+  id: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  products_count: number;
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  image_url: string;
+  category: number;
+  category_name: string;
+  description: string;
+  kilograms?: number;
+  sale_price: number;
+  cost_price: number;
+  in_stock: number;
+  minimum_stock: number;
+  is_active: boolean;
+  profit_margin: number;
+  is_low_stock: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RegisterData {
   username: string;
   email: string;
