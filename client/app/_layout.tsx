@@ -227,6 +227,42 @@ function RootLayoutNav() {
           }}
         />
 
+        <Stack.Screen
+          name="categories"
+          options={{
+            title: "Categories",
+            presentation: 'card',
+            headerShown: true
+          }}
+        />
+
+        <Stack.Screen
+          name="search" 
+          options={{
+            title: "Search",
+            presentation: 'card',
+            headerShown: true
+          }}
+        />
+
+        <Stack.Screen
+          name="product/[id]"
+          options={{
+            title: "Product Details",
+            presentation: 'card',
+            headerShown: false // We have custom header in the component
+          }}
+        />
+
+        <Stack.Screen
+          name="admin"
+          options={{
+            title: "Admin Panel",
+            presentation: 'card',
+            headerShown: false // We have custom header in the component
+          }}
+        />
+
         
         <Stack.Screen
           name="settings"
