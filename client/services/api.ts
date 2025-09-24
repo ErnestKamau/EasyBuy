@@ -192,6 +192,52 @@ export const authApi = {
   },
 };
 
+export const productsApi = {
+  async getCategories(): Promise<Category[]> {
+    const { data } = await api.get<Category[]>("/categories/");
+    return data;
+  },
+
+  async getProducts(search?: string, categoryId?: number): Promise<Product[]> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (categoryId) params.append('category', categoryId.toString());
+    
+    const { data } = await api.get<Product[]>(`/products/?${params.toString()}`);
+    return data;
+  },
+
+  async getProduct(id: number): Promise<Product> {
+    const { data } = await api.get<Product>(`/products/${id}/`);
+    return data;
+  },
+
+  // Admin functions
+  async createCategory(name: string): Promise<Category> {
+    const { data } = await api.post<Category>("/admin/categories/", { name });
+    return data;
+  },
+
+  async createProduct(productData: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category_name' | 'profit_margin' | 'is_low_stock'>): Promise<Product> {
+    const { data } = await api.post<Product>("/admin/products/", productData);
+    return data;
+  },
+
+  async updateProduct(id: number, productData: Partial<Product>): Promise<Product> {
+    const { data } = await api.put<Product>(`/admin/products/${id}/`, productData);
+    return data;
+  },
+
+  async deleteProduct(id: number): Promise<void> {
+    await api.delete(`/admin/products/${id}/`);
+  },
+
+  async getLowStockProducts(): Promise<{ count: number; products: Product[] }> {
+    const { data } = await api.get("/admin/products/low-stock/");
+    return data;
+  }
+};
+
 
 export type PingResponse = { ok: boolean; message: string };
 export async function ping(): Promise<PingResponse> {
