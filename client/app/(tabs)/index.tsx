@@ -662,7 +662,7 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#0e103d',
     marginBottom: 4,
     lineHeight: 18,
   },
@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
   },
   productWeight: {
     fontSize: 12,
-    color: '#1f3fc3',
+    color: '#1a1264',
     fontWeight: '600',
     marginBottom: 6,
   },
@@ -685,7 +685,7 @@ const styles = StyleSheet.create({
   currentPrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#22C55E',
+    color: '#1a1264',
     marginRight: 8,
   },
   originalPrice: {
@@ -703,14 +703,14 @@ const styles = StyleSheet.create({
   },
   stockText: {
     fontSize: 12,
-    color: '#22C55E',
+    color: '#1a1264',
     fontWeight: '600',
   },
   lowStockText: {
     color: '#EF4444',
   },
   addToCartButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#1a1264',
     borderRadius: 16,
     width: 32,
     height: 32,

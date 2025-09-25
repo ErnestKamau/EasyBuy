@@ -36,11 +36,11 @@ export default function TabLayout() {
         headerShadowVisible: false,
       }}>
       
-      
+     
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Discover',
           tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
           headerRight: () => (
             <Link href="/modal" asChild>
