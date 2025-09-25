@@ -1,4 +1,4 @@
-// app/_layout.tsx
+// app/_layout.tsx - Fixed with complete navigation theme
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import {
   DarkTheme,
@@ -26,18 +26,16 @@ import { toastConfig } from "@/components/ToastConfig";
 import { ToastService } from "@/utils/toastService";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { CartProvider } from "@/contexts/CartContext";
+import { ThemeProvider as CustomThemeProvider, useTheme } from "@/contexts/ThemeContext";
 
 export {
-  // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from "expo-router";
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: "(tabs)",
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 interface AuthContextType {
@@ -77,7 +75,6 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
         return;
       }
 
-      // Verify token by calling /me endpoint
       const currentUser = await authApi.getCurrentUser();
 
       if (currentUser) {
@@ -88,7 +85,6 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
           `Hello, ${currentUser.username}`
         );
       } else {
-        // Token is invalid, clear it
         await tokenManager.clearTokens();
         setIsAuthenticated(false);
         setUser(null);
@@ -140,15 +136,13 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   }, [checkAuthStatus]);
 
   useEffect(() => {
-    if (loading) return; // Still checking auth status
+    if (loading) return;
 
     const inAuthGroup = segments[0] === "auth";
 
     if (!isAuthenticated && !inAuthGroup) {
-      // User is not logged in and trying to access protected routes
       router.replace("/auth");
     } else if (isAuthenticated && inAuthGroup) {
-      // User is logged in but still on auth screen
       router.replace("/(tabs)");
     }
   }, [isAuthenticated, loading, segments]);
@@ -191,7 +185,6 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -207,27 +200,60 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <CartProvider>
-        <RootLayoutNav />
-        <Toast config={toastConfig} />
-      </CartProvider>
-    </AuthProvider>
+    <CustomThemeProvider>
+      <AuthProvider>
+        <CartProvider>
+          <RootLayoutNav />
+          <Toast config={toastConfig} />
+        </CartProvider>
+      </AuthProvider>
+    </CustomThemeProvider>
   );
 }
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const { currentTheme, themeName } = useTheme();
+
+  // Create complete navigation theme with fonts
+  const navigationTheme = {
+    dark: themeName === 'dark' || themeName === 'luxe',
+    colors: {
+      primary: currentTheme.primary,
+      background: currentTheme.background,
+      card: currentTheme.surface,
+      text: currentTheme.text,
+      border: currentTheme.border,
+      notification: currentTheme.accent,
+    },
+    fonts: {
+      regular: {
+        fontFamily: 'System',
+        fontWeight: 'normal' as const,
+      },
+      medium: {
+        fontFamily: 'System',
+        fontWeight: '500' as const,
+      },
+      bold: {
+        fontFamily: 'System',
+        fontWeight: 'bold' as const,
+      },
+      heavy: {
+        fontFamily: 'System',
+        fontWeight: '800' as const,
+      },
+    },
+  };
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={navigationTheme}>
       <SafeAreaProvider>
         <Stack>
           <Stack.Screen
             name="auth"
             options={{
               headerShown: false,
-              // Prevent going back to auth screen after login
               gestureEnabled: false,
             }}
           />
@@ -262,7 +288,7 @@ function RootLayoutNav() {
             options={{
               title: "Product Details",
               presentation: "card",
-              headerShown: false, // We have custom header in the component
+              headerShown: false,
             }}
           />
 
@@ -271,7 +297,7 @@ function RootLayoutNav() {
             options={{
               title: "Admin Panel",
               presentation: "card",
-              headerShown: false, // We have custom header in the component
+              headerShown: false,
             }}
           />
 
@@ -280,7 +306,7 @@ function RootLayoutNav() {
             options={{
               title: "Checkout",
               presentation: "card",
-              headerShown: false, // Custom header in the component
+              headerShown: false,
             }}
           />
 
@@ -289,6 +315,15 @@ function RootLayoutNav() {
             options={{
               title: "Settings",
               presentation: "card",
+            }}
+          />
+
+          <Stack.Screen
+            name="theme-selector"
+            options={{
+              title: "Theme Selection",
+              presentation: "card",
+              headerShown: false,
             }}
           />
 

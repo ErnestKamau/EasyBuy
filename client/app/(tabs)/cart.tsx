@@ -1,4 +1,4 @@
-// app/(tabs)/cart.tsx
+// app/(tabs)/cart.tsx - Theme-integrated version
 import React, { useState } from 'react';
 import {
   View,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useCart } from '@/contexts/CartContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { ToastService } from '@/utils/toastService';
 import {
   ArrowLeft,
@@ -27,10 +28,269 @@ import {
 
 const { width: screenWidth } = Dimensions.get('window');
 
-export default function CartScreen(): React.ReactElement {
-  const { state, updateItem, removeItem, clearCart } = useCart();
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
+// Helper function to create dynamic styles
+const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: currentTheme.background,
+    },
+    loadingText: {
+      fontSize: 16,
+      color: currentTheme.textSecondary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      paddingTop: 60,
+      backgroundColor: currentTheme.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: currentTheme.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: themeName === 'dark' ? 0.3 : 0.05,
+      shadowRadius: 4,
+      elevation: themeName === 'dark' ? 8 : 2,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: currentTheme.text,
+    },
+    clearButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: currentTheme.error,
+    },
+    emptyCartIcon: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: currentTheme.border + '40',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    emptyCartTitle: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: currentTheme.text,
+      marginBottom: 8,
+    },
+    emptyCartSubtitle: {
+      fontSize: 16,
+      color: currentTheme.textSecondary,
+      textAlign: 'center',
+      marginBottom: 32,
+    },
+    shopNowButton: {
+      backgroundColor: currentTheme.primary,
+      paddingVertical: 16,
+      paddingHorizontal: 32,
+      borderRadius: 12,
+    },
+    shopNowButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    cartHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: currentTheme.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: currentTheme.border,
+    },
+    cartItemsCount: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: currentTheme.text,
+    },
+    deliveryText: {
+      fontSize: 14,
+      color: currentTheme.primary,
+      fontWeight: '500',
+    },
+    cartItemsList: {
+      backgroundColor: currentTheme.surface,
+      paddingVertical: 8,
+    },
+    cartItem: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: currentTheme.border + '40',
+    },
+    itemImage: {
+      width: 64,
+      height: 64,
+      borderRadius: 8,
+      backgroundColor: currentTheme.border + '40',
+    },
+    itemName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: currentTheme.text,
+      marginBottom: 4,
+    },
+    itemCategory: {
+      fontSize: 12,
+      color: currentTheme.textSecondary,
+      marginBottom: 4,
+    },
+    itemWeight: {
+      fontSize: 12,
+      color: currentTheme.primary,
+      fontWeight: '600',
+      marginBottom: 6,
+    },
+    itemPrice: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: currentTheme.text,
+    },
+    itemQuantityMultiplier: {
+      fontSize: 12,
+      color: currentTheme.textSecondary,
+      marginLeft: 4,
+    },
+    quantityControls: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: currentTheme.background,
+      borderRadius: 8,
+      padding: 2,
+      marginBottom: 8,
+    },
+    quantityButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 6,
+      backgroundColor: currentTheme.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: themeName === 'dark' ? 0.2 : 0.05,
+      shadowRadius: 2,
+      elevation: themeName === 'dark' ? 3 : 1,
+      borderWidth: themeName === 'dark' ? 1 : 0,
+      borderColor: themeName === 'dark' ? currentTheme.border : 'transparent',
+    },
+    disabledButton: {
+      backgroundColor: currentTheme.background,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    quantityText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: currentTheme.text,
+      marginHorizontal: 8,
+      minWidth: 35,
+      textAlign: 'center',
+    },
+    subtotalText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: currentTheme.primary,
+    },
+    orderSummary: {
+      backgroundColor: currentTheme.surface,
+      marginTop: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 20,
+      borderWidth: themeName === 'dark' ? 1 : 0,
+      borderColor: themeName === 'dark' ? currentTheme.border : 'transparent',
+    },
+    summaryTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: currentTheme.text,
+      marginBottom: 16,
+    },
+    summaryLabel: {
+      fontSize: 14,
+      color: currentTheme.textSecondary,
+    },
+    summaryValue: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: currentTheme.text,
+    },
+    summaryDivider: {
+      height: 1,
+      backgroundColor: currentTheme.border,
+      marginVertical: 12,
+    },
+    totalLabel: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: currentTheme.text,
+    },
+    totalValue: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: currentTheme.primary,
+    },
+    checkoutBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: currentTheme.surface,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      paddingBottom: 34,
+      borderTopWidth: 1,
+      borderTopColor: currentTheme.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: themeName === 'dark' ? 0.3 : 0.1,
+      shadowRadius: 8,
+      elevation: themeName === 'dark' ? 15 : 8,
+    },
+    totalLabelSmall: {
+      fontSize: 14,
+      color: currentTheme.textSecondary,
+    },
+    totalAmountLarge: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: currentTheme.text,
+    },
+    checkoutButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: currentTheme.primary,
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 12,
+      gap: 8,
+      shadowColor: currentTheme.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    disabledCheckoutButton: {
+      backgroundColor: currentTheme.textSecondary,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    checkoutButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+    },
+});
 
+// Helper function for quantity changes
+const useCartHandlers = (state: any, updateItem: any, removeItem: any, clearCart: any, setIsCheckingOut: any) => {
   const handleQuantityChange = (itemId: string, currentQuantity: number, change: number, weight?: number) => {
     const newQuantity = currentQuantity + change;
     if (newQuantity <= 0) {
@@ -88,10 +348,38 @@ export default function CartScreen(): React.ReactElement {
     }
     
     setIsCheckingOut(true);
-    // Navigate to checkout flow
+    // Note: router is accessed from the global scope within the component
+    // This function will be used within the CartScreen component context
+    setIsCheckingOut(false);
+  };
+
+  return { handleQuantityChange, handleWeightChange, handleRemoveItem, handleClearCart };
+};
+
+export default function CartScreen(): React.ReactElement {
+  const { state, updateItem, removeItem, clearCart } = useCart();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const { currentTheme, themeName } = useTheme();
+
+  // Dynamic styles based on theme
+  const dynamicStyles = createDynamicStyles(currentTheme, themeName);
+  
+  // Cart handlers
+  const cartHandlers = useCartHandlers(state, updateItem, removeItem, clearCart, setIsCheckingOut);
+  
+  // Override handleCheckout to use local router
+  const handleCheckout = () => {
+    if (state.items.length === 0) {
+      ToastService.showError('Empty Cart', 'Please add items to your cart before checkout');
+      return;
+    }
+    
+    setIsCheckingOut(true);
     router.push('/checkout' as any);
     setIsCheckingOut(false);
   };
+  
+  const { handleQuantityChange, handleWeightChange, handleRemoveItem, handleClearCart } = cartHandlers;
 
   const renderCartItem = (item: any) => {
     const isWeightBased = item.product.kilograms && item.weight;
@@ -100,26 +388,26 @@ export default function CartScreen(): React.ReactElement {
       : item.product.sale_price;
 
     return (
-      <View key={item.id} style={styles.cartItem}>
+      <View key={item.id} style={dynamicStyles.cartItem}>
         <View style={styles.itemImageContainer}>
           <Image
             source={{ uri: item.product.image_url || 'https://via.placeholder.com/80x80' }}
-            style={styles.itemImage}
+            style={dynamicStyles.itemImage}
           />
         </View>
         
         <View style={styles.itemDetails}>
-          <Text style={styles.itemName} numberOfLines={2}>{item.product.name}</Text>
-          <Text style={styles.itemCategory}>{item.product.category_name}</Text>
+          <Text style={dynamicStyles.itemName} numberOfLines={2}>{item.product.name}</Text>
+          <Text style={dynamicStyles.itemCategory}>{item.product.category_name}</Text>
           
           {isWeightBased && (
-            <Text style={styles.itemWeight}>{item.weight}kg</Text>
+            <Text style={dynamicStyles.itemWeight}>{item.weight}kg</Text>
           )}
           
           <View style={styles.itemPriceRow}>
-            <Text style={styles.itemPrice}>Ksh {displayPrice.toLocaleString()}</Text>
+            <Text style={dynamicStyles.itemPrice}>Ksh {displayPrice.toLocaleString()}</Text>
             {!isWeightBased && item.quantity > 1 && (
-              <Text style={styles.itemQuantityMultiplier}>x {item.quantity}</Text>
+              <Text style={dynamicStyles.itemQuantityMultiplier}>x {item.quantity}</Text>
             )}
           </View>
         </View>
@@ -129,50 +417,48 @@ export default function CartScreen(): React.ReactElement {
             style={styles.removeButton}
             onPress={() => handleRemoveItem(item.id)}
           >
-            <Trash2 size={16} color="#EF4444" />
+            <Trash2 size={16} color={currentTheme.error} />
           </TouchableOpacity>
           
-          <View style={styles.quantityControls}>
+          <View style={dynamicStyles.quantityControls}>
             {isWeightBased ? (
-              // Weight controls
               <>
                 <TouchableOpacity
-                  style={[styles.quantityButton, item.weight <= 0.25 && styles.disabledButton]}
+                  style={[dynamicStyles.quantityButton, item.weight <= 0.25 && dynamicStyles.disabledButton]}
                   onPress={() => handleWeightChange(item.id, item.quantity, item.weight, -0.25)}
                   disabled={item.weight <= 0.25}
                 >
-                  <Minus size={14} color={item.weight <= 0.25 ? '#94A3B8' : '#64748B'} />
+                  <Minus size={14} color={item.weight <= 0.25 ? currentTheme.textSecondary : currentTheme.text} />
                 </TouchableOpacity>
-                <Text style={styles.quantityText}>{item.weight}kg</Text>
+                <Text style={dynamicStyles.quantityText}>{item.weight}kg</Text>
                 <TouchableOpacity
-                  style={styles.quantityButton}
+                  style={dynamicStyles.quantityButton}
                   onPress={() => handleWeightChange(item.id, item.quantity, item.weight, 0.25)}
                 >
-                  <Plus size={14} color="#64748B" />
+                  <Plus size={14} color={currentTheme.text} />
                 </TouchableOpacity>
               </>
             ) : (
-              // Quantity controls
               <>
                 <TouchableOpacity
-                  style={[styles.quantityButton, item.quantity <= 1 && styles.disabledButton]}
+                  style={[dynamicStyles.quantityButton, item.quantity <= 1 && dynamicStyles.disabledButton]}
                   onPress={() => handleQuantityChange(item.id, item.quantity, -1)}
                   disabled={item.quantity <= 1}
                 >
-                  <Minus size={14} color={item.quantity <= 1 ? '#94A3B8' : '#64748B'} />
+                  <Minus size={14} color={item.quantity <= 1 ? currentTheme.textSecondary : currentTheme.text} />
                 </TouchableOpacity>
-                <Text style={styles.quantityText}>{item.quantity}</Text>
+                <Text style={dynamicStyles.quantityText}>{item.quantity}</Text>
                 <TouchableOpacity
-                  style={styles.quantityButton}
+                  style={dynamicStyles.quantityButton}
                   onPress={() => handleQuantityChange(item.id, item.quantity, 1)}
                 >
-                  <Plus size={14} color="#64748B" />
+                  <Plus size={14} color={currentTheme.text} />
                 </TouchableOpacity>
               </>
             )}
           </View>
           
-          <Text style={styles.subtotalText}>Ksh {item.subtotal.toLocaleString()}</Text>
+          <Text style={dynamicStyles.subtotalText}>Ksh {item.subtotal.toLocaleString()}</Text>
         </View>
       </View>
     );
@@ -180,100 +466,99 @@ export default function CartScreen(): React.ReactElement {
 
   if (state.isLoading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>Loading cart...</Text>
+      <View style={[styles.centerContainer, { backgroundColor: currentTheme.background }]}>
+        <Text style={dynamicStyles.loadingText}>Loading cart...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <View style={dynamicStyles.container}>
+      <StatusBar 
+        barStyle={themeName === 'dark' ? "light-content" : "dark-content"} 
+        backgroundColor={currentTheme.surface} 
+      />
       
-      {/* Header */}
-      <View style={styles.header}>
+      <View style={dynamicStyles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-          <ArrowLeft size={24} color="#1E293B" />
+          <ArrowLeft size={24} color={currentTheme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Cart</Text>
+        <Text style={dynamicStyles.headerTitle}>My Cart</Text>
         {state.items.length > 0 && (
           <TouchableOpacity onPress={handleClearCart} style={styles.clearButton}>
-            <Text style={styles.clearButtonText}>Clear</Text>
+            <Text style={dynamicStyles.clearButtonText}>Clear</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {state.items.length === 0 ? (
-        /* Empty Cart State */
         <View style={styles.emptyCart}>
-          <View style={styles.emptyCartIcon}>
-            <ShoppingBag size={64} color="#94A3B8" />
+          <View style={dynamicStyles.emptyCartIcon}>
+            <ShoppingBag size={64} color={currentTheme.textSecondary} />
           </View>
-          <Text style={styles.emptyCartTitle}>Your cart is empty</Text>
-          <Text style={styles.emptyCartSubtitle}>Add some items to get started</Text>
+          <Text style={dynamicStyles.emptyCartTitle}>Your cart is empty</Text>
+          <Text style={dynamicStyles.emptyCartSubtitle}>Add some items to get started</Text>
           <TouchableOpacity
-            style={styles.shopNowButton}
+            style={dynamicStyles.shopNowButton}
             onPress={() => router.push('/(tabs)/' as any)}
           >
-            <Text style={styles.shopNowButtonText}>Start Shopping</Text>
+            <Text style={dynamicStyles.shopNowButtonText}>Start Shopping</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        /* Cart with Items */
         <>
-          {/* Cart Items */}
           <ScrollView style={styles.cartItemsContainer} showsVerticalScrollIndicator={false}>
-            <View style={styles.cartHeader}>
-              <Text style={styles.cartItemsCount}>{state.totalItems} item{state.totalItems !== 1 ? 's' : ''}</Text>
+            <View style={dynamicStyles.cartHeader}>
+              <Text style={dynamicStyles.cartItemsCount}>
+                {state.totalItems} item{state.totalItems !== 1 ? 's' : ''}
+              </Text>
               <View style={styles.deliveryInfo}>
-                <MapPin size={14} color="#22C55E" />
-                <Text style={styles.deliveryText}>Pickup at shop</Text>
+                <MapPin size={14} color={currentTheme.primary} />
+                <Text style={dynamicStyles.deliveryText}>Pickup at shop</Text>
               </View>
             </View>
             
-            <View style={styles.cartItemsList}>
+            <View style={dynamicStyles.cartItemsList}>
               {state.items.map(renderCartItem)}
             </View>
             
-            {/* Order Summary */}
-            <View style={styles.orderSummary}>
-              <Text style={styles.summaryTitle}>Order Summary</Text>
+            <View style={dynamicStyles.orderSummary}>
+              <Text style={dynamicStyles.summaryTitle}>Order Summary</Text>
               
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal ({state.totalItems} items)</Text>
-                <Text style={styles.summaryValue}>Ksh {state.totalAmount.toLocaleString()}</Text>
+                <Text style={dynamicStyles.summaryLabel}>Subtotal ({state.totalItems} items)</Text>
+                <Text style={dynamicStyles.summaryValue}>Ksh {state.totalAmount.toLocaleString()}</Text>
               </View>
               
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Delivery</Text>
-                <Text style={styles.summaryValue}>Pickup at shop</Text>
+                <Text style={dynamicStyles.summaryLabel}>Delivery</Text>
+                <Text style={dynamicStyles.summaryValue}>Pickup at shop</Text>
               </View>
               
-              <View style={styles.summaryDivider} />
+              <View style={dynamicStyles.summaryDivider} />
               
               <View style={styles.summaryRow}>
-                <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>Ksh {state.totalAmount.toLocaleString()}</Text>
+                <Text style={dynamicStyles.totalLabel}>Total</Text>
+                <Text style={dynamicStyles.totalValue}>Ksh {state.totalAmount.toLocaleString()}</Text>
               </View>
             </View>
             
             <View style={styles.bottomSpacing} />
           </ScrollView>
 
-          {/* Bottom Checkout Bar */}
-          <View style={styles.checkoutBar}>
+          <View style={dynamicStyles.checkoutBar}>
             <View style={styles.totalContainer}>
-              <Text style={styles.totalLabelSmall}>Total</Text>
-              <Text style={styles.totalAmountLarge}>Ksh {state.totalAmount.toLocaleString()}</Text>
+              <Text style={dynamicStyles.totalLabelSmall}>Total</Text>
+              <Text style={dynamicStyles.totalAmountLarge}>Ksh {state.totalAmount.toLocaleString()}</Text>
             </View>
             
             <TouchableOpacity
-              style={[styles.checkoutButton, isCheckingOut && styles.disabledCheckoutButton]}
+              style={[dynamicStyles.checkoutButton, isCheckingOut && dynamicStyles.disabledCheckoutButton]}
               onPress={handleCheckout}
               disabled={isCheckingOut}
             >
               <CreditCard size={18} color="#FFFFFF" />
-              <Text style={styles.checkoutButtonText}>
+              <Text style={dynamicStyles.checkoutButtonText}>
                 {isCheckingOut ? 'Processing...' : 'Place Order'}
               </Text>
             </TouchableOpacity>
@@ -284,180 +569,45 @@ export default function CartScreen(): React.ReactElement {
   );
 }
 
+// Static styles that don't change with theme
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#64748B',
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 60,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   headerButton: {
     padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
   },
   clearButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
-  clearButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#EF4444',
-  },
-
-  // Empty Cart
   emptyCart: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
   },
-  emptyCartIcon: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  emptyCartTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  emptyCartSubtitle: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  shopNowButton: {
-    backgroundColor: '#22C55E',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-  },
-  shopNowButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // Cart Items Container
   cartItemsContainer: {
     flex: 1,
-  },
-  cartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  cartItemsCount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
   },
   deliveryInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  deliveryText: {
-    fontSize: 14,
-    color: '#22C55E',
-    fontWeight: '500',
-  },
-
-  // Cart Items
-  cartItemsList: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 8,
-  },
-  cartItem: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
-  },
   itemImageContainer: {
     marginRight: 16,
-  },
-  itemImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
   },
   itemDetails: {
     flex: 1,
     marginRight: 16,
   },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  itemCategory: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  itemWeight: {
-    fontSize: 12,
-    color: '#22C55E',
-    fontWeight: '600',
-    marginBottom: 6,
-  },
   itemPriceRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  itemPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  itemQuantityMultiplier: {
-    fontSize: 12,
-    color: '#64748B',
-    marginLeft: 4,
-  },
-
-  // Item Controls
   itemControls: {
     alignItems: 'flex-end',
     minWidth: 80,
@@ -466,132 +616,17 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 8,
   },
-  quantityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 2,
-    marginBottom: 8,
-  },
-  quantityButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  disabledButton: {
-    backgroundColor: '#F1F5F9',
-  },
-  quantityText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginHorizontal: 8,
-    minWidth: 35,
-    textAlign: 'center',
-  },
-  subtotalText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#22C55E',
-  },
-
-  // Order Summary
-  orderSummary: {
-    backgroundColor: '#FFFFFF',
-    marginTop: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 16,
-  },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 8,
   },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1E293B',
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-    marginVertical: 12,
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#22C55E',
-  },
-
-  // Bottom Spacing
   bottomSpacing: {
     height: 100,
-  },
-
-  // Checkout Bar
-  checkoutBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: 34,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
   },
   totalContainer: {
     flex: 1,
     marginRight: 16,
-  },
-  totalLabelSmall: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  totalAmountLarge: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1E293B',
-  },
-  checkoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#22C55E',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-  },
-  disabledCheckoutButton: {
-    backgroundColor: '#94A3B8',
-  },
-  checkoutButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

@@ -116,4 +116,4 @@ export const Themes = {
 };
 
 export type ThemeName = keyof typeof Themes;
-export type Theme = typeof Themes.light;
+export type Theme = typeof Themes.light

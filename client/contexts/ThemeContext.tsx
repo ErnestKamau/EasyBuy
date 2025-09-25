@@ -1,5 +1,5 @@
 // contexts/ThemeContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance, ColorSchemeName } from 'react-native';
 import { Themes, ThemeName, Theme } from '@/constants/Themes';
@@ -116,19 +116,19 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   };
 
-  // Don't render children until theme is loaded
-  if (isLoading) {
-    return null;
-  }
-
-  const contextValue: ThemeContextType = {
+  const contextValue: ThemeContextType = useMemo(() => ({
     currentTheme,
     themeName,
     isSystemTheme,
     changeTheme,
     toggleSystemTheme,
     availableThemes,
-  };
+  }), [currentTheme, themeName, isSystemTheme, changeTheme, toggleSystemTheme, availableThemes]);
+
+  // Don't render children until theme is loaded
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <ThemeContext.Provider value={contextValue}>
