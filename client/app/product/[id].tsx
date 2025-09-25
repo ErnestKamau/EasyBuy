@@ -15,6 +15,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Product, productsApi } from '@/services/api';
 import { ToastService } from '@/utils/toastService';
+import { useCart } from '@/contexts/CartContext';
 import { 
   ArrowLeft,
   Heart,
@@ -36,7 +37,9 @@ export default function ProductDetailScreen() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
+  const [selectedWeight, setSelectedWeight] = useState<number>(0.5); // Default weight for weight-based products
   const [isFavorite, setIsFavorite] = useState(false);
+  const { addItem, getItemCount, state } = useCart();
 
   useEffect(() => {
     if (id) {
@@ -64,7 +67,7 @@ export default function ProductDetailScreen() {
     }
   };
 
-  const addToCart = () => {
+  const addToCart = async () => {
     if (!product) return;
     
     if (product.in_stock === 0) {
@@ -72,8 +75,23 @@ export default function ProductDetailScreen() {
       return;
     }
 
-    // Here you would typically add to cart logic
-    ToastService.showSuccess('Added to Cart', `${quantity}x ${product.name} added to cart`);
+    try {
+      // For weight-based products, use selected weight; for regular products, use quantity
+      const weightToUse = product.kilograms ? selectedWeight : undefined;
+      const quantityToUse = product.kilograms ? 1 : quantity; // Weight-based products always use quantity 1
+      
+      addItem(product, quantityToUse, weightToUse);
+      
+      const weightText = weightToUse ? ` (${weightToUse}kg)` : '';
+      const quantityText = product.kilograms ? '' : `${quantity}x `;
+      
+      ToastService.showSuccess(
+        'Added to Cart', 
+        `${quantityText}${product.name}${weightText} added to cart`
+      );
+    } catch (error) {
+      ToastService.showError('Error', 'Failed to add item to cart');
+    }
   };
 
   const toggleFavorite = () => {
@@ -112,7 +130,11 @@ export default function ProductDetailScreen() {
   const hasDiscount = product.cost_price && product.sale_price > product.cost_price;
   const discountPercent = hasDiscount ? 
     Math.round(((product.sale_price - product.cost_price) / product.cost_price) * 100) : 0;
-  const totalPrice = product.sale_price * quantity;
+  
+  // Calculate total price based on product type
+  const totalPrice = product.kilograms 
+    ? (product.sale_price / (product.kilograms || 1)) * selectedWeight  // Price per kg * selected weight
+    : product.sale_price * quantity; // Regular price * quantity
 
   return (
     <View style={styles.container}>
@@ -282,26 +304,50 @@ export default function ProductDetailScreen() {
 
       {/* Modern Bottom Action Bar */}
       <View style={styles.bottomBar}>
-        <View style={styles.quantityContainer}>
-          <Text style={styles.quantityLabel}>Qty</Text>
-          <View style={styles.modernQuantityControls}>
-            <TouchableOpacity 
-              style={[styles.modernQuantityButton, quantity <= 1 && styles.disabledQuantityButton]}
-              onPress={() => handleQuantityChange(-1)}
-              disabled={quantity <= 1}
-            >
-              <Minus size={14} color={quantity <= 1 ? "#94A3B8" : "#64748B"} />
-            </TouchableOpacity>
-            <Text style={styles.quantityValue}>{quantity}</Text>
-            <TouchableOpacity 
-              style={[styles.modernQuantityButton, quantity >= product.in_stock && styles.disabledQuantityButton]}
-              onPress={() => handleQuantityChange(1)}
-              disabled={quantity >= product.in_stock}
-            >
-              <Plus size={14} color={quantity >= product.in_stock ? "#94A3B8" : "#64748B"} />
-            </TouchableOpacity>
+        {product.kilograms ? (
+          /* Weight Selection for Kilogram-based Products */
+          <View style={styles.weightContainer}>
+            <Text style={styles.quantityLabel}>Weight (kg)</Text>
+            <View style={styles.weightControls}>
+              <TouchableOpacity 
+                style={[styles.modernQuantityButton, selectedWeight <= 0.5 && styles.disabledQuantityButton]}
+                onPress={() => setSelectedWeight(Math.max(0.5, selectedWeight - 0.25))}
+                disabled={selectedWeight <= 0.5}
+              >
+                <Minus size={14} color={selectedWeight <= 0.5 ? "#94A3B8" : "#64748B"} />
+              </TouchableOpacity>
+              <Text style={styles.quantityValue}>{selectedWeight}kg</Text>
+              <TouchableOpacity 
+                style={styles.modernQuantityButton}
+                onPress={() => setSelectedWeight(selectedWeight + 0.25)}
+              >
+                <Plus size={14} color="#64748B" />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        ) : (
+          /* Quantity Selection for Regular Products */
+          <View style={styles.quantityContainer}>
+            <Text style={styles.quantityLabel}>Qty</Text>
+            <View style={styles.modernQuantityControls}>
+              <TouchableOpacity 
+                style={[styles.modernQuantityButton, quantity <= 1 && styles.disabledQuantityButton]}
+                onPress={() => handleQuantityChange(-1)}
+                disabled={quantity <= 1}
+              >
+                <Minus size={14} color={quantity <= 1 ? "#94A3B8" : "#64748B"} />
+              </TouchableOpacity>
+              <Text style={styles.quantityValue}>{quantity}</Text>
+              <TouchableOpacity 
+                style={[styles.modernQuantityButton, quantity >= product.in_stock && styles.disabledQuantityButton]}
+                onPress={() => handleQuantityChange(1)}
+                disabled={quantity >= product.in_stock}
+              >
+                <Plus size={14} color={quantity >= product.in_stock ? "#94A3B8" : "#64748B"} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <View style={styles.actionContainer}>
           <View style={styles.priceContainer}>
@@ -636,6 +682,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  weightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  weightControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 2,
   },
   quantityLabel: {
     fontSize: 16,

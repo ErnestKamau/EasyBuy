@@ -1,32 +1,44 @@
 // app/_layout.tsx
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState, createContext, useContext, useCallback, useMemo } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import 'react-native-reanimated';
-import Toast from 'react-native-toast-message';
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { useFonts } from "expo-font";
+import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import {
+  useEffect,
+  useState,
+  createContext,
+  useContext,
+  useCallback,
+  useMemo,
+} from "react";
+import { ActivityIndicator, View } from "react-native";
+import "react-native-reanimated";
+import Toast from "react-native-toast-message";
 
-import { useColorScheme } from '@/components/useColorScheme';
-import { authApi, tokenManager, User } from '@/services/api';
-import { toastConfig } from '@/components/ToastConfig';
-import { ToastService } from '@/utils/toastService';
+import { useColorScheme } from "@/components/useColorScheme";
+import { authApi, tokenManager, User } from "@/services/api";
+import { toastConfig } from "@/components/ToastConfig";
+import { ToastService } from "@/utils/toastService";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { CartProvider } from "@/contexts/CartContext";
 
 export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
-} from 'expo-router';
+} from "expo-router";
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: "(tabs)",
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
-
 
 interface AuthContextType {
   user: User | null;
@@ -48,9 +60,6 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-
-
-
 function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -58,7 +67,6 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
 
-  
   const checkAuthStatus = useCallback(async () => {
     try {
       const token = await tokenManager.getAccessToken();
@@ -75,7 +83,10 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       if (currentUser) {
         setUser(currentUser);
         setIsAuthenticated(true);
-        ToastService.showSuccess('Welcome back!', `Hello, ${currentUser.username}`)
+        ToastService.showSuccess(
+          "Welcome back!",
+          `Hello, ${currentUser.username}`
+        );
       } else {
         // Token is invalid, clear it
         await tokenManager.clearTokens();
@@ -83,7 +94,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
         setUser(null);
       }
     } catch (error) {
-      console.log('Auth check failed:', error);
+      console.log("Auth check failed:", error);
       await tokenManager.clearTokens();
       setIsAuthenticated(false);
       setUser(null);
@@ -92,33 +103,33 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     }
   }, []);
 
-  
   const login = useCallback(async (credentials: any) => {
     try {
       const response = await authApi.login(credentials);
       setUser(response.user);
       setIsAuthenticated(true);
-      ToastService.showSuccess('Login Successful!', `Welcome back, ${response.user.username}`);
+      ToastService.showSuccess(
+        "Login Successful!",
+        `Welcome back, ${response.user.username}`
+      );
     } catch (error) {
-      console.log("Login failed", error)
-      ToastService.showApiError(error, 'Login Failed');
+      console.log("Login failed", error);
+      ToastService.showApiError(error, "Login Failed");
       throw new Error("Login failed. Please try again.");
     }
   }, []);
 
-  
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
     } catch (error) {
-      console.log('Logout error:', error);
+      console.log("Logout error:", error);
     } finally {
       setUser(null);
       setIsAuthenticated(false);
     }
   }, []);
 
-  
   const refreshAuth = useCallback(async () => {
     setLoading(true);
     await checkAuthStatus();
@@ -131,52 +142,52 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return; // Still checking auth status
 
-    const inAuthGroup = segments[0] === 'auth';
+    const inAuthGroup = segments[0] === "auth";
 
     if (!isAuthenticated && !inAuthGroup) {
       // User is not logged in and trying to access protected routes
-      router.replace('/auth');
+      router.replace("/auth");
     } else if (isAuthenticated && inAuthGroup) {
       // User is logged in but still on auth screen
-      router.replace('/(tabs)');
+      router.replace("/(tabs)");
     }
   }, [isAuthenticated, loading, segments]);
 
-
-  const contextValue = useMemo<AuthContextType>(() => ({
-    user,
-    isAuthenticated,
-    loading,
-    login,
-    logout,
-    refreshAuth,
-  }), [user, isAuthenticated, loading, login, logout, refreshAuth]);
-
+  const contextValue = useMemo<AuthContextType>(
+    () => ({
+      user,
+      isAuthenticated,
+      loading,
+      login,
+      logout,
+      refreshAuth,
+    }),
+    [user, isAuthenticated, loading, login, logout, refreshAuth]
+  );
 
   if (loading) {
     return (
-      <View style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#f8f9fa'
-      }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#f8f9fa",
+        }}
+      >
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
-    
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
     ...FontAwesome.font,
   });
 
@@ -197,8 +208,10 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <RootLayoutNav />
-      <Toast config={toastConfig} />
+      <CartProvider>
+        <RootLayoutNav />
+        <Toast config={toastConfig} />
+      </CartProvider>
     </AuthProvider>
   );
 }
@@ -207,78 +220,86 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        
-        <Stack.Screen
-          name="auth"
-          options={{
-            headerShown: false,
-            // Prevent going back to auth screen after login
-            gestureEnabled: false
-          }}
-        />
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <SafeAreaProvider>
+        <Stack>
+          <Stack.Screen
+            name="auth"
+            options={{
+              headerShown: false,
+              // Prevent going back to auth screen after login
+              gestureEnabled: false,
+            }}
+          />
 
-        
-        <Stack.Screen
-          name="(tabs)"
-          options={{
-            headerShown: false
-          }}
-        />
+          <Stack.Screen
+            name="(tabs)"
+            options={{
+              headerShown: false,
+            }}
+          />
 
-        <Stack.Screen
-          name="categories"
-          options={{
-            title: "Categories",
-            presentation: 'card',
-            headerShown: true
-          }}
-        />
+          <Stack.Screen
+            name="categories"
+            options={{
+              title: "Categories",
+              presentation: "card",
+              headerShown: true,
+            }}
+          />
 
-        <Stack.Screen
-          name="search" 
-          options={{
-            title: "Search",
-            presentation: 'card',
-            headerShown: true
-          }}
-        />
+          <Stack.Screen
+            name="search"
+            options={{
+              title: "Search",
+              presentation: "card",
+              headerShown: true,
+            }}
+          />
 
-        <Stack.Screen
-          name="product/[id]"
-          options={{
-            title: "Product Details",
-            presentation: 'card',
-            headerShown: false // We have custom header in the component
-          }}
-        />
+          <Stack.Screen
+            name="product/[id]"
+            options={{
+              title: "Product Details",
+              presentation: "card",
+              headerShown: false, // We have custom header in the component
+            }}
+          />
 
-        <Stack.Screen
-          name="admin"
-          options={{
-            title: "Admin Panel",
-            presentation: 'card',
-            headerShown: false // We have custom header in the component
-          }}
-        />
+          <Stack.Screen
+            name="admin"
+            options={{
+              title: "Admin Panel",
+              presentation: "card",
+              headerShown: false, // We have custom header in the component
+            }}
+          />
 
-        
-        <Stack.Screen
-          name="settings"
-          options={{
-            title: "Settings",
-            presentation: 'card'
-          }}
-        />
+          <Stack.Screen
+            name="checkout"
+            options={{
+              title: "Checkout",
+              presentation: "card",
+              headerShown: false, // Custom header in the component
+            }}
+          />
 
-        <Stack.Screen
-          name="modal"
-          options={{
-            presentation: 'modal'
-          }}
-        />
-      </Stack>
+          <Stack.Screen
+            name="settings"
+            options={{
+              title: "Settings",
+              presentation: "card",
+            }}
+          />
+
+          <Stack.Screen
+            name="modal"
+            options={{
+              presentation: "modal",
+            }}
+          />
+        </Stack>
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/app/_layout';
-import { productsApi, Category, Product } from '@/services/api';
+import { productsApi, Category, Product, ordersApi, Order } from '@/services/api';
 import { ToastService } from '@/utils/toastService';
 import { 
   ArrowLeft,
@@ -25,7 +25,11 @@ import {
   Tag,
   AlertTriangle,
   Save,
-  X
+  X,
+  Clock,
+  CheckCircle,
+  XCircle,
+  ShoppingBag
 } from 'lucide-react-native';
 
 export default function AdminScreen() {
@@ -34,11 +38,12 @@ export default function AdminScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'alerts'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'orders' | 'alerts'>('categories');
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: '' });
@@ -66,15 +71,17 @@ export default function AdminScreen() {
   const loadAdminData = async () => {
     try {
       setLoading(true);
-      const [categoriesData, productsData, lowStockData] = await Promise.all([
+      const [categoriesData, productsData, lowStockData, ordersData] = await Promise.all([
         productsApi.getCategories(),
         productsApi.getProducts(),
-        productsApi.getLowStockProducts()
+        productsApi.getLowStockProducts(),
+        ordersApi.getPendingOrders().catch(() => ({ orders: [], count: 0 }))
       ]);
       
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
       setProducts(Array.isArray(productsData) ? productsData : []);
       setLowStockProducts(Array.isArray(lowStockData?.products) ? lowStockData.products : []);
+      setPendingOrders(Array.isArray(ordersData?.orders) ? ordersData.orders : []);
     } catch (error) {
       ToastService.showApiError(error, 'Failed to load admin data');
     } finally {
@@ -233,6 +240,102 @@ export default function AdminScreen() {
     );
   };
 
+  // Order Management
+  const confirmOrder = async (order: Order) => {
+    Alert.alert(
+      'Confirm Order',
+      `Confirm order #${order.id} from ${order.customer_name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: 'default',
+          onPress: () => {
+            (async () => {
+              try {
+                await ordersApi.confirmOrder(order.id);
+                ToastService.showSuccess('Success', 'Order confirmed and converted to sale');
+                loadAdminData();
+              } catch (error) {
+                ToastService.showApiError(error, 'Failed to confirm order');
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
+  const cancelOrder = async (order: Order) => {
+    Alert.alert(
+      'Cancel Order',
+      `Cancel order #${order.id} from ${order.customer_name}?`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Cancel Order',
+          style: 'destructive',
+          onPress: () => {
+            (async () => {
+              try {
+                await ordersApi.cancelOrder(order.id);
+                ToastService.showSuccess('Success', 'Order cancelled');
+                loadAdminData();
+              } catch (error) {
+                ToastService.showApiError(error, 'Failed to cancel order');
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
+  const renderOrderItem = ({ item }: { item: Order }) => (
+    <View style={styles.orderCard}>
+      <View style={styles.orderHeader}>
+        <View style={styles.orderInfo}>
+          <Text style={styles.orderNumber}>Order #{item.id}</Text>
+          <Text style={styles.orderCustomer}>{item.customer_name}</Text>
+          <Text style={styles.orderDate}>
+            {new Date(`${item.order_date}T${item.order_time}`).toLocaleString()}
+          </Text>
+        </View>
+        <View style={styles.orderAmount}>
+          <Text style={styles.orderTotal}>Ksh {item.total_amount?.toLocaleString() || 0}</Text>
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: item.status === 'pending' ? '#FEF3C7' : '#F0FDF4' }
+          ]}>
+            <Text style={[
+              styles.statusText,
+              { color: item.status === 'pending' ? '#D97706' : '#22C55E' }
+            ]}>
+              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+            </Text>
+          </View>
+        </View>
+      </View>
+      
+      <View style={styles.orderActions}>
+        <TouchableOpacity
+          style={styles.confirmButton}
+          onPress={() => confirmOrder(item)}
+        >
+          <CheckCircle size={16} color="#22C55E" />
+          <Text style={styles.confirmButtonText}>Confirm</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.orderCancelButton}
+          onPress={() => cancelOrder(item)}
+        >
+          <XCircle size={16} color="#EF4444" />
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   const renderCategoryItem = ({ item }: { item: Category }) => (
     <View style={styles.itemCard}>
       <View style={styles.itemInfo}>
@@ -325,6 +428,15 @@ export default function AdminScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.tab, activeTab === 'orders' && styles.activeTab]}
+          onPress={() => setActiveTab('orders')}
+        >
+          <ShoppingBag size={20} color={activeTab === 'orders' ? '#FFFFFF' : '#64748B'} />
+          <Text style={[styles.tabText, activeTab === 'orders' && styles.activeTabText]}>
+            Orders ({pendingOrders.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'alerts' && styles.activeTab]}
           onPress={() => setActiveTab('alerts')}
         >
@@ -377,6 +489,29 @@ export default function AdminScreen() {
               key={products.length} // Force re-render when products change
               showsVerticalScrollIndicator={false}
             />
+          </View>
+        )}
+
+        {activeTab === 'orders' && (
+          <View style={styles.tabContent}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Pending Orders ({pendingOrders.length})</Text>
+            </View>
+            {pendingOrders.length > 0 ? (
+              <FlatList
+                data={pendingOrders}
+                renderItem={renderOrderItem}
+                keyExtractor={(item) => item.id.toString()}
+                key={pendingOrders.length}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View style={styles.noOrders}>
+                <ShoppingBag size={48} color="#94A3B8" />
+                <Text style={styles.noOrdersText}>No pending orders</Text>
+                <Text style={styles.noOrdersSubtext}>Orders will appear here when customers place them</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -886,5 +1021,105 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+
+  // Order Styles
+  orderCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  orderInfo: {
+    flex: 1,
+  },
+  orderNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  orderCustomer: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  orderDate: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  orderAmount: {
+    alignItems: 'flex-end',
+  },
+  orderTotal: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#22C55E',
+    marginBottom: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  orderActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  confirmButtonText: {
+    fontSize: 14,
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    color: '#EF4444',
+    fontWeight: '600',
+  },
+
+  // No Orders
+  noOrders: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  noOrdersText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#94A3B8',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noOrdersSubtext: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
   },
 });

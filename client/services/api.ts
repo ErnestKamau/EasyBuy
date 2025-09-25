@@ -285,6 +285,72 @@ export const productsApi = {
   }
 };
 
+// Order interfaces
+export interface OrderItem {
+  id: number;
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  weight?: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+export interface Order {
+  id: number;
+  user: number;
+  customer_name: string;
+  customer_phone: string;
+  notes: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  order_date: string;
+  order_time: string;
+  updated_at: string;
+  total_amount: number;
+  items?: OrderItem[];
+}
+
+export interface CartItemForOrder {
+  product_id: number;
+  quantity: number;
+  weight?: number;
+}
+
+// Orders API
+export const ordersApi = {
+  async createOrder(items: CartItemForOrder[], notes?: string): Promise<Order> {
+    const { data } = await api.post('/orders/create/', {
+      items,
+      notes: notes || ''
+    });
+    return data.order;
+  },
+
+  async getOrders(): Promise<Order[]> {
+    const { data } = await api.get('/orders/orders/');
+    return Array.isArray(data) ? data : data.results || [];
+  },
+
+  async getOrderDetails(orderId: number): Promise<{ order: Order; items: OrderItem[] }> {
+    const { data } = await api.get(`/orders/${orderId}/details/`);
+    return data;
+  },
+
+  async getPendingOrders(): Promise<{ orders: Order[]; count: number }> {
+    const { data } = await api.get('/orders/admin/pending/');
+    return data;
+  },
+
+  async confirmOrder(orderId: number): Promise<{ message: string; sale_id: number }> {
+    const { data } = await api.post(`/orders/orders/${orderId}/confirm/`);
+    return data;
+  },
+
+  async cancelOrder(orderId: number): Promise<void> {
+    await api.patch(`/orders/orders/${orderId}/`, { status: 'cancelled' });
+  }
+};
+
 export type PingResponse = { ok: boolean; message: string };
 export async function ping(): Promise<PingResponse> {
   const { data } = await api.get<PingResponse>("/ping/");

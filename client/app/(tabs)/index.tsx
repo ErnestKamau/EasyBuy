@@ -286,11 +286,11 @@ export default function HomeScreen() {
             source={{ uri: item.image_url || 'https://via.placeholder.com/300x300' }} 
             style={styles.productImage} 
           />
-          {hasDiscount && (
+          {/* {hasDiscount && (
             <View style={styles.discountBadge}>
               <Text style={styles.discountText}>{discountPercent}% OFF</Text>
             </View>
-          )}
+          )} */}
           <TouchableOpacity style={styles.favoriteButton}>
             <Heart size={16} color="#64748B" />
           </TouchableOpacity>
@@ -361,9 +361,7 @@ export default function HomeScreen() {
     >
       {/* Welcome Section */}
       <View style={styles.welcomeSection}>
-        <Text style={styles.welcomeText}>
-          Hello, {user?.username || 'Guest'}!
-        </Text>
+        
         <Text style={styles.welcomeSubtext}>
           What would you like to buy today?
         </Text>
@@ -487,17 +485,17 @@ const styles = StyleSheet.create({
   // Welcome Section
   welcomeSection: {
     marginTop: 20,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   welcomeText: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1E293B',
+    color: '#000000ff',
     marginBottom: 4,
   },
   welcomeSubtext: {
     fontSize: 16,
-    color: '#64748B',
+    color: '#1a1264',
     fontWeight: '500',
   },
 
@@ -511,14 +509,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 4,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 0,
   },
   searchIconStyle: {
     marginRight: 12,

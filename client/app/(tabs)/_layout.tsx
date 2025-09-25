@@ -7,6 +7,7 @@ import { Pressable } from 'react-native';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { useCart } from '@/contexts/CartContext';
 
 // Reusable icon component for tabs
 function TabBarIcon(props: {
@@ -18,6 +19,7 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { state } = useCart();
 
   return (
     <Tabs
@@ -30,7 +32,7 @@ export default function TabLayout() {
           elevation: 0,
           shadowOpacity: 0,
         },
-        headerStyle: {backgroundColor: "#0f9e99"},
+        headerStyle: {backgroundColor: "#ebebe0"},
         headerShadowVisible: false,
       }}>
       
@@ -62,7 +64,8 @@ export default function TabLayout() {
         options={{
           title: 'Cart',
           tabBarIcon: ({ color }) => <TabBarIcon name="shopping-cart" color={color} />,
-          tabBarBadge: 3, // Shows number of items in cart
+          tabBarBadge: state.totalItems > 0 ? state.totalItems : undefined,
+          headerShown: false, // Custom header in the component
         }}
       />
 
