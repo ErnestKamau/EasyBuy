@@ -326,7 +326,7 @@ export default function AdminScreen() {
           <Text style={styles.confirmButtonText}>Confirm</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.orderCancelButton}
+          // style={styles.orderCancelButton}
           onPress={() => cancelOrder(item)}
         >
           <XCircle size={16} color="#EF4444" />
