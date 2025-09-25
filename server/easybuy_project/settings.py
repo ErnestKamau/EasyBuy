@@ -190,6 +190,7 @@ if DEBUG:
         "http://192.168.100.55:8081",
         "http://192.168.100.65:8081",
         "http://192.168.100.65:8000",
+        "http://192.168.100.71:8081",
     ]
 else:
     # Production settings - more restrictive

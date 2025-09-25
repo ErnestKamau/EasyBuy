@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
   },
   productWeight: {
     fontSize: 12,
-    color: '#22C55E',
+    color: '#1f3fc3',
     fontWeight: '600',
     marginBottom: 6,
   },
