@@ -261,6 +261,10 @@ export const productsApi = {
     return data;
   },
 
+  async deleteCategory(id: number): Promise<void> {
+    await api.delete(`/admin/categories/${id}/`);
+  },
+
   async createProduct(productData: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category_name' | 'profit_margin' | 'is_low_stock'>): Promise<Product> {
     const { data } = await api.post<Product>("/admin/products/", productData);
     return data;

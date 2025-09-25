@@ -26,7 +26,12 @@ export default function TabLayout() {
         headerShown: useClientOnlyValue(false, true),
         tabBarStyle: {
           backgroundColor: Colors[colorScheme ?? 'light'].background,
+          borderTopWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
         },
+        headerStyle: {backgroundColor: "#0f9e99"},
+        headerShadowVisible: false,
       }}>
       
       

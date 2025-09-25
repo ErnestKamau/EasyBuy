@@ -183,6 +183,31 @@ export default function AdminScreen() {
     }
   };
 
+  const deleteCategory = (category: Category) => {
+    Alert.alert(
+      'Delete Category',
+      `Are you sure you want to delete "${category.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            (async () => {
+              try {
+                await productsApi.deleteCategory(category.id);
+                ToastService.showSuccess('Success', 'Category deleted successfully');
+                loadAdminData();
+              } catch (error) {
+                ToastService.showApiError(error, 'Failed to delete category');
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
   const deleteProduct = (product: Product) => {
     Alert.alert(
       'Delete Product',
@@ -220,6 +245,12 @@ export default function AdminScreen() {
           onPress={() => openCategoryModal(item)}
         >
           <Edit size={16} color="#3B82F6" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => deleteCategory(item)}
+        >
+          <Trash2 size={16} color="#EF4444" />
         </TouchableOpacity>
       </View>
     </View>
