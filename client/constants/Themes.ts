@@ -37,15 +37,15 @@ export const Themes = {
     tabIconDefault: '#64748B',
     tabIconSelected: '#22C55E',
   },
-  
+
   // Premium Theme (Luxe Noir & Soft Oat)
   luxe: {
     primary: '#D4AF37', // Gold
     secondary: '#8B5CF6',
     accent: '#EC4899',
-    background: '#060D0C', // Luxe Noir
-    surface: '#F0EDE5', // Soft Oat
-    text: '#F8FAFC',
+    background: '#7d7d7dff', // Luxe Noir
+    surface: '#ffffffff', // Soft Oat
+    text: '#000000ff',
     textSecondary: '#94A3B8',
     border: '#1E293B',
     error: '#F87171',

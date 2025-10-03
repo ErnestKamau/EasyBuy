@@ -160,7 +160,15 @@ export const authApi = {
 
   async login(credentials: LoginData): Promise<AuthResponse> {
     const { data } = await api.post<AuthResponse>("/auth/login/", credentials);
-    await tokenManager.setTokens(data.tokens.access, data.tokens.refresh);
+
+    // Validate response shape to avoid "cannot read property 'access' of undefined"
+    const tokens = (data as any)?.tokens;
+    if (!tokens?.access || !tokens?.refresh) {
+      const backendMsg = (data as any)?.error || (data as any)?.detail || 'Invalid login response from server';
+      throw new Error(backendMsg);
+    }
+
+    await tokenManager.setTokens(tokens.access, tokens.refresh);
     return data;
   },
 
@@ -356,6 +364,118 @@ export async function ping(): Promise<PingResponse> {
   const { data } = await api.get<PingResponse>("/ping/");
   return data;
 }
+
+// Sales interfaces
+export interface SaleItem {
+  id: number;
+  product: number;
+  product_name: string;
+  product_image: string;
+  category_name: string;
+  quantity: number;
+  unit_price: number;
+  sale_price: number;
+  subtotal: number;
+  profit_total: number;
+}
+
+export interface Payment {
+  id: number;
+  method: 'cash' | 'mpesa' | 'bank_transfer' | 'card';
+  amount: number;
+  reference: string;
+  notes: string;
+  paid_at: string;
+}
+
+export interface Sale {
+  id: number;
+  order_id: number;
+  sale_number: string;
+  customer_name: string;
+  customer_phone: string;
+  total_amount: number;
+  cost_amount: number;
+  profit_amount: number;
+  payment_status: 'fully-paid' | 'partial' | 'no-payment' | 'overdue';
+  due_date?: string;
+  made_on: string;
+  updated_on: string;
+  total_paid: number;
+  balance: number;
+  is_fully_paid: boolean;
+  items?: SaleItem[];
+  payments?: Payment[];
+}
+
+export interface SalesAnalytics {
+  total_sales: number;
+  total_revenue: number;
+  total_cost: number;
+  total_profit: number;
+  profit_margin: number;
+  payment_status_breakdown: Record<string, { name: string; count: number }>;
+  recent_sales: Sale[];
+  daily_sales: Array<{
+    date: string;
+    sales_count: number;
+    revenue: number;
+  }>;
+  period_days: number;
+}
+
+export interface PaymentSummary {
+  date: string;
+  total_payments: number;
+  cash_total: number;
+  mpesa_total: number;
+  other_total: number;
+  transaction_count: number;
+  recent_payments: Payment[];
+}
+
+// Sales API
+export const salesApi = {
+  async getSales(): Promise<Sale[]> {
+    const { data } = await api.get('/sales/sales/');
+    return Array.isArray(data) ? data : data.results || [];
+  },
+
+  async getSaleDetails(saleId: number): Promise<Sale> {
+    const { data } = await api.get(`/sales/sales/${saleId}/`);
+    return data;
+  },
+
+  async addPayment(saleId: number, payment: {
+    method: string;
+    amount: number;
+    reference?: string;
+    notes?: string;
+  }): Promise<{ message: string; payment: Payment; sale: Sale }> {
+    const { data } = await api.post(`/sales/sales/${saleId}/add_payment/`, payment);
+    return data;
+  },
+
+  async getAnalytics(days: number = 30): Promise<SalesAnalytics> {
+    const { data } = await api.get(`/sales/analytics/?days=${days}`);
+    return data;
+  },
+
+  async getOverduePayments(): Promise<{ overdue_sales: Sale[]; count: number }> {
+    const { data } = await api.get('/sales/overdue/');
+    return data;
+  },
+
+  async getPaymentSummary(): Promise<PaymentSummary> {
+    const { data } = await api.get('/sales/payments/summary/');
+    return data;
+  },
+
+  async getUnpaidSales(): Promise<{ unpaid_sales: Sale[]; count: number }> {
+    const { data } = await api.get('/sales/unpaid/');
+    return data;
+  }
+};
 
 export async function isAuthenticated(): Promise<boolean> {
   const token = await tokenManager.getAccessToken();

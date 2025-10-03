@@ -36,10 +36,10 @@ class Sale(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(Decimal(0.00))]
     )
-    payment_status = models.CharField(choices=PAYMENT_STATUS_CHOICES, default='debt')
+    payment_status = models.CharField(choices=PAYMENT_STATUS_CHOICES, default='no-payment', max_length=20)
     due_date = models.DateTimeField(null=True) # set if debt/partial
     made_on = models.DateTimeField(auto_now_add=True)
-    updated_on = models.DateTimeField(auto_created=True)
+    updated_on = models.DateTimeField(auto_now=True)
     
     @property
     def total_paid(self):
@@ -65,7 +65,7 @@ class Sale(models.Model):
         else:
             self.payment_status = "no-payment"
         
-        self.updated_at = timezone.now()
+        self.updated_on = timezone.now()
         self.save()
         
     def set_as_debt(self, days=7): # Mark sale as debt with deadline.
@@ -104,7 +104,7 @@ class SaleItem(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(Decimal(0.00))]
     )
-    sale_price = models.DecimalField(
+    cost_price = models.DecimalField(
         # What you paid for it (at time of sale)
         max_digits=10,
         decimal_places=2,

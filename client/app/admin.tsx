@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/app/_layout';
-import { productsApi, Category, Product, ordersApi, Order } from '@/services/api';
+import { productsApi, Category, Product, ordersApi, Order, salesApi, Sale, SalesAnalytics, Payment } from '@/services/api';
 import { ToastService } from '@/utils/toastService';
 import { 
   ArrowLeft,
@@ -29,7 +29,11 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  ShoppingBag
+  ShoppingBag,
+  TrendingUp,
+  DollarSign,
+  Calendar,
+  CreditCard
 } from 'lucide-react-native';
 
 export default function AdminScreen() {
@@ -39,11 +43,16 @@ export default function AdminScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [salesAnalytics, setSalesAnalytics] = useState<SalesAnalytics | null>(null);
+  const [unpaidSales, setUnpaidSales] = useState<Sale[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'orders' | 'alerts'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'orders' | 'sales' | 'alerts'>('categories');
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: '' });
@@ -58,6 +67,12 @@ export default function AdminScreen() {
     in_stock: '',
     minimum_stock: '',
   });
+  const [paymentForm, setPaymentForm] = useState({
+    method: 'cash',
+    amount: '',
+    reference: '',
+    notes: '',
+  });
 
   useEffect(() => {
     if (user?.role !== 'admin') {
@@ -71,17 +86,23 @@ export default function AdminScreen() {
   const loadAdminData = async () => {
     try {
       setLoading(true);
-      const [categoriesData, productsData, lowStockData, ordersData] = await Promise.all([
+      const [categoriesData, productsData, lowStockData, ordersData, salesData, analyticsData, unpaidData] = await Promise.all([
         productsApi.getCategories(),
         productsApi.getProducts(),
         productsApi.getLowStockProducts(),
-        ordersApi.getPendingOrders().catch(() => ({ orders: [], count: 0 }))
+        ordersApi.getPendingOrders().catch(() => ({ orders: [], count: 0 })),
+        salesApi.getSales().catch(() => []),
+        salesApi.getAnalytics().catch(() => null),
+        salesApi.getUnpaidSales().catch(() => ({ unpaid_sales: [], count: 0 }))
       ]);
       
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
       setProducts(Array.isArray(productsData) ? productsData : []);
       setLowStockProducts(Array.isArray(lowStockData?.products) ? lowStockData.products : []);
       setPendingOrders(Array.isArray(ordersData?.orders) ? ordersData.orders : []);
+      setSales(Array.isArray(salesData) ? salesData : []);
+      setSalesAnalytics(analyticsData);
+      setUnpaidSales(Array.isArray(unpaidData?.unpaid_sales) ? unpaidData.unpaid_sales : []);
     } catch (error) {
       ToastService.showApiError(error, 'Failed to load admin data');
     } finally {
@@ -291,6 +312,109 @@ export default function AdminScreen() {
     );
   };
 
+  // Payment Management
+  const openPaymentModal = (sale: Sale) => {
+    setSelectedSale(sale);
+    setPaymentForm({
+      method: 'cash',
+      amount: sale.balance.toString(),
+      reference: '',
+      notes: '',
+    });
+    setShowPaymentModal(true);
+  };
+
+  const addPaymentToSale = async () => {
+    if (!selectedSale || !paymentForm.amount) {
+      ToastService.showError('Validation Error', 'Amount is required');
+      return;
+    }
+
+    try {
+      const paymentData = {
+        method: paymentForm.method,
+        amount: parseFloat(paymentForm.amount),
+        reference: paymentForm.reference,
+        notes: paymentForm.notes,
+      };
+
+      await salesApi.addPayment(selectedSale.id, paymentData);
+      ToastService.showSuccess('Success', 'Payment added successfully');
+      setShowPaymentModal(false);
+      loadAdminData();
+    } catch (error) {
+      ToastService.showApiError(error, 'Failed to add payment');
+    }
+  };
+
+  const renderSaleItem = ({ item }: { item: Sale }) => {
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'fully-paid': return '#22C55E';
+        case 'partial': return '#F59E0B';
+        case 'overdue': return '#EF4444';
+        default: return '#94A3B8';
+      }
+    };
+
+    const getStatusBgColor = (status: string) => {
+      switch (status) {
+        case 'fully-paid': return '#F0FDF4';
+        case 'partial': return '#FFFBEB';
+        case 'overdue': return '#FEF2F2';
+        default: return '#F8FAFC';
+      }
+    };
+
+    return (
+      <View style={styles.salesCard}>
+        <View style={styles.salesHeader}>
+          <View style={styles.salesInfo}>
+            <Text style={styles.saleNumber}>{item.sale_number}</Text>
+            <Text style={styles.saleCustomer}>{item.customer_name}</Text>
+            <Text style={styles.saleDate}>
+              {new Date(item.made_on).toLocaleDateString()}
+            </Text>
+          </View>
+          <View style={styles.salesAmount}>
+            <Text style={styles.saleTotal}>Ksh {item.total_amount?.toLocaleString() || 0}</Text>
+            <Text style={styles.saleProfit}>Profit: Ksh {item.profit_amount?.toLocaleString() || 0}</Text>
+            <View style={[
+              styles.paymentStatusBadge,
+              { backgroundColor: getStatusBgColor(item.payment_status) }
+            ]}>
+              <Text style={[
+                styles.paymentStatusText,
+                { color: getStatusColor(item.payment_status) }
+              ]}>
+                {item.payment_status.replace('-', ' ').toUpperCase()}
+              </Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={styles.paymentInfo}>
+          <Text style={styles.paymentInfoText}>
+            Paid: Ksh {item.total_paid?.toLocaleString() || 0} | 
+            Balance: Ksh {item.balance?.toLocaleString() || 0}
+          </Text>
+        </View>
+        
+        {!item.is_fully_paid && (
+          <View style={styles.salesActions}>
+            <TouchableOpacity
+              style={styles.addPaymentButton}
+              onPress={() => openPaymentModal(item)}
+            >
+              <CreditCard size={16} color="#3B82F6" />
+              <Text style={styles.addPaymentButtonText}>Add Payment</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderOrderItem = ({ item }: { item: Order }) => (
     <View style={styles.orderCard}>
       <View style={styles.orderHeader}>
@@ -437,6 +561,15 @@ export default function AdminScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.tab, activeTab === 'sales' && styles.activeTab]}
+          onPress={() => setActiveTab('sales')}
+        >
+          <TrendingUp size={20} color={activeTab === 'sales' ? '#FFFFFF' : '#64748B'} />
+          <Text style={[styles.tabText, activeTab === 'sales' && styles.activeTabText]}>
+            Sales ({sales.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'alerts' && styles.activeTab]}
           onPress={() => setActiveTab('alerts')}
         >
@@ -510,6 +643,71 @@ export default function AdminScreen() {
                 <ShoppingBag size={48} color="#94A3B8" />
                 <Text style={styles.noOrdersText}>No pending orders</Text>
                 <Text style={styles.noOrdersSubtext}>Orders will appear here when customers place them</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {activeTab === 'sales' && (
+          <View style={styles.tabContent}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Sales & Payments</Text>
+            </View>
+            
+            {/* Analytics Cards */}
+            {salesAnalytics && (
+              <View style={styles.analyticsContainer}>
+                <View style={styles.analyticsRow}>
+                  <View style={styles.analyticsCard}>
+                    <DollarSign size={24} color="#22C55E" />
+                    <Text style={styles.analyticsValue}>Ksh {salesAnalytics.total_revenue?.toLocaleString() || 0}</Text>
+                    <Text style={styles.analyticsLabel}>Total Revenue</Text>
+                  </View>
+                  <View style={styles.analyticsCard}>
+                    <TrendingUp size={24} color="#3B82F6" />
+                    <Text style={styles.analyticsValue}>Ksh {salesAnalytics.total_profit?.toLocaleString() || 0}</Text>
+                    <Text style={styles.analyticsLabel}>Total Profit</Text>
+                  </View>
+                </View>
+                <View style={styles.analyticsRow}>
+                  <View style={styles.analyticsCard}>
+                    <ShoppingBag size={24} color="#8B5CF6" />
+                    <Text style={styles.analyticsValue}>{salesAnalytics.total_sales}</Text>
+                    <Text style={styles.analyticsLabel}>Total Sales</Text>
+                  </View>
+                  <View style={styles.analyticsCard}>
+                    <Calendar size={24} color="#F59E0B" />
+                    <Text style={styles.analyticsValue}>{salesAnalytics.profit_margin.toFixed(1)}%</Text>
+                    <Text style={styles.analyticsLabel}>Profit Margin</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+            
+            {/* Unpaid Sales Alert */}
+            {unpaidSales.length > 0 && (
+              <View style={styles.unpaidAlert}>
+                <AlertTriangle size={20} color="#F59E0B" />
+                <Text style={styles.unpaidAlertText}>
+                  {unpaidSales.length} sale{unpaidSales.length !== 1 ? 's' : ''} with outstanding payments
+                </Text>
+              </View>
+            )}
+            
+            {/* Sales List */}
+            {sales.length > 0 ? (
+              <FlatList
+                data={sales}
+                renderItem={renderSaleItem}
+                keyExtractor={(item) => item.id.toString()}
+                key={sales.length}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View style={styles.noSales}>
+                <TrendingUp size={48} color="#94A3B8" />
+                <Text style={styles.noSalesText}>No sales yet</Text>
+                <Text style={styles.noSalesSubtext}>Sales will appear here when orders are confirmed</Text>
               </View>
             )}
           </View>
@@ -722,6 +920,98 @@ export default function AdminScreen() {
               </View>
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Payment Modal */}
+      <Modal visible={showPaymentModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Add Payment - {selectedSale?.sale_number}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowPaymentModal(false)}
+                style={styles.closeButton}
+              >
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formContainer}>
+              <View style={styles.paymentSummary}>
+                <Text style={styles.paymentSummaryTitle}>Sale Summary</Text>
+                <Text style={styles.paymentSummaryText}>Total: Ksh {selectedSale?.total_amount?.toLocaleString()}</Text>
+                <Text style={styles.paymentSummaryText}>Paid: Ksh {selectedSale?.total_paid?.toLocaleString()}</Text>
+                <Text style={styles.paymentSummaryBalance}>Balance: Ksh {selectedSale?.balance?.toLocaleString()}</Text>
+              </View>
+
+              <Text style={styles.fieldLabel}>Payment Method *</Text>
+              <View style={styles.paymentMethodContainer}>
+                {[{value: 'cash', label: 'Cash'}, {value: 'mpesa', label: 'M-Pesa'}, {value: 'card', label: 'Card'}].map((method) => (
+                  <TouchableOpacity
+                    key={method.value}
+                    style={[
+                      styles.paymentMethodOption,
+                      paymentForm.method === method.value && styles.selectedPaymentMethodOption
+                    ]}
+                    onPress={() => setPaymentForm({ ...paymentForm, method: method.value })}
+                  >
+                    <Text style={[
+                      styles.paymentMethodOptionText,
+                      paymentForm.method === method.value && styles.selectedPaymentMethodOptionText
+                    ]}>
+                      {method.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Amount *</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter payment amount"
+                value={paymentForm.amount}
+                onChangeText={(text) => setPaymentForm({ ...paymentForm, amount: text })}
+                keyboardType="decimal-pad"
+              />
+
+              <Text style={styles.fieldLabel}>Reference (Optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Transaction ID, receipt number, etc."
+                value={paymentForm.reference}
+                onChangeText={(text) => setPaymentForm({ ...paymentForm, reference: text })}
+              />
+
+              <Text style={styles.fieldLabel}>Notes (Optional)</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                placeholder="Additional notes about this payment"
+                value={paymentForm.notes}
+                onChangeText={(text) => setPaymentForm({ ...paymentForm, notes: text })}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowPaymentModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={addPaymentToSale}
+              >
+                <CreditCard size={16} color="#FFFFFF" />
+                <Text style={styles.saveButtonText}>Add Payment</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>
@@ -1121,5 +1411,209 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
     textAlign: 'center',
+  },
+
+  // Sales Styles
+  analyticsContainer: {
+    marginBottom: 16,
+  },
+  analyticsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  analyticsCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  analyticsValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  analyticsLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  unpaidAlert: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  unpaidAlertText: {
+    fontSize: 14,
+    color: '#92400E',
+    fontWeight: '500',
+  },
+  salesCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  salesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  salesInfo: {
+    flex: 1,
+  },
+  saleNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  saleCustomer: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  saleDate: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  salesAmount: {
+    alignItems: 'flex-end',
+  },
+  saleTotal: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#22C55E',
+    marginBottom: 4,
+  },
+  saleProfit: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3B82F6',
+    marginBottom: 8,
+  },
+  paymentStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  paymentStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  paymentInfo: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
+    marginBottom: 12,
+  },
+  paymentInfoText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  salesActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  addPaymentButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DBEAFE',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  addPaymentButtonText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '600',
+  },
+  noSales: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  noSalesText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#94A3B8',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noSalesSubtext: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+
+  // Payment Modal Styles
+  paymentSummary: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+  },
+  paymentSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  paymentSummaryText: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  paymentSummaryBalance: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#22C55E',
+    marginTop: 4,
+  },
+  paymentMethodContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  paymentMethodOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  selectedPaymentMethodOption: {
+    backgroundColor: '#22C55E',
+    borderColor: '#22C55E',
+  },
+  paymentMethodOptionText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  selectedPaymentMethodOptionText: {
+    color: '#FFFFFF',
   },
 });

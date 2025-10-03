@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from .models import Order, OrderItems
 from sales.models import Sale, SaleItem
 from products.models import Product
+from django.utils import timezone
 from .serializers import OrderSerializer, OrderItemsSerializer
 from products.permissions import IsAdmin
 
@@ -52,8 +53,14 @@ class OrderViewSet(viewsets.ModelViewSet):
                 )
                 total_revenue = order.total_amount
                 
+                # Generate sale number
+                year = timezone.now().year
+                sale_count = Sale.objects.filter(made_on__year=year).count() + 1
+                sale_number = f"SALE-{year}-{sale_count:03d}"
+                
                 sale = Sale.objects.create(
                     order=order,
+                    sale_number=sale_number,
                     customer_name=order.customer_name,
                     customer_phone=order.customer_phone,
                     total_amount=total_revenue,
@@ -68,7 +75,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                         product=item.product,
                         quantity=item.quantity,
                         unit_price=item.unit_price,
-                        cost_price=item.product.cost_price
+                        cost_price=item.product.cost_price,
+                        sale_price=item.product.cost_price
                     )
                     
                     # Update product stock
