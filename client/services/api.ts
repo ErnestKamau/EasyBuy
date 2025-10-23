@@ -83,7 +83,7 @@ api.interceptors.response.use(
     } else {
       rejectionError = new Error(JSON.stringify(error));
     }
-    return Promise.reject(rejectionError);
+    throw rejectionError;
   }
 );
 

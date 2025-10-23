@@ -3,8 +3,8 @@ from django.db import migrations, models
 
 
 def set_default_payment_status(apps, schema_editor):
-    Order = apps.get_model('orders', 'Order')
-    for order in Order.objects.all():
+    order_model = apps.get_model('orders', 'Order')
+    for order in order_model.objects.all():
         if not hasattr(order, 'payment_status') or order.payment_status is None:
             order.payment_status = 'PENDING'
             order.save()
