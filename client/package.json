@@ -32,7 +32,7 @@
     "lucide-react-native": "^0.544.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "react-native": "0.79.5",
+    "react-native": "^0.79.6",
     "react-native-maps": "1.20.1",
     "react-native-paper": "^5.14.5",
     "react-native-reanimated": "~3.17.4",
