@@ -1,5 +1,5 @@
 // app/admin.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,12 +11,22 @@ import {
   Alert,
   Modal,
   FlatList,
-} from 'react-native';
-import { router } from 'expo-router';
-import { useAuth } from '@/app/_layout';
-import { productsApi, Category, Product, ordersApi, Order, salesApi, Sale, SalesAnalytics, Payment } from '@/services/api';
-import { ToastService } from '@/utils/toastService';
-import { 
+} from "react-native";
+import { router } from "expo-router";
+import { useAuth } from "@/app/_layout";
+import {
+  productsApi,
+  Category,
+  Product,
+  ordersApi,
+  Order,
+  salesApi,
+  Sale,
+  SalesAnalytics,
+  Payment,
+} from "@/services/api";
+import { ToastService } from "@/utils/toastService";
+import {
   ArrowLeft,
   Plus,
   Edit,
@@ -33,8 +43,8 @@ import {
   TrendingUp,
   DollarSign,
   Calendar,
-  CreditCard
-} from 'lucide-react-native';
+  CreditCard,
+} from "lucide-react-native";
 
 export default function AdminScreen() {
   const { user } = useAuth();
@@ -44,7 +54,9 @@ export default function AdminScreen() {
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
-  const [salesAnalytics, setSalesAnalytics] = useState<SalesAnalytics | null>(null);
+  const [salesAnalytics, setSalesAnalytics] = useState<SalesAnalytics | null>(
+    null
+  );
   const [unpaidSales, setUnpaidSales] = useState<Sale[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
@@ -52,31 +64,33 @@ export default function AdminScreen() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'orders' | 'sales' | 'alerts'>('categories');
+  const [activeTab, setActiveTab] = useState<
+    "categories" | "products" | "orders" | "sales" | "alerts"
+  >("categories");
 
   // Form states
-  const [categoryForm, setCategoryForm] = useState({ name: '' });
+  const [categoryForm, setCategoryForm] = useState({ name: "" });
   const [productForm, setProductForm] = useState({
-    name: '',
-    description: '',
-    image_url: '',
-    category: '',
-    kilograms: '',
-    sale_price: '',
-    cost_price: '',
-    in_stock: '',
-    minimum_stock: '',
+    name: "",
+    description: "",
+    image_url: "",
+    category: "",
+    kilograms: "",
+    sale_price: "",
+    cost_price: "",
+    in_stock: "",
+    minimum_stock: "",
   });
   const [paymentForm, setPaymentForm] = useState({
-    method: 'cash',
-    amount: '',
-    reference: '',
-    notes: '',
+    method: "cash",
+    amount: "",
+    reference: "",
+    notes: "",
   });
 
   useEffect(() => {
-    if (user?.role !== 'admin') {
-      ToastService.showError('Access Denied', 'Admin access required');
+    if (user?.role !== "admin") {
+      ToastService.showError("Access Denied", "Admin access required");
       router.back();
       return;
     }
@@ -86,25 +100,39 @@ export default function AdminScreen() {
   const loadAdminData = async () => {
     try {
       setLoading(true);
-      const [categoriesData, productsData, lowStockData, ordersData, salesData, analyticsData, unpaidData] = await Promise.all([
+      const [
+        categoriesData,
+        productsData,
+        lowStockData,
+        ordersData,
+        salesData,
+        analyticsData,
+        unpaidData,
+      ] = await Promise.all([
         productsApi.getCategories(),
         productsApi.getProducts(),
         productsApi.getLowStockProducts(),
         ordersApi.getPendingOrders().catch(() => ({ orders: [], count: 0 })),
         salesApi.getSales().catch(() => []),
         salesApi.getAnalytics().catch(() => null),
-        salesApi.getUnpaidSales().catch(() => ({ unpaid_sales: [], count: 0 }))
+        salesApi.getUnpaidSales().catch(() => ({ unpaid_sales: [], count: 0 })),
       ]);
-      
+
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
       setProducts(Array.isArray(productsData) ? productsData : []);
-      setLowStockProducts(Array.isArray(lowStockData?.products) ? lowStockData.products : []);
-      setPendingOrders(Array.isArray(ordersData?.orders) ? ordersData.orders : []);
+      setLowStockProducts(
+        Array.isArray(lowStockData?.products) ? lowStockData.products : []
+      );
+      setPendingOrders(
+        Array.isArray(ordersData?.orders) ? ordersData.orders : []
+      );
       setSales(Array.isArray(salesData) ? salesData : []);
       setSalesAnalytics(analyticsData);
-      setUnpaidSales(Array.isArray(unpaidData?.unpaid_sales) ? unpaidData.unpaid_sales : []);
+      setUnpaidSales(
+        Array.isArray(unpaidData?.unpaid_sales) ? unpaidData.unpaid_sales : []
+      );
     } catch (error) {
-      ToastService.showApiError(error, 'Failed to load admin data');
+      ToastService.showApiError(error, "Failed to load admin data");
     } finally {
       setLoading(false);
     }
@@ -117,29 +145,29 @@ export default function AdminScreen() {
       setCategoryForm({ name: category.name });
     } else {
       setEditingCategory(null);
-      setCategoryForm({ name: '' });
+      setCategoryForm({ name: "" });
     }
     setShowCategoryModal(true);
   };
 
   const saveCategoryForm = async () => {
     if (!categoryForm.name.trim()) {
-      ToastService.showError('Validation Error', 'Category name is required');
+      ToastService.showError("Validation Error", "Category name is required");
       return;
     }
 
     try {
       if (editingCategory) {
         await productsApi.updateCategory(editingCategory.id, categoryForm.name);
-        ToastService.showSuccess('Success', 'Category updated successfully');
+        ToastService.showSuccess("Success", "Category updated successfully");
       } else {
         await productsApi.createCategory(categoryForm.name);
-        ToastService.showSuccess('Success', 'Category created successfully');
+        ToastService.showSuccess("Success", "Category created successfully");
       }
       setShowCategoryModal(false);
       loadAdminData();
     } catch (error) {
-      ToastService.showApiError(error, 'Failed to save category');
+      ToastService.showApiError(error, "Failed to save category");
     }
   };
 
@@ -152,7 +180,7 @@ export default function AdminScreen() {
         description: product.description,
         image_url: product.image_url,
         category: product.category.toString(),
-        kilograms: product.kilograms?.toString() || '',
+        kilograms: product.kilograms?.toString() || "",
         sale_price: product.sale_price.toString(),
         cost_price: product.cost_price.toString(),
         in_stock: product.in_stock.toString(),
@@ -161,15 +189,15 @@ export default function AdminScreen() {
     } else {
       setEditingProduct(null);
       setProductForm({
-        name: '',
-        description: '',
-        image_url: '',
-        category: '',
-        kilograms: '',
-        sale_price: '',
-        cost_price: '',
-        in_stock: '',
-        minimum_stock: '',
+        name: "",
+        description: "",
+        image_url: "",
+        category: "",
+        kilograms: "",
+        sale_price: "",
+        cost_price: "",
+        in_stock: "",
+        minimum_stock: "",
       });
     }
     setShowProductModal(true);
@@ -177,8 +205,16 @@ export default function AdminScreen() {
 
   const saveProductForm = async () => {
     // Validation
-    if (!productForm.name.trim() || !productForm.category || !productForm.sale_price || !productForm.cost_price) {
-      ToastService.showError('Validation Error', 'Please fill in all required fields');
+    if (
+      !productForm.name.trim() ||
+      !productForm.category ||
+      !productForm.sale_price ||
+      !productForm.cost_price
+    ) {
+      ToastService.showError(
+        "Validation Error",
+        "Please fill in all required fields"
+      );
       return;
     }
 
@@ -188,7 +224,9 @@ export default function AdminScreen() {
         description: productForm.description,
         image_url: productForm.image_url,
         category: parseInt(productForm.category),
-        kilograms: productForm.kilograms ? parseFloat(productForm.kilograms) : null,
+        kilograms: productForm.kilograms
+          ? parseFloat(productForm.kilograms)
+          : null,
         sale_price: parseFloat(productForm.sale_price),
         cost_price: parseFloat(productForm.cost_price),
         in_stock: parseInt(productForm.in_stock) || 0,
@@ -198,36 +236,39 @@ export default function AdminScreen() {
 
       if (editingProduct) {
         await productsApi.updateProduct(editingProduct.id, productData);
-        ToastService.showSuccess('Success', 'Product updated successfully');
+        ToastService.showSuccess("Success", "Product updated successfully");
       } else {
         await productsApi.createProduct(productData);
-        ToastService.showSuccess('Success', 'Product created successfully');
+        ToastService.showSuccess("Success", "Product created successfully");
       }
-      
+
       setShowProductModal(false);
       loadAdminData();
     } catch (error) {
-      ToastService.showApiError(error, 'Failed to save product');
+      ToastService.showApiError(error, "Failed to save product");
     }
   };
 
   const deleteCategory = (category: Category) => {
     Alert.alert(
-      'Delete Category',
+      "Delete Category",
       `Are you sure you want to delete "${category.name}"?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: () => {
             (async () => {
               try {
                 await productsApi.deleteCategory(category.id);
-                ToastService.showSuccess('Success', 'Category deleted successfully');
+                ToastService.showSuccess(
+                  "Success",
+                  "Category deleted successfully"
+                );
                 loadAdminData();
               } catch (error) {
-                ToastService.showApiError(error, 'Failed to delete category');
+                ToastService.showApiError(error, "Failed to delete category");
               }
             })();
           },
@@ -238,21 +279,24 @@ export default function AdminScreen() {
 
   const deleteProduct = (product: Product) => {
     Alert.alert(
-      'Delete Product',
+      "Delete Product",
       `Are you sure you want to delete "${product.name}"?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: () => {
             (async () => {
               try {
                 await productsApi.deleteProduct(product.id);
-                ToastService.showSuccess('Success', 'Product deleted successfully');
+                ToastService.showSuccess(
+                  "Success",
+                  "Product deleted successfully"
+                );
                 loadAdminData();
               } catch (error) {
-                ToastService.showApiError(error, 'Failed to delete product');
+                ToastService.showApiError(error, "Failed to delete product");
               }
             })();
           },
@@ -264,21 +308,24 @@ export default function AdminScreen() {
   // Order Management
   const confirmOrder = async (order: Order) => {
     Alert.alert(
-      'Confirm Order',
+      "Confirm Order",
       `Confirm order #${order.id} from ${order.customer_name}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Confirm',
-          style: 'default',
+          text: "Confirm",
+          style: "default",
           onPress: () => {
             (async () => {
               try {
                 await ordersApi.confirmOrder(order.id);
-                ToastService.showSuccess('Success', 'Order confirmed and converted to sale');
+                ToastService.showSuccess(
+                  "Success",
+                  "Order confirmed and converted to sale"
+                );
                 loadAdminData();
               } catch (error) {
-                ToastService.showApiError(error, 'Failed to confirm order');
+                ToastService.showApiError(error, "Failed to confirm order");
               }
             })();
           },
@@ -289,21 +336,21 @@ export default function AdminScreen() {
 
   const cancelOrder = async (order: Order) => {
     Alert.alert(
-      'Cancel Order',
+      "Cancel Order",
       `Cancel order #${order.id} from ${order.customer_name}?`,
       [
-        { text: 'No', style: 'cancel' },
+        { text: "No", style: "cancel" },
         {
-          text: 'Cancel Order',
-          style: 'destructive',
+          text: "Cancel Order",
+          style: "destructive",
           onPress: () => {
             (async () => {
               try {
                 await ordersApi.cancelOrder(order.id);
-                ToastService.showSuccess('Success', 'Order cancelled');
+                ToastService.showSuccess("Success", "Order cancelled");
                 loadAdminData();
               } catch (error) {
-                ToastService.showApiError(error, 'Failed to cancel order');
+                ToastService.showApiError(error, "Failed to cancel order");
               }
             })();
           },
@@ -316,17 +363,17 @@ export default function AdminScreen() {
   const openPaymentModal = (sale: Sale) => {
     setSelectedSale(sale);
     setPaymentForm({
-      method: 'cash',
+      method: "cash",
       amount: sale.balance.toString(),
-      reference: '',
-      notes: '',
+      reference: "",
+      notes: "",
     });
     setShowPaymentModal(true);
   };
 
   const addPaymentToSale = async () => {
     if (!selectedSale || !paymentForm.amount) {
-      ToastService.showError('Validation Error', 'Amount is required');
+      ToastService.showError("Validation Error", "Amount is required");
       return;
     }
 
@@ -339,30 +386,38 @@ export default function AdminScreen() {
       };
 
       await salesApi.addPayment(selectedSale.id, paymentData);
-      ToastService.showSuccess('Success', 'Payment added successfully');
+      ToastService.showSuccess("Success", "Payment added successfully");
       setShowPaymentModal(false);
       loadAdminData();
     } catch (error) {
-      ToastService.showApiError(error, 'Failed to add payment');
+      ToastService.showApiError(error, "Failed to add payment");
     }
   };
 
   const renderSaleItem = ({ item }: { item: Sale }) => {
     const getStatusColor = (status: string) => {
       switch (status) {
-        case 'fully-paid': return '#22C55E';
-        case 'partial': return '#F59E0B';
-        case 'overdue': return '#EF4444';
-        default: return '#94A3B8';
+        case "fully-paid":
+          return "#22C55E";
+        case "partial":
+          return "#F59E0B";
+        case "overdue":
+          return "#EF4444";
+        default:
+          return "#94A3B8";
       }
     };
 
     const getStatusBgColor = (status: string) => {
       switch (status) {
-        case 'fully-paid': return '#F0FDF4';
-        case 'partial': return '#FFFBEB';
-        case 'overdue': return '#FEF2F2';
-        default: return '#F8FAFC';
+        case "fully-paid":
+          return "#F0FDF4";
+        case "partial":
+          return "#FFFBEB";
+        case "overdue":
+          return "#FEF2F2";
+        default:
+          return "#F8FAFC";
       }
     };
 
@@ -377,29 +432,37 @@ export default function AdminScreen() {
             </Text>
           </View>
           <View style={styles.salesAmount}>
-            <Text style={styles.saleTotal}>Ksh {item.total_amount?.toLocaleString() || 0}</Text>
-            <Text style={styles.saleProfit}>Profit: Ksh {item.profit_amount?.toLocaleString() || 0}</Text>
-            <View style={[
-              styles.paymentStatusBadge,
-              { backgroundColor: getStatusBgColor(item.payment_status) }
-            ]}>
-              <Text style={[
-                styles.paymentStatusText,
-                { color: getStatusColor(item.payment_status) }
-              ]}>
-                {item.payment_status.replace('-', ' ').toUpperCase()}
+            <Text style={styles.saleTotal}>
+              Ksh {item.total_amount?.toLocaleString() || 0}
+            </Text>
+            <Text style={styles.saleProfit}>
+              Profit: Ksh {item.profit_amount?.toLocaleString() || 0}
+            </Text>
+            <View
+              style={[
+                styles.paymentStatusBadge,
+                { backgroundColor: getStatusBgColor(item.payment_status) },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.paymentStatusText,
+                  { color: getStatusColor(item.payment_status) },
+                ]}
+              >
+                {item.payment_status.replace("-", " ").toUpperCase()}
               </Text>
             </View>
           </View>
         </View>
-        
+
         <View style={styles.paymentInfo}>
           <Text style={styles.paymentInfoText}>
-            Paid: Ksh {item.total_paid?.toLocaleString() || 0} | 
-            Balance: Ksh {item.balance?.toLocaleString() || 0}
+            Paid: Ksh {item.total_paid?.toLocaleString() || 0} | Balance: Ksh{" "}
+            {item.balance?.toLocaleString() || 0}
           </Text>
         </View>
-        
+
         {!item.is_fully_paid && (
           <View style={styles.salesActions}>
             <TouchableOpacity
@@ -426,21 +489,30 @@ export default function AdminScreen() {
           </Text>
         </View>
         <View style={styles.orderAmount}>
-          <Text style={styles.orderTotal}>Ksh {item.total_amount?.toLocaleString() || 0}</Text>
-          <View style={[
-            styles.statusBadge,
-            { backgroundColor: item.status === 'pending' ? '#FEF3C7' : '#F0FDF4' }
-          ]}>
-            <Text style={[
-              styles.statusText,
-              { color: item.status === 'pending' ? '#D97706' : '#22C55E' }
-            ]}>
+          <Text style={styles.orderTotal}>
+            Ksh {item.total_amount?.toLocaleString() || 0}
+          </Text>
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor:
+                  item.status === "pending" ? "#FEF3C7" : "#F0FDF4",
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                { color: item.status === "pending" ? "#D97706" : "#22C55E" },
+              ]}
+            >
               {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
             </Text>
           </View>
         </View>
       </View>
-      
+
       <View style={styles.orderActions}>
         <TouchableOpacity
           style={styles.confirmButton}
@@ -449,6 +521,35 @@ export default function AdminScreen() {
           <CheckCircle size={16} color="#22C55E" />
           <Text style={styles.confirmButtonText}>Confirm</Text>
         </TouchableOpacity>
+        {item.payment_status === "PENDING" && (
+          <TouchableOpacity
+            style={styles.addPaymentButton}
+            onPress={() =>
+              (async () => {
+                try {
+                  const response = await ordersApi.initiatePayment(item.id);
+                  if (response.success) {
+                    ToastService.showSuccess("Success", "Payment request sent");
+                  } else {
+                    ToastService.showError(
+                      "Payment Error",
+                      response.message || "Failed to send payment request"
+                    );
+                  }
+                  loadAdminData();
+                } catch (error) {
+                  ToastService.showApiError(
+                    error,
+                    "Failed to initiate payment"
+                  );
+                }
+              })()
+            }
+          >
+            <CreditCard size={16} color="#2563EB" />
+            <Text style={styles.addPaymentButtonText}>Request MPesa</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => cancelOrder(item)}
@@ -524,7 +625,10 @@ export default function AdminScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <ArrowLeft size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Admin Panel</Text>
@@ -534,47 +638,87 @@ export default function AdminScreen() {
       {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'categories' && styles.activeTab]}
-          onPress={() => setActiveTab('categories')}
+          style={[styles.tab, activeTab === "categories" && styles.activeTab]}
+          onPress={() => setActiveTab("categories")}
         >
-          <Tag size={20} color={activeTab === 'categories' ? '#FFFFFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'categories' && styles.activeTabText]}>
+          <Tag
+            size={20}
+            color={activeTab === "categories" ? "#FFFFFF" : "#64748B"}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "categories" && styles.activeTabText,
+            ]}
+          >
             Categories
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
-          onPress={() => setActiveTab('products')}
+          style={[styles.tab, activeTab === "products" && styles.activeTab]}
+          onPress={() => setActiveTab("products")}
         >
-          <Package size={20} color={activeTab === 'products' ? '#FFFFFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
+          <Package
+            size={20}
+            color={activeTab === "products" ? "#FFFFFF" : "#64748B"}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "products" && styles.activeTabText,
+            ]}
+          >
             Products
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'orders' && styles.activeTab]}
-          onPress={() => setActiveTab('orders')}
+          style={[styles.tab, activeTab === "orders" && styles.activeTab]}
+          onPress={() => setActiveTab("orders")}
         >
-          <ShoppingBag size={20} color={activeTab === 'orders' ? '#FFFFFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'orders' && styles.activeTabText]}>
+          <ShoppingBag
+            size={20}
+            color={activeTab === "orders" ? "#FFFFFF" : "#64748B"}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "orders" && styles.activeTabText,
+            ]}
+          >
             Orders ({pendingOrders.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'sales' && styles.activeTab]}
-          onPress={() => setActiveTab('sales')}
+          style={[styles.tab, activeTab === "sales" && styles.activeTab]}
+          onPress={() => setActiveTab("sales")}
         >
-          <TrendingUp size={20} color={activeTab === 'sales' ? '#FFFFFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'sales' && styles.activeTabText]}>
+          <TrendingUp
+            size={20}
+            color={activeTab === "sales" ? "#FFFFFF" : "#64748B"}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "sales" && styles.activeTabText,
+            ]}
+          >
             Sales ({sales.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'alerts' && styles.activeTab]}
-          onPress={() => setActiveTab('alerts')}
+          style={[styles.tab, activeTab === "alerts" && styles.activeTab]}
+          onPress={() => setActiveTab("alerts")}
         >
-          <AlertTriangle size={20} color={activeTab === 'alerts' ? '#FFFFFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'alerts' && styles.activeTabText]}>
+          <AlertTriangle
+            size={20}
+            color={activeTab === "alerts" ? "#FFFFFF" : "#64748B"}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "alerts" && styles.activeTabText,
+            ]}
+          >
             Alerts ({lowStockProducts.length})
           </Text>
         </TouchableOpacity>
@@ -582,10 +726,12 @@ export default function AdminScreen() {
 
       {/* Content */}
       <View style={styles.content}>
-        {activeTab === 'categories' && (
+        {activeTab === "categories" && (
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Categories ({categories.length})</Text>
+              <Text style={styles.sectionTitle}>
+                Categories ({categories.length})
+              </Text>
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => openCategoryModal()}
@@ -593,7 +739,7 @@ export default function AdminScreen() {
                 <Plus size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-                          <FlatList
+            <FlatList
               data={categories}
               renderItem={renderCategoryItem}
               keyExtractor={(item) => item.id.toString()}
@@ -604,10 +750,12 @@ export default function AdminScreen() {
           </View>
         )}
 
-        {activeTab === 'products' && (
+        {activeTab === "products" && (
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Products ({products.length})</Text>
+              <Text style={styles.sectionTitle}>
+                Products ({products.length})
+              </Text>
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => openProductModal()}
@@ -625,10 +773,12 @@ export default function AdminScreen() {
           </View>
         )}
 
-        {activeTab === 'orders' && (
+        {activeTab === "orders" && (
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Pending Orders ({pendingOrders.length})</Text>
+              <Text style={styles.sectionTitle}>
+                Pending Orders ({pendingOrders.length})
+              </Text>
             </View>
             {pendingOrders.length > 0 ? (
               <FlatList
@@ -642,58 +792,69 @@ export default function AdminScreen() {
               <View style={styles.noOrders}>
                 <ShoppingBag size={48} color="#94A3B8" />
                 <Text style={styles.noOrdersText}>No pending orders</Text>
-                <Text style={styles.noOrdersSubtext}>Orders will appear here when customers place them</Text>
+                <Text style={styles.noOrdersSubtext}>
+                  Orders will appear here when customers place them
+                </Text>
               </View>
             )}
           </View>
         )}
 
-        {activeTab === 'sales' && (
+        {activeTab === "sales" && (
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Sales & Payments</Text>
             </View>
-            
+
             {/* Analytics Cards */}
             {salesAnalytics && (
               <View style={styles.analyticsContainer}>
                 <View style={styles.analyticsRow}>
                   <View style={styles.analyticsCard}>
                     <DollarSign size={24} color="#22C55E" />
-                    <Text style={styles.analyticsValue}>Ksh {salesAnalytics.total_revenue?.toLocaleString() || 0}</Text>
+                    <Text style={styles.analyticsValue}>
+                      Ksh {salesAnalytics.total_revenue?.toLocaleString() || 0}
+                    </Text>
                     <Text style={styles.analyticsLabel}>Total Revenue</Text>
                   </View>
                   <View style={styles.analyticsCard}>
                     <TrendingUp size={24} color="#3B82F6" />
-                    <Text style={styles.analyticsValue}>Ksh {salesAnalytics.total_profit?.toLocaleString() || 0}</Text>
+                    <Text style={styles.analyticsValue}>
+                      Ksh {salesAnalytics.total_profit?.toLocaleString() || 0}
+                    </Text>
                     <Text style={styles.analyticsLabel}>Total Profit</Text>
                   </View>
                 </View>
                 <View style={styles.analyticsRow}>
                   <View style={styles.analyticsCard}>
                     <ShoppingBag size={24} color="#8B5CF6" />
-                    <Text style={styles.analyticsValue}>{salesAnalytics.total_sales}</Text>
+                    <Text style={styles.analyticsValue}>
+                      {salesAnalytics.total_sales}
+                    </Text>
                     <Text style={styles.analyticsLabel}>Total Sales</Text>
                   </View>
                   <View style={styles.analyticsCard}>
                     <Calendar size={24} color="#F59E0B" />
-                    <Text style={styles.analyticsValue}>{salesAnalytics.profit_margin.toFixed(1)}%</Text>
+                    <Text style={styles.analyticsValue}>
+                      {salesAnalytics.profit_margin.toFixed(1)}%
+                    </Text>
                     <Text style={styles.analyticsLabel}>Profit Margin</Text>
                   </View>
                 </View>
               </View>
             )}
-            
+
             {/* Unpaid Sales Alert */}
             {unpaidSales.length > 0 && (
               <View style={styles.unpaidAlert}>
                 <AlertTriangle size={20} color="#F59E0B" />
                 <Text style={styles.unpaidAlertText}>
-                  {unpaidSales.length} sale{unpaidSales.length !== 1 ? 's' : ''} with outstanding payments
+                  {unpaidSales.length} sale{unpaidSales.length !== 1 ? "s" : ""}{" "}
+                  with outstanding payments
                 </Text>
               </View>
             )}
-            
+
             {/* Sales List */}
             {sales.length > 0 ? (
               <FlatList
@@ -707,13 +868,15 @@ export default function AdminScreen() {
               <View style={styles.noSales}>
                 <TrendingUp size={48} color="#94A3B8" />
                 <Text style={styles.noSalesText}>No sales yet</Text>
-                <Text style={styles.noSalesSubtext}>Sales will appear here when orders are confirmed</Text>
+                <Text style={styles.noSalesSubtext}>
+                  Sales will appear here when orders are confirmed
+                </Text>
               </View>
             )}
           </View>
         )}
 
-        {activeTab === 'alerts' && (
+        {activeTab === "alerts" && (
           <View style={styles.tabContent}>
             <Text style={styles.sectionTitle}>Low Stock Alerts</Text>
             {lowStockProducts.length > 0 ? (
@@ -728,7 +891,9 @@ export default function AdminScreen() {
               <View style={styles.noAlerts}>
                 <AlertTriangle size={48} color="#22C55E" />
                 <Text style={styles.noAlertsText}>No low stock alerts</Text>
-                <Text style={styles.noAlertsSubtext}>All products are well stocked</Text>
+                <Text style={styles.noAlertsSubtext}>
+                  All products are well stocked
+                </Text>
               </View>
             )}
           </View>
@@ -741,7 +906,7 @@ export default function AdminScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingCategory ? 'Edit Category' : 'Add New Category'}
+                {editingCategory ? "Edit Category" : "Add New Category"}
               </Text>
               <TouchableOpacity
                 onPress={() => setShowCategoryModal(false)}
@@ -783,11 +948,14 @@ export default function AdminScreen() {
       {/* Product Modal */}
       <Modal visible={showProductModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.modalScrollView}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
-                  {editingProduct ? 'Edit Product' : 'Add New Product'}
+                  {editingProduct ? "Edit Product" : "Add New Product"}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setShowProductModal(false)}
@@ -803,7 +971,9 @@ export default function AdminScreen() {
                   style={styles.textInput}
                   placeholder="Enter product name"
                   value={productForm.name}
-                  onChangeText={(text) => setProductForm({ ...productForm, name: text })}
+                  onChangeText={(text) =>
+                    setProductForm({ ...productForm, name: text })
+                  }
                 />
 
                 <Text style={styles.fieldLabel}>Description</Text>
@@ -811,7 +981,9 @@ export default function AdminScreen() {
                   style={[styles.textInput, styles.textArea]}
                   placeholder="Enter product description"
                   value={productForm.description}
-                  onChangeText={(text) => setProductForm({ ...productForm, description: text })}
+                  onChangeText={(text) =>
+                    setProductForm({ ...productForm, description: text })
+                  }
                   multiline
                   numberOfLines={3}
                 />
@@ -821,29 +993,44 @@ export default function AdminScreen() {
                   style={styles.textInput}
                   placeholder="Enter image URL"
                   value={productForm.image_url}
-                  onChangeText={(text) => setProductForm({ ...productForm, image_url: text })}
+                  onChangeText={(text) =>
+                    setProductForm({ ...productForm, image_url: text })
+                  }
                 />
 
                 <Text style={styles.fieldLabel}>Category *</Text>
                 <View style={styles.pickerContainer}>
-                  {Array.isArray(categories) && categories.length > 0 ? categories.map((category) => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={[
-                        styles.categoryOption,
-                        productForm.category === category.id.toString() && styles.selectedCategoryOption
-                      ]}
-                      onPress={() => setProductForm({ ...productForm, category: category.id.toString() })}
-                    >
-                      <Text style={[
-                        styles.categoryOptionText,
-                        productForm.category === category.id.toString() && styles.selectedCategoryOptionText
-                      ]}>
-                        {category.name}
-                      </Text>
-                    </TouchableOpacity>
-                  )) : (
-                    <Text style={styles.noCategoriesText}>No categories available. Please create categories first.</Text>
+                  {Array.isArray(categories) && categories.length > 0 ? (
+                    categories.map((category) => (
+                      <TouchableOpacity
+                        key={category.id}
+                        style={[
+                          styles.categoryOption,
+                          productForm.category === category.id.toString() &&
+                            styles.selectedCategoryOption,
+                        ]}
+                        onPress={() =>
+                          setProductForm({
+                            ...productForm,
+                            category: category.id.toString(),
+                          })
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.categoryOptionText,
+                            productForm.category === category.id.toString() &&
+                              styles.selectedCategoryOptionText,
+                          ]}
+                        >
+                          {category.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.noCategoriesText}>
+                      No categories available. Please create categories first.
+                    </Text>
                   )}
                 </View>
 
@@ -854,7 +1041,9 @@ export default function AdminScreen() {
                       style={styles.textInput}
                       placeholder="0.0"
                       value={productForm.kilograms}
-                      onChangeText={(text) => setProductForm({ ...productForm, kilograms: text })}
+                      onChangeText={(text) =>
+                        setProductForm({ ...productForm, kilograms: text })
+                      }
                       keyboardType="decimal-pad"
                     />
                   </View>
@@ -864,7 +1053,9 @@ export default function AdminScreen() {
                       style={styles.textInput}
                       placeholder="0.00"
                       value={productForm.sale_price}
-                      onChangeText={(text) => setProductForm({ ...productForm, sale_price: text })}
+                      onChangeText={(text) =>
+                        setProductForm({ ...productForm, sale_price: text })
+                      }
                       keyboardType="decimal-pad"
                     />
                   </View>
@@ -877,7 +1068,9 @@ export default function AdminScreen() {
                       style={styles.textInput}
                       placeholder="0.00"
                       value={productForm.cost_price}
-                      onChangeText={(text) => setProductForm({ ...productForm, cost_price: text })}
+                      onChangeText={(text) =>
+                        setProductForm({ ...productForm, cost_price: text })
+                      }
                       keyboardType="decimal-pad"
                     />
                   </View>
@@ -887,7 +1080,9 @@ export default function AdminScreen() {
                       style={styles.textInput}
                       placeholder="0"
                       value={productForm.in_stock}
-                      onChangeText={(text) => setProductForm({ ...productForm, in_stock: text })}
+                      onChangeText={(text) =>
+                        setProductForm({ ...productForm, in_stock: text })
+                      }
                       keyboardType="number-pad"
                     />
                   </View>
@@ -898,7 +1093,9 @@ export default function AdminScreen() {
                   style={styles.textInput}
                   placeholder="5"
                   value={productForm.minimum_stock}
-                  onChangeText={(text) => setProductForm({ ...productForm, minimum_stock: text })}
+                  onChangeText={(text) =>
+                    setProductForm({ ...productForm, minimum_stock: text })
+                  }
                   keyboardType="number-pad"
                 />
               </View>
@@ -942,26 +1139,42 @@ export default function AdminScreen() {
             <View style={styles.formContainer}>
               <View style={styles.paymentSummary}>
                 <Text style={styles.paymentSummaryTitle}>Sale Summary</Text>
-                <Text style={styles.paymentSummaryText}>Total: Ksh {selectedSale?.total_amount?.toLocaleString()}</Text>
-                <Text style={styles.paymentSummaryText}>Paid: Ksh {selectedSale?.total_paid?.toLocaleString()}</Text>
-                <Text style={styles.paymentSummaryBalance}>Balance: Ksh {selectedSale?.balance?.toLocaleString()}</Text>
+                <Text style={styles.paymentSummaryText}>
+                  Total: Ksh {selectedSale?.total_amount?.toLocaleString()}
+                </Text>
+                <Text style={styles.paymentSummaryText}>
+                  Paid: Ksh {selectedSale?.total_paid?.toLocaleString()}
+                </Text>
+                <Text style={styles.paymentSummaryBalance}>
+                  Balance: Ksh {selectedSale?.balance?.toLocaleString()}
+                </Text>
               </View>
 
               <Text style={styles.fieldLabel}>Payment Method *</Text>
               <View style={styles.paymentMethodContainer}>
-                {[{value: 'cash', label: 'Cash'}, {value: 'mpesa', label: 'M-Pesa'}, {value: 'card', label: 'Card'}].map((method) => (
+                {[
+                  { value: "cash", label: "Cash" },
+                  { value: "mpesa", label: "M-Pesa" },
+                  { value: "card", label: "Card" },
+                ].map((method) => (
                   <TouchableOpacity
                     key={method.value}
                     style={[
                       styles.paymentMethodOption,
-                      paymentForm.method === method.value && styles.selectedPaymentMethodOption
+                      paymentForm.method === method.value &&
+                        styles.selectedPaymentMethodOption,
                     ]}
-                    onPress={() => setPaymentForm({ ...paymentForm, method: method.value })}
+                    onPress={() =>
+                      setPaymentForm({ ...paymentForm, method: method.value })
+                    }
                   >
-                    <Text style={[
-                      styles.paymentMethodOptionText,
-                      paymentForm.method === method.value && styles.selectedPaymentMethodOptionText
-                    ]}>
+                    <Text
+                      style={[
+                        styles.paymentMethodOptionText,
+                        paymentForm.method === method.value &&
+                          styles.selectedPaymentMethodOptionText,
+                      ]}
+                    >
                       {method.label}
                     </Text>
                   </TouchableOpacity>
@@ -973,7 +1186,9 @@ export default function AdminScreen() {
                 style={styles.textInput}
                 placeholder="Enter payment amount"
                 value={paymentForm.amount}
-                onChangeText={(text) => setPaymentForm({ ...paymentForm, amount: text })}
+                onChangeText={(text) =>
+                  setPaymentForm({ ...paymentForm, amount: text })
+                }
                 keyboardType="decimal-pad"
               />
 
@@ -982,7 +1197,9 @@ export default function AdminScreen() {
                 style={styles.textInput}
                 placeholder="Transaction ID, receipt number, etc."
                 value={paymentForm.reference}
-                onChangeText={(text) => setPaymentForm({ ...paymentForm, reference: text })}
+                onChangeText={(text) =>
+                  setPaymentForm({ ...paymentForm, reference: text })
+                }
               />
 
               <Text style={styles.fieldLabel}>Notes (Optional)</Text>
@@ -990,7 +1207,9 @@ export default function AdminScreen() {
                 style={[styles.textInput, styles.textArea]}
                 placeholder="Additional notes about this payment"
                 value={paymentForm.notes}
-                onChangeText={(text) => setPaymentForm({ ...paymentForm, notes: text })}
+                onChangeText={(text) =>
+                  setPaymentForm({ ...paymentForm, notes: text })
+                }
                 multiline
                 numberOfLines={3}
               />
@@ -1021,37 +1240,37 @@ export default function AdminScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
   },
   centerContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#64748B',
+    color: "#64748B",
   },
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 16,
     paddingTop: 60,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: "#8B5CF6",
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   placeholder: {
     width: 40,
@@ -1059,29 +1278,29 @@ const styles = StyleSheet.create({
 
   // Tabs
   tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: "#E2E8F0",
   },
   tab: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 16,
     gap: 8,
   },
   activeTab: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: "#8B5CF6",
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#64748B',
+    fontWeight: "600",
+    color: "#64748B",
   },
   activeTabText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
 
   // Content
@@ -1093,31 +1312,31 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
   },
   addButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: "#22C55E",
     borderRadius: 8,
     padding: 12,
   },
 
   // Item Cards
   itemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -1128,31 +1347,31 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: "600",
+    color: "#1E293B",
     marginBottom: 4,
   },
   itemSubtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
   },
   lowStockIndicator: {
     fontSize: 12,
-    color: '#EF4444',
-    fontWeight: '600',
+    color: "#EF4444",
+    fontWeight: "600",
     marginTop: 4,
   },
   itemActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   editButton: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: "#DBEAFE",
     borderRadius: 8,
     padding: 8,
   },
   deleteButton: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: "#FEE2E2",
     borderRadius: 8,
     padding: 8,
   },
@@ -1160,53 +1379,53 @@ const styles = StyleSheet.create({
   // No Alerts
   noAlerts: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 60,
   },
   noAlertsText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#22C55E',
+    fontWeight: "600",
+    color: "#22C55E",
     marginTop: 16,
     marginBottom: 8,
   },
   noAlertsSubtext: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
   },
 
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalScrollView: {
     flex: 1,
-    width: '100%',
+    width: "100%",
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     margin: 16,
     maxWidth: 400,
-    width: '100%',
-    alignSelf: 'center',
+    width: "100%",
+    alignSelf: "center",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: "#E2E8F0",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: "600",
+    color: "#1E293B",
   },
   closeButton: {
     padding: 4,
@@ -1218,72 +1437,72 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: "600",
+    color: "#1E293B",
     marginBottom: 8,
     marginTop: 12,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#1E293B',
-    backgroundColor: '#FFFFFF',
+    color: "#1E293B",
+    backgroundColor: "#FFFFFF",
   },
   textArea: {
     height: 80,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   formRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   formColumn: {
     flex: 1,
   },
   pickerContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   categoryOption: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
   },
   selectedCategoryOption: {
-    backgroundColor: '#22C55E',
-    borderColor: '#22C55E',
+    backgroundColor: "#22C55E",
+    borderColor: "#22C55E",
   },
   categoryOptionText: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
   },
   selectedCategoryOptionText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   noCategoriesText: {
     fontSize: 14,
-    color: '#EF4444',
-    fontStyle: 'italic',
-    textAlign: 'center',
+    color: "#EF4444",
+    fontStyle: "italic",
+    textAlign: "center",
     padding: 16,
   },
 
   // Modal Actions
   modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: "#E2E8F0",
     gap: 12,
   },
   cancelButton: {
@@ -1291,17 +1510,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
   },
   cancelButtonText: {
     fontSize: 16,
-    color: '#64748B',
-    fontWeight: '600',
+    color: "#64748B",
+    fontWeight: "600",
   },
   saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#22C55E',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#22C55E",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -1309,27 +1528,27 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 
   // Order Styles
   orderCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 16,
     marginVertical: 8,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
   orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 16,
   },
   orderInfo: {
@@ -1337,26 +1556,26 @@ const styles = StyleSheet.create({
   },
   orderNumber: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
     marginBottom: 4,
   },
   orderCustomer: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
     marginBottom: 4,
   },
   orderDate: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: "#94A3B8",
   },
   orderAmount: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   orderTotal: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#22C55E',
+    fontWeight: "700",
+    color: "#22C55E",
     marginBottom: 8,
   },
   statusBadge: {
@@ -1366,51 +1585,51 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   orderActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   confirmButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F0FDF4',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0FDF4",
     paddingVertical: 12,
     borderRadius: 8,
     gap: 6,
   },
   confirmButtonText: {
     fontSize: 14,
-    color: '#22C55E',
-    fontWeight: '600',
+    color: "#22C55E",
+    fontWeight: "600",
   },
   orderCancelButtonText: {
     fontSize: 14,
-    color: '#EF4444',
-    fontWeight: '600',
+    color: "#EF4444",
+    fontWeight: "600",
   },
 
   // No Orders
   noOrders: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 60,
   },
   noOrdersText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontWeight: "600",
+    color: "#94A3B8",
     marginTop: 16,
     marginBottom: 8,
   },
   noOrdersSubtext: {
     fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
+    color: "#64748B",
+    textAlign: "center",
   },
 
   // Sales Styles
@@ -1418,17 +1637,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   analyticsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 12,
   },
   analyticsCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -1436,46 +1655,46 @@ const styles = StyleSheet.create({
   },
   analyticsValue: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
     marginTop: 8,
     marginBottom: 4,
   },
   analyticsLabel: {
     fontSize: 12,
-    color: '#64748B',
-    textAlign: 'center',
+    color: "#64748B",
+    textAlign: "center",
   },
   unpaidAlert: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: "#FFFBEB",
     borderRadius: 8,
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginBottom: 16,
   },
   unpaidAlertText: {
     fontSize: 14,
-    color: '#92400E',
-    fontWeight: '500',
+    color: "#92400E",
+    fontWeight: "500",
   },
   salesCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 16,
     marginVertical: 8,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
   salesHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 12,
   },
   salesInfo: {
@@ -1483,32 +1702,32 @@ const styles = StyleSheet.create({
   },
   saleNumber: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
     marginBottom: 4,
   },
   saleCustomer: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
     marginBottom: 4,
   },
   saleDate: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: "#94A3B8",
   },
   salesAmount: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   saleTotal: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#22C55E',
+    fontWeight: "700",
+    color: "#22C55E",
     marginBottom: 4,
   },
   saleProfit: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#3B82F6',
+    fontWeight: "600",
+    color: "#3B82F6",
     marginBottom: 8,
   },
   paymentStatusBadge: {
@@ -1518,82 +1737,82 @@ const styles = StyleSheet.create({
   },
   paymentStatusText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   paymentInfo: {
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: "#F1F5F9",
     paddingTop: 12,
     marginBottom: 12,
   },
   paymentInfoText: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
   },
   salesActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   addPaymentButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#DBEAFE',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#DBEAFE",
     paddingVertical: 10,
     borderRadius: 8,
     gap: 6,
   },
   addPaymentButtonText: {
     fontSize: 14,
-    color: '#3B82F6',
-    fontWeight: '600',
+    color: "#3B82F6",
+    fontWeight: "600",
   },
   noSales: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 60,
   },
   noSalesText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontWeight: "600",
+    color: "#94A3B8",
     marginTop: 16,
     marginBottom: 8,
   },
   noSalesSubtext: {
     fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
+    color: "#64748B",
+    textAlign: "center",
   },
 
   // Payment Modal Styles
   paymentSummary: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
     borderRadius: 8,
     padding: 16,
     marginBottom: 20,
   },
   paymentSummaryTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
     marginBottom: 8,
   },
   paymentSummaryText: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
     marginBottom: 4,
   },
   paymentSummaryBalance: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#22C55E',
+    fontWeight: "700",
+    color: "#22C55E",
     marginTop: 4,
   },
   paymentMethodContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginBottom: 12,
   },
@@ -1601,19 +1820,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
   },
   selectedPaymentMethodOption: {
-    backgroundColor: '#22C55E',
-    borderColor: '#22C55E',
+    backgroundColor: "#22C55E",
+    borderColor: "#22C55E",
   },
   paymentMethodOptionText: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
   },
   selectedPaymentMethodOptionText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
 });

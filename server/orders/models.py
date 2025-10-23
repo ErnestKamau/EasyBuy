@@ -23,6 +23,13 @@ class Order(models.Model):
     customer_phone = models.CharField(max_length=15)
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=15, choices=ORDER_STATUS, default='pending')
+    PAYMENT_STATUS = [
+        ('PENDING', 'Pending'),
+        ('PAID', 'Paid'),
+        ('DEBT', 'On Debt'),
+        ('FAILED', 'Failed'),
+    ]
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='PENDING')
     order_date = models.DateField(auto_now_add=True)
     order_time = models.TimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

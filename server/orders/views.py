@@ -29,13 +29,17 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None): # Convert order to sale and update stock
         order = self.get_object()
-        
+
         if order.status != 'pending':
             return Response(
                 {'error': 'Only pending orders can be confirmed'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        # admin can optionally pass payment info in body: { payment_method: 'mpesa'|'cash'|'debt', mark_as_debt_days: 7 }
+        payment_method = request.data.get('payment_method')
+        mark_as_debt_days = request.data.get('mark_as_debt_days', None)
+
         try:
             with transaction.atomic():
                 # Check stock availability
@@ -45,19 +49,19 @@ class OrderViewSet(viewsets.ModelViewSet):
                             {'error': f'Insufficient stock for {item.product.name}'}, 
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                
+
                 # Create sale
                 total_cost = sum(
                     item.quantity * item.product.cost_price 
                     for item in order.items.all()
                 )
                 total_revenue = order.total_amount
-                
+
                 # Generate sale number
                 year = timezone.now().year
                 sale_count = Sale.objects.filter(made_on__year=year).count() + 1
                 sale_number = f"SALE-{year}-{sale_count:03d}"
-                
+
                 sale = Sale.objects.create(
                     order=order,
                     sale_number=sale_number,
@@ -67,7 +71,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                     cost_amount=total_cost,
                     profit_amount=total_revenue - total_cost,
                 )
-                
+
                 # Create sale items and update stock
                 for item in order.items.all():
                     SaleItem.objects.create(
@@ -76,22 +80,36 @@ class OrderViewSet(viewsets.ModelViewSet):
                         quantity=item.quantity,
                         unit_price=item.unit_price,
                         cost_price=item.product.cost_price,
-                        sale_price=item.product.cost_price
                     )
-                    
+
                     # Update product stock
                     item.product.in_stock -= item.quantity
                     item.product.save()
-                
+
                 # Update order status
                 order.status = 'confirmed'
+
+                # Handle payment_status and sale.payment_status
+                if payment_method == 'cash' or payment_method == 'mpesa':
+                    order.payment_status = 'PAID'
+                    sale.payment_status = 'fully-paid'
+                    # Optionally you could create a Payment entry in sales.Payment
+                    sale.save()
+                elif payment_method == 'debt' or mark_as_debt_days:
+                    # mark as debt
+                    order.payment_status = 'DEBT'
+                    sale.set_as_debt(days=int(mark_as_debt_days) if mark_as_debt_days else 7)
+                    sale.update_payment_status()
+                else:
+                    order.payment_status = 'PENDING'
+
                 order.save()
-                
+
                 return Response({
                     'message': 'Order confirmed successfully',
                     'sale_id': sale.id
                 })
-                
+
         except Exception as e:
             return Response(
                 {'error': str(e)}, 

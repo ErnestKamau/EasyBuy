@@ -315,6 +315,7 @@ export interface Order {
   order_time: string;
   updated_at: string;
   total_amount: number;
+  payment_status?: 'PENDING' | 'PAID' | 'DEBT' | 'FAILED';
   items?: OrderItem[];
 }
 
@@ -356,6 +357,31 @@ export const ordersApi = {
 
   async cancelOrder(orderId: number): Promise<void> {
     await api.patch(`/orders/orders/${orderId}/`, { status: 'cancelled' });
+  },
+
+  async initiatePayment(orderId: number): Promise<{ success: boolean; message: string; MerchantRequestID?: string; CheckoutRequestID?: string }> {
+    try {
+      // fetch order details
+      const { data: order } = await api.get(`/orders/${orderId}/`);
+      const payload = {
+        order_id: order.id,
+        phone_number: order.customer_phone,
+        amount: order.total_amount,
+      };
+
+      const { data } = await api.post('/mpesa/initiate/', payload);
+      return {
+        success: true,
+        message: data.ResponseDescription || data.message || 'Payment request sent',
+        MerchantRequestID: data.MerchantRequestID,
+        CheckoutRequestID: data.CheckoutRequestID,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.response?.data?.error || error.message || 'Failed to initiate payment',
+      };
+    }
   }
 };
 
