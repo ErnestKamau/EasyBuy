@@ -168,6 +168,10 @@ def create_order(request):
                 
                 total_amount += subtotal
             
+            # Update order's total amount
+            order.total_amount = total_amount
+            order.save()
+            
             # Send notification to admin (you can implement this later)
             # send_order_notification.delay(order.id)
             
