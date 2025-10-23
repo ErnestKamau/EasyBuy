@@ -31,10 +31,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         order = self.get_object()
 
         if order.status != 'pending':
-            return Response(
-                {'error': 'Only pending orders can be confirmed'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'Only pending orders can be confirmed'}, status=status.HTTP_400_BAD_REQUEST)
 
         # admin can optionally pass payment info in body: { payment_method: 'mpesa'|'cash'|'debt', mark_as_debt_days: 7 }
         payment_method = request.data.get('payment_method')
@@ -45,26 +42,16 @@ class OrderViewSet(viewsets.ModelViewSet):
                 # Check stock availability
                 for item in order.items.all():
                     if item.product.in_stock < item.quantity:
-                        return Response(
-                            {'error': f'Insufficient stock for {item.product.name}'}, 
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+                        return Response({'error': f'Insufficient stock for {item.product.name}'}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Create sale
-                total_cost = sum(
-                    item.quantity * item.product.cost_price 
-                    for item in order.items.all()
-                )
-                total_revenue = order.total_amount
+                # Calculate totals
+                total_revenue = sum(item.subtotal for item in order.items.all())
+                total_cost = sum((item.quantity * (item.product.cost_price or 0)) for item in order.items.all())
 
-                # Generate sale number
-                year = timezone.now().year
-                sale_count = Sale.objects.filter(made_on__year=year).count() + 1
-                sale_number = f"SALE-{year}-{sale_count:03d}"
-
+                # Create a Sale record
                 sale = Sale.objects.create(
                     order=order,
-                    sale_number=sale_number,
+                    sale_number=f"SALE-{timezone.now().strftime('%Y%m%d%H%M%S')}",
                     customer_name=order.customer_name,
                     customer_phone=order.customer_phone,
                     total_amount=total_revenue,
@@ -72,31 +59,29 @@ class OrderViewSet(viewsets.ModelViewSet):
                     profit_amount=total_revenue - total_cost,
                 )
 
-                # Create sale items and update stock
+                # Create sale items and decrement stock
                 for item in order.items.all():
                     SaleItem.objects.create(
                         sale=sale,
                         product=item.product,
                         quantity=item.quantity,
                         unit_price=item.unit_price,
-                        cost_price=item.product.cost_price,
+                        cost_price=(item.product.cost_price or 0),
                     )
 
-                    # Update product stock
-                    item.product.in_stock -= item.quantity
-                    item.product.save()
+                    # decrement inventory
+                    prod = item.product
+                    prod.in_stock = max(0, prod.in_stock - item.quantity)
+                    prod.save()
 
-                # Update order status
                 order.status = 'confirmed'
 
                 # Handle payment_status and sale.payment_status
-                if payment_method == 'cash' or payment_method == 'mpesa':
+                if payment_method in ('cash', 'mpesa'):
                     order.payment_status = 'PAID'
                     sale.payment_status = 'fully-paid'
-                    # Optionally you could create a Payment entry in sales.Payment
                     sale.save()
                 elif payment_method == 'debt' or mark_as_debt_days:
-                    # mark as debt
                     order.payment_status = 'DEBT'
                     sale.set_as_debt(days=int(mark_as_debt_days) if mark_as_debt_days else 7)
                     sale.update_payment_status()
@@ -105,16 +90,10 @@ class OrderViewSet(viewsets.ModelViewSet):
 
                 order.save()
 
-                return Response({
-                    'message': 'Order confirmed successfully',
-                    'sale_id': sale.id
-                })
+                return Response({'message': 'Order confirmed successfully', 'sale_id': sale.id})
 
         except Exception as e:
-            return Response(
-                {'error': str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Create Order API
 @api_view(['POST'])
@@ -142,38 +121,41 @@ def create_order(request):
             )
             
             # Create order items
-            total_amount = 0
+            order_items = []
             for cart_item in cart_items:
                 product_id = cart_item.get('product_id')
                 quantity = cart_item.get('quantity', 1)
-                weight = cart_item.get('weight')
+                weight = cart_item.get('weight', None)
+                
+                # Get product
+                product = get_object_or_404(Product, id=product_id)
+                
+                # Create order item
+                order_item = OrderItems.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=quantity,
+                    kilogram=weight if weight else None,
+                    unit_price=product.sale_price
+                )
+                order_items.append(order_item)
                 
                 product = get_object_or_404(Product, id=product_id)
                 
                 # Calculate unit price based on weight or quantity
                 if product.kilograms and weight:
                     unit_price = product.sale_price / product.kilograms
-                    subtotal = unit_price * weight
                 else:
                     unit_price = product.sale_price
-                    subtotal = unit_price * quantity
                 
-                OrderItems.objects.create(
+                order_item = OrderItems.objects.create(
                     order=order,
                     product=product,
                     quantity=quantity,
                     kilogram=weight,
                     unit_price=unit_price
                 )
-                
-                total_amount += subtotal
-            
-            # Update order's total amount
-            order.total_amount = total_amount
-            order.save()
-            
-            # Send notification to admin (you can implement this later)
-            # send_order_notification.delay(order.id)
+                order_items.append(order_item)
             
             serializer = OrderSerializer(order)
             return Response({

@@ -16,7 +16,6 @@ class MpesaTransaction(models.Model):
     checkout_request_id = models.CharField(max_length=100, unique=True) # When you initiate an STK Push (the payment popup on user's phone), M-Pesa gives you a CheckoutRequestID to track that specific request.
     merchant_request_id = models.CharField(max_length=100, blank=True)
     account_reference = models.CharField(max_length=100, blank=True) # M-Pesa assigns this when you make the payment request. Less commonly used but part of M-Pesa's response.
-    account_reference = models.CharField(max_length=100, blank=True) # If someone pays for Sale #123, you might set this to "SALE_123" so their SMS shows "You paid KES 1000 to BuyNow for SALE_123"
     payment = models.OneToOneField(
         'sales.Payment',
         on_delete=models.CASCADE,
@@ -47,3 +46,6 @@ class MpesaTransaction(models.Model):
     
     class Meta:
         db_table = 'mpesa_transactions'
+
+# Backwards compatibility: some modules expect MpesaPayment model name
+MpesaPayment = MpesaTransaction

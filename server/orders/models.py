@@ -33,7 +33,7 @@ class Order(models.Model):
     order_date = models.DateField(auto_now_add=True)
     order_time = models.TimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+   
     
     @property
     def total_amount(self):
