@@ -13,7 +13,7 @@ def set_default_payment_status(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('orders', '0002_auto_2025'),
+        ('orders', '0002_orderitems_kilogram'),
     ]
 
     operations = [
