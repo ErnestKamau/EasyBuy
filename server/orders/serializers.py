@@ -8,7 +8,8 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'user', 'customer_name', 'customer_phone',
-            'notes', 'status', 'order_date', 'order_time', 'updated_at', 'total_amount'
+            'notes', 'status', 'payment_status', 'delivery_type', 'payment_method',
+            'order_date', 'order_time', 'updated_at', 'total_amount'
         ]
         
 class OrderItemsSerializer(serializers.ModelSerializer):

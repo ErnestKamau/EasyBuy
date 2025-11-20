@@ -30,6 +30,17 @@ class Order(models.Model):
         ('FAILED', 'Failed'),
     ]
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='PENDING')
+    DELIVERY_TYPE = [
+        ('pickup', 'Pickup'),
+        ('delivery', 'Delivery'),
+    ]
+    delivery_type = models.CharField(max_length=20, choices=DELIVERY_TYPE, default='pickup')
+    PAYMENT_METHOD = [
+        ('cash', 'Cash'),
+        ('mpesa', 'M-Pesa'),
+        ('debt', 'Debt'),
+    ]
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD, default='cash')
     order_date = models.DateField(auto_now_add=True)
     order_time = models.TimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

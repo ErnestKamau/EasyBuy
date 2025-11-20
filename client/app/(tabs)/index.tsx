@@ -35,6 +35,7 @@ import {
   Plus,
 } from "lucide-react-native";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useCart } from "@/contexts/CartContext";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -66,6 +67,7 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const { currentTheme, themeName } = useTheme();
+  const { addItem } = useCart();
 
   // Create dynamic styles based on theme
   const dynamicStyles = StyleSheet.create({
@@ -501,6 +503,18 @@ export default function HomeScreen() {
                 item.in_stock === 0 && dynamicStyles.disabledButton,
               ]}
               disabled={item.in_stock === 0}
+              onPress={(e) => {
+                e.stopPropagation();
+                if (item.in_stock > 0) {
+                  const weightToUse = item.kilograms ? 0.5 : undefined;
+                  const quantityToUse = item.kilograms ? 1 : 1;
+                  addItem(item, quantityToUse, weightToUse);
+                  ToastService.showSuccess(
+                    'Added to Cart',
+                    `${item.name} added to cart`
+                  );
+                }
+              }}
             >
               <Plus size={16} color="#FFFFFF" />
             </TouchableOpacity>

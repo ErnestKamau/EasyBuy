@@ -9,7 +9,7 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCart } from '@/contexts/CartContext';
 import { ordersApi, CartItemForOrder } from '@/services/api';
 import { ToastService } from '@/utils/toastService';
@@ -23,11 +23,16 @@ import {
   AlertTriangle,
 } from 'lucide-react-native';
 
-type PaymentMethod = 'cash' | 'mpesa';
+type PaymentMethod = 'cash' | 'mpesa' | 'debt';
+type DeliveryType = 'pickup' | 'delivery';
 
 export default function CheckoutScreen() {
   const { state, clearCart } = useCart();
+  const params = useLocalSearchParams();
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('cash');
+  const [selectedDelivery, setSelectedDelivery] = useState<DeliveryType>(
+    (params.deliveryType as DeliveryType) || 'pickup'
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
@@ -50,7 +55,9 @@ export default function CheckoutScreen() {
       // Create the order
       const order = await ordersApi.createOrder(
         orderItems,
-        `Payment method: ${selectedPayment === 'cash' ? 'Cash' : 'M-Pesa'}`
+        `Payment method: ${selectedPayment === 'cash' ? 'Cash' : selectedPayment === 'mpesa' ? 'M-Pesa' : 'Debt'} | Delivery: ${selectedDelivery === 'pickup' ? 'Pickup' : 'Delivery'}`,
+        selectedDelivery,
+        selectedPayment
       );
 
       // Clear the cart after successful order creation
@@ -99,14 +106,31 @@ export default function CheckoutScreen() {
               <Clock size={20} color="#22C55E" />
               <Text style={styles.stepText}>Wait for admin confirmation</Text>
             </View>
+          {selectedDelivery === 'pickup' ? (
             <View style={styles.stepItem}>
               <MapPin size={20} color="#22C55E" />
               <Text style={styles.stepText}>Visit the shop for pickup</Text>
             </View>
+          ) : (
+            <View style={styles.stepItem}>
+              <MapPin size={20} color="#22C55E" />
+              <Text style={styles.stepText}>We'll deliver to your location</Text>
+            </View>
+          )}
+          {selectedPayment !== 'debt' && (
             <View style={styles.stepItem}>
               <CreditCard size={20} color="#22C55E" />
-              <Text style={styles.stepText}>Pay at the shop</Text>
+              <Text style={styles.stepText}>
+                {selectedPayment === 'mpesa' ? 'Pay via M-Pesa' : 'Pay at the shop'}
+              </Text>
             </View>
+          )}
+          {selectedPayment === 'debt' && (
+            <View style={styles.stepItem}>
+              <AlertTriangle size={20} color="#F59E0B" />
+              <Text style={styles.stepText}>Payment due within 7 days</Text>
+            </View>
+          )}
           </View>
           
           <Text style={styles.redirectText}>Redirecting to home...</Text>
@@ -140,7 +164,9 @@ export default function CheckoutScreen() {
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Delivery</Text>
-            <Text style={styles.summaryValue}>Pickup at shop</Text>
+            <Text style={styles.summaryValue}>
+              {selectedDelivery === 'pickup' ? 'Pickup at shop' : 'Home delivery'}
+            </Text>
           </View>
           
           <View style={styles.summaryDivider} />
@@ -151,31 +177,87 @@ export default function CheckoutScreen() {
           </View>
         </View>
 
-        {/* Delivery Info */}
+        {/* Delivery Option */}
         <View style={styles.deliveryCard}>
-          <Text style={styles.sectionTitle}>Pickup Information</Text>
+          <Text style={styles.sectionTitle}>Delivery Option</Text>
           
-          <View style={styles.infoItem}>
-            <MapPin size={20} color="#22C55E" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>Shop Location</Text>
-              <Text style={styles.infoDescription}>Visit our shop to collect your order</Text>
+          <TouchableOpacity
+            style={[
+              styles.paymentOption,
+              selectedDelivery === 'pickup' && styles.selectedPaymentOption
+            ]}
+            onPress={() => setSelectedDelivery('pickup')}
+          >
+            <View style={styles.paymentIcon}>
+              <MapPin size={24} color={selectedDelivery === 'pickup' ? '#22C55E' : '#64748B'} />
             </View>
-          </View>
-          
-          <View style={styles.infoItem}>
-            <Clock size={20} color="#22C55E" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>Preparation Time</Text>
-              <Text style={styles.infoDescription}>Your order will be ready shortly after confirmation</Text>
+            <View style={styles.paymentContent}>
+              <Text style={[
+                styles.paymentTitle,
+                selectedDelivery === 'pickup' && styles.selectedPaymentTitle
+              ]}>
+                Pickup at Shop
+              </Text>
+              <Text style={styles.paymentDescription}>
+                Visit our shop to collect your order
+              </Text>
             </View>
-          </View>
+            <View style={[
+              styles.radioButton,
+              selectedDelivery === 'pickup' && styles.selectedRadioButton
+            ]} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.paymentOption,
+              selectedDelivery === 'delivery' && styles.selectedPaymentOption
+            ]}
+            onPress={() => setSelectedDelivery('delivery')}
+          >
+            <View style={styles.paymentIcon}>
+              <MapPin size={24} color={selectedDelivery === 'delivery' ? '#22C55E' : '#64748B'} />
+            </View>
+            <View style={styles.paymentContent}>
+              <Text style={[
+                styles.paymentTitle,
+                selectedDelivery === 'delivery' && styles.selectedPaymentTitle
+              ]}>
+                Home Delivery
+              </Text>
+              <Text style={styles.paymentDescription}>
+                We'll deliver your order to your location
+              </Text>
+            </View>
+            <View style={[
+              styles.radioButton,
+              selectedDelivery === 'delivery' && styles.selectedRadioButton
+            ]} />
+          </TouchableOpacity>
         </View>
 
         {/* Payment Method */}
         <View style={styles.paymentCard}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
-          <Text style={styles.paymentSubtitle}>You will pay when you arrive at the shop</Text>
+              <Text style={styles.paymentSubtitle}>
+            {selectedPayment === 'debt' 
+              ? 'Payment will be due within 7 days' 
+              : selectedPayment === 'mpesa' 
+                ? 'Pay via M-Pesa Paybill' 
+                : 'You will pay when you collect your order'}
+          </Text>
+          
+          {selectedPayment === 'mpesa' && (
+            <View style={styles.paybillInstructions}>
+              <Text style={styles.paybillTitle}>Paybill Instructions:</Text>
+              <Text style={styles.paybillStep}>1. Go to M-Pesa on your phone</Text>
+              <Text style={styles.paybillStep}>2. Select "Pay Bill"</Text>
+              <Text style={styles.paybillStep}>3. Enter Paybill Number: <Text style={styles.paybillHighlight}>542542</Text></Text>
+              <Text style={styles.paybillStep}>4. Enter Account Number: <Text style={styles.paybillHighlight}>88881</Text></Text>
+              <Text style={styles.paybillStep}>5. Enter Amount: KSh {state.totalAmount.toLocaleString()}</Text>
+              <Text style={styles.paybillStep}>6. Enter your M-Pesa PIN and confirm</Text>
+            </View>
+          )}
           
           <TouchableOpacity
             style={[
@@ -222,7 +304,7 @@ export default function CheckoutScreen() {
                 M-Pesa Payment
               </Text>
               <Text style={styles.paymentDescription}>
-                Pay via M-Pesa STK push at the shop
+                Pay via M-Pesa Paybill (542542)
               </Text>
             </View>
             <View style={[
@@ -230,18 +312,47 @@ export default function CheckoutScreen() {
               selectedPayment === 'mpesa' && styles.selectedRadioButton
             ]} />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.paymentOption,
+              selectedPayment === 'debt' && styles.selectedPaymentOption
+            ]}
+            onPress={() => handlePaymentMethodSelect('debt')}
+          >
+            <View style={styles.paymentIcon}>
+              <CreditCard size={24} color={selectedPayment === 'debt' ? '#22C55E' : '#64748B'} />
+            </View>
+            <View style={styles.paymentContent}>
+              <Text style={[
+                styles.paymentTitle,
+                selectedPayment === 'debt' && styles.selectedPaymentTitle
+              ]}>
+                Pay on Debt
+              </Text>
+              <Text style={styles.paymentDescription}>
+                Pay later (7 days maximum)
+              </Text>
+            </View>
+            <View style={[
+              styles.radioButton,
+              selectedPayment === 'debt' && styles.selectedRadioButton
+            ]} />
+          </TouchableOpacity>
         </View>
 
         {/* Important Note */}
-        <View style={styles.noteCard}>
-          <AlertTriangle size={20} color="#F59E0B" />
-          <View style={styles.noteContent}>
-            <Text style={styles.noteTitle}>Important Note</Text>
-            <Text style={styles.noteDescription}>
-              This is a pickup order. Please visit our shop to collect and pay for your items after admin confirmation.
-            </Text>
+        {selectedPayment === 'debt' && (
+          <View style={styles.noteCard}>
+            <AlertTriangle size={20} color="#F59E0B" />
+            <View style={styles.noteContent}>
+              <Text style={styles.noteTitle}>Debt Payment Terms</Text>
+              <Text style={styles.noteDescription}>
+                This order will be on debt. Payment must be completed within 7 days. You and the admin will be notified 2 days before the due date.
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
       </ScrollView>
 
       {/* Bottom Action */}
@@ -495,6 +606,30 @@ const styles = StyleSheet.create({
   paymentDescription: {
     fontSize: 14,
     color: '#64748B',
+  },
+  paybillInstructions: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#22C55E',
+  },
+  paybillTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#15803D',
+    marginBottom: 12,
+  },
+  paybillStep: {
+    fontSize: 14,
+    color: '#1E293B',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  paybillHighlight: {
+    fontWeight: '700',
+    color: '#15803D',
   },
   radioButton: {
     width: 20,

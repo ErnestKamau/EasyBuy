@@ -24,6 +24,7 @@ import {
   CreditCard,
   MapPin,
   Clock,
+  Truck,
 } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -359,6 +360,7 @@ const useCartHandlers = (state: any, updateItem: any, removeItem: any, clearCart
 export default function CartScreen(): React.ReactElement {
   const { state, updateItem, removeItem, clearCart } = useCart();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
   const { currentTheme, themeName } = useTheme();
 
   // Dynamic styles based on theme
@@ -375,7 +377,10 @@ export default function CartScreen(): React.ReactElement {
     }
     
     setIsCheckingOut(true);
-    router.push('/checkout' as any);
+    router.push({
+      pathname: '/checkout',
+      params: { deliveryType: deliveryType }
+    } as any);
     setIsCheckingOut(false);
   };
   
@@ -512,9 +517,33 @@ export default function CartScreen(): React.ReactElement {
               <Text style={dynamicStyles.cartItemsCount}>
                 {state.totalItems} item{state.totalItems !== 1 ? 's' : ''}
               </Text>
-              <View style={styles.deliveryInfo}>
-                <MapPin size={14} color={currentTheme.primary} />
-                <Text style={dynamicStyles.deliveryText}>Pickup at shop</Text>
+              <View style={styles.deliveryOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.deliveryOption,
+                    deliveryType === 'pickup' && { backgroundColor: currentTheme.primary + '20', borderColor: currentTheme.primary }
+                  ]}
+                  onPress={() => setDeliveryType('pickup')}
+                >
+                  <MapPin size={14} color={deliveryType === 'pickup' ? currentTheme.primary : currentTheme.textSecondary} />
+                  <Text style={[
+                    dynamicStyles.deliveryText,
+                    deliveryType === 'pickup' && { color: currentTheme.primary, fontWeight: '600' }
+                  ]}>Pickup</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.deliveryOption,
+                    deliveryType === 'delivery' && { backgroundColor: currentTheme.primary + '20', borderColor: currentTheme.primary }
+                  ]}
+                  onPress={() => setDeliveryType('delivery')}
+                >
+                  <Truck size={14} color={deliveryType === 'delivery' ? currentTheme.primary : currentTheme.textSecondary} />
+                  <Text style={[
+                    dynamicStyles.deliveryText,
+                    deliveryType === 'delivery' && { color: currentTheme.primary, fontWeight: '600' }
+                  ]}>Delivery</Text>
+                </TouchableOpacity>
               </View>
             </View>
             
@@ -532,7 +561,7 @@ export default function CartScreen(): React.ReactElement {
               
               <View style={styles.summaryRow}>
                 <Text style={dynamicStyles.summaryLabel}>Delivery</Text>
-                <Text style={dynamicStyles.summaryValue}>Pickup at shop</Text>
+                <Text style={dynamicStyles.summaryValue}>{deliveryType === 'pickup' ? 'Pickup at shop' : 'Home delivery'}</Text>
               </View>
               
               <View style={dynamicStyles.summaryDivider} />
@@ -596,6 +625,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  deliveryOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deliveryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
   },
   itemImageContainer: {
     marginRight: 16,

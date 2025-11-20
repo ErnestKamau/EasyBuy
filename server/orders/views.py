@@ -41,12 +41,25 @@ class OrderViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 # Check stock availability
                 for item in order.items.all():
-                    if item.product.in_stock < item.quantity:
-                        return Response({'error': f'Insufficient stock for {item.product.name}'}, status=status.HTTP_400_BAD_REQUEST)
+                    # For weight-based products, check if we have enough stock
+                    if item.product.kilograms:
+                        # For weight-based, we check if in_stock (which represents available weight) is sufficient
+                        required_weight = float(item.kilogram) if item.kilogram else 0
+                        if item.product.in_stock < required_weight:
+                            return Response({'error': f'Insufficient stock for {item.product.name}. Available: {item.product.in_stock}kg, Required: {required_weight}kg'}, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        # For quantity-based products
+                        if item.product.in_stock < item.quantity:
+                            return Response({'error': f'Insufficient stock for {item.product.name}. Available: {item.product.in_stock}, Required: {item.quantity}'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Calculate totals
                 total_revenue = sum(item.subtotal for item in order.items.all())
-                total_cost = sum((item.quantity * (item.product.cost_price or 0)) for item in order.items.all())
+                # Calculate cost - for weight-based products, use kilogram, otherwise use quantity
+                total_cost = sum(
+                    (float(item.kilogram) * (item.product.cost_price or 0) if item.kilogram and item.product.kilograms 
+                     else item.quantity * (item.product.cost_price or 0))
+                    for item in order.items.all()
+                )
 
                 # Create a Sale record
                 sale = Sale.objects.create(
@@ -61,17 +74,25 @@ class OrderViewSet(viewsets.ModelViewSet):
 
                 # Create sale items and decrement stock
                 for item in order.items.all():
+                    # Determine quantity for sale item (for weight-based, use 1, for quantity-based use actual quantity)
+                    sale_quantity = 1 if item.product.kilograms and item.kilogram else item.quantity
+                    
                     SaleItem.objects.create(
                         sale=sale,
                         product=item.product,
-                        quantity=item.quantity,
+                        quantity=sale_quantity,
                         unit_price=item.unit_price,
                         cost_price=(item.product.cost_price or 0),
                     )
 
                     # decrement inventory
                     prod = item.product
-                    prod.in_stock = max(0, prod.in_stock - item.quantity)
+                    if prod.kilograms and item.kilogram:
+                        # For weight-based products, subtract the weight
+                        prod.in_stock = max(0, prod.in_stock - float(item.kilogram))
+                    else:
+                        # For quantity-based products, subtract the quantity
+                        prod.in_stock = max(0, prod.in_stock - item.quantity)
                     prod.save()
 
                 order.status = 'confirmed'
@@ -117,7 +138,9 @@ def create_order(request):
                 customer_name=request.user.username,
                 customer_phone=getattr(request.user, 'phone_number', ''),
                 notes=data.get('notes', ''),
-                status='pending'
+                status='pending',
+                delivery_type=data.get('delivery_type', 'pickup'),
+                payment_method=data.get('payment_method', 'cash')
             )
             
             # Create order items
@@ -130,29 +153,18 @@ def create_order(request):
                 # Get product
                 product = get_object_or_404(Product, id=product_id)
                 
-                # Create order item
-                order_item = OrderItems.objects.create(
-                    order=order,
-                    product=product,
-                    quantity=quantity,
-                    kilogram=weight if weight else None,
-                    unit_price=product.sale_price
-                )
-                order_items.append(order_item)
-                
-                product = get_object_or_404(Product, id=product_id)
-                
                 # Calculate unit price based on weight or quantity
                 if product.kilograms and weight:
                     unit_price = product.sale_price / product.kilograms
                 else:
                     unit_price = product.sale_price
                 
+                # Create order item
                 order_item = OrderItems.objects.create(
                     order=order,
                     product=product,
                     quantity=quantity,
-                    kilogram=weight,
+                    kilogram=weight if weight else None,
                     unit_price=unit_price
                 )
                 order_items.append(order_item)

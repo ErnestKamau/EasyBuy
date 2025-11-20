@@ -15,18 +15,34 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.easybuy.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "EasyBuy needs location access to provide accurate delivery estimates."
-      }
+      },
+      "associatedDomains": ["applinks:yourdomain.com"]
     },
     "android": {
+      "package": "com.easybuy.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#22C55E"
       },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "easybuy"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
@@ -35,6 +51,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f59d3e27-46e0-47ca-9f70-135eb8cf0864"
+      }
     }
   }
 }

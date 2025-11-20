@@ -5,7 +5,8 @@ from .views import (
     get_sales_analytics,
     get_overdue_payments,
     get_payment_summary,
-    get_unpaid_sales
+    get_unpaid_sales,
+    get_debts
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ urlpatterns = [
     path('overdue/', get_overdue_payments, name='overdue_payments'),
     path('payments/summary/', get_payment_summary, name='payment_summary'),
     path('unpaid/', get_unpaid_sales, name='unpaid_sales'),
+    path('debts/', get_debts, name='debts'),
 ]
 
 # This creates these URLs automatically:

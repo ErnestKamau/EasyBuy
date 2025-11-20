@@ -3,36 +3,29 @@ import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:8000";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:8000/api";
 
 console.log('API Base URL:', BASE_URL);
 
 export const api = axios.create({
-  baseURL: `${BASE_URL}/api`,
+  baseURL: BASE_URL,
   timeout: 15000,
 });
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = "access_token";
-const REFRESH_TOKEN_KEY = "refresh_token";
 
 export const tokenManager = {
-  async setTokens(accessToken: string, refreshToken: string) {
+  async setToken(accessToken: string) {
     await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   },
 
   async getAccessToken(): Promise<string | null> {
     return await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
   },
 
-  async getRefreshToken(): Promise<string | null> {
-    return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-  },
-
   async clearTokens() {
     await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
-    await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
   }
 };
 
@@ -45,45 +38,18 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response interceptor for token refresh
+// Response interceptor for handling 401 errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = await tokenManager.getRefreshToken();
-        if (refreshToken) {
-          const response = await axios.post(`${BASE_URL}/api/token/refresh/`, {
-            refresh: refreshToken,
-          });
-
-          const { access } = response.data;
-          await AsyncStorage.setItem(ACCESS_TOKEN_KEY, access);
-
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${access}`;
-          return api(originalRequest);
-        }
-      } catch (refreshError) {
-        console.error("Token Refresh Error:", refreshError)
-        await tokenManager.clearTokens();
-        router.replace('/auth');
-      }
+    // If 401, clear tokens and redirect to auth
+    if (error.response?.status === 401) {
+      await tokenManager.clearTokens();
+      router.replace('/auth');
     }
 
-    let rejectionError;
-    if (error instanceof Error) {
-      rejectionError = error;
-    } else if (typeof error === 'string') {
-      rejectionError = new Error(error);
-    } else {
-      rejectionError = new Error(JSON.stringify(error));
-    }
-    throw rejectionError;
+    // Preserve the original error with response data for better error handling
+    throw error;
   }
 );
 
@@ -91,22 +57,22 @@ api.interceptors.response.use(
 export interface User {
   id: number;
   username: string;
+  first_name?: string;
+  last_name?: string;
   email: string;
-  phone_number: string;
-  gender?: 'Male' | 'Female';
-  role: 'admin' | 'customer';
-  is_active: boolean;
+  phone_number?: string;
+  gender?: 'male' | 'female' | 'other' | 'Male' | 'Female';
+  role?: 'admin' | 'customer';
+  email_verified_at?: string | null;
   created_at: string;
   updated_at: string;
-  last_login?: string;
 }
 
 export interface AuthResponse {
+  message?: string;
   user: User;
-  tokens: {
-    access: string;
-    refresh: string;
-  };
+  access_token: string;
+  token_type: string;
 }
 
 export interface Category {
@@ -138,74 +104,106 @@ export interface Product {
 
 export interface RegisterData {
   username: string;
+  first_name: string;
+  last_name: string;
   email: string;
-  phone_number: string;
+  phone_number?: string;
   password: string;
-  password_confirm: string;
-  gender?: 'Male' | 'Female';
-  role?: 'admin' | 'customer';
+  password_confirmation: string;
+  gender?: 'male' | 'female' | 'other';
+  date_of_birth?: string;
 }
 
 export interface LoginData {
-  username: string;
+  username?: string;
+  email?: string;
   password: string;
 }
 
 export const authApi = {
   async register(userData: RegisterData): Promise<AuthResponse> {
-    const { data } = await api.post<AuthResponse>("/auth/register/", userData);
-    await tokenManager.setTokens(data.tokens.access, data.tokens.refresh);
-    return data;
+    try {
+      const { data } = await api.post<AuthResponse>("/register", userData);
+
+      // Laravel returns access_token directly
+      if (data.access_token) {
+        await tokenManager.setToken(data.access_token);
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error("Registration API error:", error);
+      if (error.response) {
+        const errorData = error.response.data;
+        const errorMsg = errorData?.message || errorData?.error || 'Registration failed';
+        throw new Error(errorMsg);
+      }
+      throw new Error(error?.message || 'Registration failed. Please try again.');
+    }
   },
 
   async login(credentials: LoginData): Promise<AuthResponse> {
-    const { data } = await api.post<AuthResponse>("/auth/login/", credentials);
+    try {
+      console.log('Login attempt - API Base URL:', BASE_URL);
+      console.log('Login attempt - Full URL:', `${BASE_URL}/login`);
 
-    // Validate response shape to avoid "cannot read property 'access' of undefined"
-    const tokens = (data as any)?.tokens;
-    if (!tokens?.access || !tokens?.refresh) {
-      const backendMsg = (data as any)?.error || (data as any)?.detail || 'Invalid login response from server';
-      throw new Error(backendMsg);
+      const { data } = await api.post<AuthResponse>("/login", credentials);
+
+      // Check if we got HTML instead of JSON (wrong endpoint)
+      if (typeof data === 'string' && (data as string).includes('<!DOCTYPE html>')) {
+        console.error('ERROR: Received HTML instead of JSON. API URL:', `${BASE_URL}/login`);
+        throw new Error(`Received HTML instead of JSON. API URL is: ${BASE_URL}. Please check your .env file (EXPO_PUBLIC_API_URL) and restart the Expo server.`);
+      }
+
+      // Laravel returns access_token directly, not in a tokens object
+      if (!data.access_token) {
+        const backendMsg = (data as any)?.message || (data as any)?.error || 'Invalid login response from server';
+        console.error("Login response validation failed:", data);
+        throw new Error(backendMsg);
+      }
+
+      await tokenManager.setToken(data.access_token);
+      return data;
+    } catch (error: any) {
+      console.error("Login API error:", error);
+
+      // If it's an axios error, extract the actual response
+      if (error.response) {
+        // Check if response is HTML
+        const responseData = error.response.data;
+        if (typeof responseData === 'string' && responseData.includes('<!DOCTYPE html>')) {
+          throw new Error('API endpoint returned HTML instead of JSON. Please check your API URL configuration.');
+        }
+
+        const errorData = responseData;
+        const errorMsg = errorData?.message || errorData?.error || 'Login failed';
+
+        // For email verification errors (403), preserve the message
+        if (error.response.status === 403 && errorData?.email_verified === false) {
+          throw new Error(errorMsg);
+        }
+
+        throw new Error(errorMsg);
+      }
+
+      // If it's already an Error object, re-throw it
+      if (error instanceof Error) {
+        throw error;
+      }
+
+      // Otherwise, wrap it
+      throw new Error(error?.message || 'Login failed. Please try again.');
     }
-
-    await tokenManager.setTokens(tokens.access, tokens.refresh);
-    return data;
   },
-
 
   async logout(): Promise<void> {
     try {
-      const refreshToken = await tokenManager.getRefreshToken();
-      if (refreshToken) {
-        await api.post("/auth/logout/", {
-          refresh: refreshToken
-        });
-      }
+      await api.post("/logout");
     } catch (error) {
       console.error("Logout API error (non-critical):", error);
     } finally {
       await tokenManager.clearTokens();
       router.replace('/auth');
-    }
-  },
-
-  async refreshToken(): Promise<string | null> {
-    try {
-      const refreshToken = await tokenManager.getRefreshToken();
-      if (!refreshToken) return null;
-
-      const response = await axios.post(`${BASE_URL}/api/token/refresh/`, {
-        refresh: refreshToken,
-      });
-
-      const { access } = response.data;
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, access);
-
-      return access;
-    } catch (error) {
-      console.error("Token refresh error:", error);
-      await tokenManager.clearTokens();
-      return null;
     }
   },
 
@@ -217,11 +215,93 @@ export const authApi = {
         return null;
       }
 
-      const { data } = await api.get<User>("/auth/me/");
+      const { data } = await api.get<User>("/user");
       return data;
     } catch (error) {
       console.log("Failed to fetch current user:", error);
       return null;
+    }
+  },
+
+  async checkVerificationStatus(): Promise<boolean> {
+    try {
+      const user = await this.getCurrentUser();
+      return user ? !!user.email_verified_at : false;
+    } catch (error) {
+      console.error("Failed to check verification status:", error);
+      return false;
+    }
+  },
+
+  async resendVerificationEmail(): Promise<void> {
+    try {
+      await api.post("/email/resend");
+    } catch (error: any) {
+      if (error.response) {
+        const errorData = error.response.data;
+        const errorMsg = errorData?.message || errorData?.error || 'Failed to resend verification email';
+        throw new Error(errorMsg);
+      }
+      throw new Error('Failed to resend verification email');
+    }
+  },
+
+  async forgotPassword(email: string): Promise<void> {
+    try {
+      await api.post("/forgot-password", { email });
+    } catch (error: any) {
+      if (error.response) {
+        const errorData = error.response.data;
+        const errorMsg = errorData?.message || errorData?.error || 'Failed to send password reset code';
+        throw new Error(errorMsg);
+      }
+      throw new Error('Failed to send password reset code');
+    }
+  },
+
+  async verifyEmailCode(email: string, code: string): Promise<{ user: User }> {
+    try {
+      const { data } = await api.post("/verify-email-code", { email, code });
+      return data;
+    } catch (error: any) {
+      if (error.response) {
+        const errorData = error.response.data;
+        const errorMsg = errorData?.message || errorData?.error || 'Invalid verification code';
+        throw new Error(errorMsg);
+      }
+      throw new Error('Failed to verify email code');
+    }
+  },
+
+  async verifyResetCode(email: string, code: string): Promise<boolean> {
+    try {
+      await api.post("/verify-reset-code", { email, code });
+      return true;
+    } catch (error: any) {
+      if (error.response) {
+        const errorData = error.response.data;
+        const errorMsg = errorData?.message || errorData?.error || 'Invalid reset code';
+        throw new Error(errorMsg);
+      }
+      throw new Error('Failed to verify reset code');
+    }
+  },
+
+  async resetPassword(email: string, code: string, password: string, passwordConfirmation: string): Promise<void> {
+    try {
+      await api.post("/reset-password", {
+        email,
+        code,
+        password,
+        password_confirmation: passwordConfirmation,
+      });
+    } catch (error: any) {
+      if (error.response) {
+        const errorData = error.response.data;
+        const errorMsg = errorData?.message || errorData?.error || 'Failed to reset password';
+        throw new Error(errorMsg);
+      }
+      throw new Error('Failed to reset password');
     }
   },
 };
@@ -232,8 +312,8 @@ export const productsApi = {
     if (!token) {
       throw new Error("No authentication token found");
     }
-    
-    const { data } = await api.get<{results: Category[]} | Category[]>("/categories/");
+
+    const { data } = await api.get<{ results: Category[] } | Category[]>("/categories/");
     // Handle both paginated and non-paginated responses
     return Array.isArray(data) ? data : data.results;
   },
@@ -243,12 +323,12 @@ export const productsApi = {
     if (!token) {
       throw new Error("No authentication token found");
     }
-    
+
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (categoryId) params.append('category', categoryId.toString());
-    
-    const { data } = await api.get<{results: Product[]} | Product[]>(`/products/?${params.toString()}`);
+
+    const { data } = await api.get<{ results: Product[] } | Product[]>(`/products/?${params.toString()}`);
     // Handle both paginated and non-paginated responses
     return Array.isArray(data) ? data : data.results;
   },
@@ -316,6 +396,8 @@ export interface Order {
   updated_at: string;
   total_amount: number;
   payment_status?: 'PENDING' | 'PAID' | 'DEBT' | 'FAILED';
+  delivery_type?: 'pickup' | 'delivery';
+  payment_method?: 'cash' | 'mpesa' | 'debt';
   items?: OrderItem[];
 }
 
@@ -327,10 +409,17 @@ export interface CartItemForOrder {
 
 // Orders API
 export const ordersApi = {
-  async createOrder(items: CartItemForOrder[], notes?: string): Promise<Order> {
+  async createOrder(
+    items: CartItemForOrder[],
+    notes?: string,
+    deliveryType?: 'pickup' | 'delivery',
+    paymentMethod?: 'cash' | 'mpesa' | 'debt'
+  ): Promise<Order> {
     const { data } = await api.post('/orders/create/', {
       items,
-      notes: notes || ''
+      notes: notes || '',
+      delivery_type: deliveryType || 'pickup',
+      payment_method: paymentMethod || 'cash'
     });
     return data.order;
   },
@@ -432,6 +521,9 @@ export interface Sale {
   is_fully_paid: boolean;
   items?: SaleItem[];
   payments?: Payment[];
+  days_remaining?: number;
+  is_near_due?: boolean;
+  is_overdue?: boolean;
 }
 
 export interface SalesAnalytics {
@@ -494,6 +586,11 @@ export const salesApi = {
 
   async getPaymentSummary(): Promise<PaymentSummary> {
     const { data } = await api.get('/sales/payments/summary/');
+    return data;
+  },
+
+  async getDebts(): Promise<{ debts: Sale[]; count: number }> {
+    const { data } = await api.get('/sales/debts/');
     return data;
   },
 

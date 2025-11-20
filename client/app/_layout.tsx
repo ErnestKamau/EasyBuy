@@ -6,8 +6,28 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter";
+import {
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from "@expo-google-fonts/space-grotesk";
+import {
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from "@expo-google-fonts/manrope";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as Linking from "expo-linking";
 import {
   useEffect,
   useState,
@@ -16,7 +36,7 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, Alert } from "react-native";
 import "react-native-reanimated";
 import Toast from "react-native-toast-message";
 
@@ -45,6 +65,7 @@ interface AuthContextType {
   login: (credentials: any) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  checkVerificationStatus: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -54,6 +75,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   logout: async () => {},
   refreshAuth: async () => {},
+  checkVerificationStatus: async () => false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -131,6 +153,20 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     await checkAuthStatus();
   }, [checkAuthStatus]);
 
+  const checkVerificationStatus = useCallback(async () => {
+    try {
+      const isVerified = await authApi.checkVerificationStatus();
+      if (isVerified && user && !user.email_verified_at) {
+        // Refresh user data to get updated verification status
+        await checkAuthStatus();
+      }
+      return isVerified;
+    } catch (error) {
+      console.error("Failed to check verification status:", error);
+      return false;
+    }
+  }, [user, checkAuthStatus]);
+
   useEffect(() => {
     checkAuthStatus();
   }, [checkAuthStatus]);
@@ -138,10 +174,10 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === "auth";
+    const inAuthGroup = segments[0] === "auth" || segments[0] === "onboarding";
 
     if (!isAuthenticated && !inAuthGroup) {
-      router.replace("/auth");
+      router.replace("/onboarding");
     } else if (isAuthenticated && inAuthGroup) {
       router.replace("/(tabs)");
     }
@@ -155,8 +191,9 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       login,
       logout,
       refreshAuth,
+      checkVerificationStatus,
     }),
-    [user, isAuthenticated, loading, login, logout, refreshAuth]
+    [user, isAuthenticated, loading, login, logout, refreshAuth, checkVerificationStatus]
   );
 
   if (loading) {
@@ -183,6 +220,22 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
     ...FontAwesome.font,
+    // Inter fonts
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    // Space Grotesk fonts
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+    // Manrope fonts
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
   });
 
   useEffect(() => {
@@ -214,6 +267,58 @@ export default function RootLayout() {
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const { currentTheme, themeName } = useTheme();
+  const { checkVerificationStatus } = useAuth();
+  const router = useRouter();
+
+  // Handle deep links for email verification
+  useEffect(() => {
+    // Handle initial URL (cold start - app was closed)
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
+    // Handle URL when app is running (warm start)
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      handleDeepLink(url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleDeepLink = async (url: string) => {
+    try {
+      const { path, queryParams } = Linking.parse(url);
+
+      if (path === "email-verified") {
+        // Check verification status with backend
+        const isVerified = await checkVerificationStatus();
+
+        if (isVerified) {
+          Alert.alert(
+            "Email Verified!",
+            "Your email has been successfully verified.",
+            [
+              {
+                text: "Continue",
+                onPress: () => {
+                  router.replace("/(tabs)");
+                },
+              },
+            ]
+          );
+        } else {
+          Alert.alert(
+            "Verification Pending",
+            "Please wait a moment and try again, or check your email for the verification link."
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Deep link handling error:", error);
+    }
+  };
 
   // Create complete navigation theme with fonts
   const navigationTheme = {
@@ -250,6 +355,14 @@ function RootLayoutNav() {
     <ThemeProvider value={navigationTheme}>
       <SafeAreaProvider>
         <Stack>
+          <Stack.Screen
+            name="onboarding"
+            options={{
+              headerShown: false,
+              gestureEnabled: false,
+            }}
+          />
+
           <Stack.Screen
             name="auth"
             options={{

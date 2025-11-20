@@ -1,41 +1,41 @@
 // constants/Themes.ts
 export const Themes = {
-  // Light Mode Themes
+  // Light Mode Themes - Mature & Masculine
   light: {
-    primary: '#22C55E',
-    secondary: '#3B82F6',
-    accent: '#F59E0B',
-    background: '#F8FAFC',
-    surface: '#FFFFFF',
-    text: '#1E293B',
-    textSecondary: '#64748B',
-    border: '#E2E8F0',
-    error: '#EF4444',
-    success: '#22C55E',
-    warning: '#F59E0B',
-    info: '#3B82F6',
-    tint: '#22C55E',
+    primary: '#1E3A5F', // Deep Navy - mature, professional
+    secondary: '#4A6FA5', // Steel Blue
+    accent: '#D97706', // Burnt Orange - warm but strong
+    background: '#FAFAFA', // Off-white
+    surface: '#FFFFFF', // Pure white
+    text: '#1A1A1A', // Charcoal
+    textSecondary: '#64748B', // Slate grey
+    border: '#E2E8F0', // Light grey border
+    error: '#DC2626', // Strong red
+    success: '#059669', // Deep green
+    warning: '#D97706', // Burnt orange
+    info: '#2563EB', // Deep blue
+    tint: '#1E3A5F',
     tabIconDefault: '#94A3B8',
-    tabIconSelected: '#22C55E',
+    tabIconSelected: '#1E3A5F',
   },
   
-  // Dark Mode Themes
+  // Dark Mode Themes - Mature & Masculine
   dark: {
-    primary: '#22C55E',
-    secondary: '#60A5FA',
-    accent: '#FBBF24',
-    background: '#0F172A',
-    surface: '#1E293B',
-    text: '#F8FAFC',
-    textSecondary: '#CBD5E1',
-    border: '#334155',
-    error: '#F87171',
-    success: '#4ADE80',
-    warning: '#FBBF24',
-    info: '#60A5FA',
-    tint: '#22C55E',
+    primary: '#5B8FC7', // Bright Steel Blue
+    secondary: '#7C9BC4', // Soft Blue
+    accent: '#F59E0B', // Amber
+    background: '#0F172A', // Deep Charcoal
+    surface: '#1E293B', // Dark Slate
+    text: '#F8FAFC', // Off-white
+    textSecondary: '#CBD5E1', // Light Grey
+    border: '#334155', // Medium grey border
+    error: '#F87171', // Soft red
+    success: '#4ADE80', // Bright green
+    warning: '#FBBF24', // Amber
+    info: '#60A5FA', // Light blue
+    tint: '#5B8FC7',
     tabIconDefault: '#64748B',
-    tabIconSelected: '#22C55E',
+    tabIconSelected: '#5B8FC7',
   },
 
   // Premium Theme (Luxe Noir & Soft Oat)

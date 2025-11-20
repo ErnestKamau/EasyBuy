@@ -92,14 +92,14 @@ export default function ProfileScreen() {
       icon: HelpCircle,
       title: 'Help & Support',
       subtitle: 'Get help or contact support',
-      onPress: () => ToastService.showInfo('Support', 'Contact support at help@example.com'),
+      onPress: () => router.push('/help-support'),
       color: currentTheme.secondary,
     },
     {
       icon: Info,
       title: 'About',
       subtitle: 'App version and information',
-      onPress: () => ToastService.showInfo('About', 'Shopping App v1.0.0'),
+      onPress: () => router.push('/about'),
       color: currentTheme.textSecondary,
     },
   ];

@@ -1,4 +1,4 @@
-// app/product/[id].tsx - Theme-integrated version
+// app/product/[id].tsx - Original design without specifications and category
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,7 +8,6 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Dimensions,
   StatusBar,
 } from 'react-native';
@@ -24,16 +23,13 @@ import {
   Plus,
   Minus,
   ShoppingCart,
-  Package,
-  Info,
-  Star,
   Shield,
-  Truck
+  Truck,
+  Star,
 } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// Helper function to create dynamic styles - extracted to reduce complexity
 const createProductDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet.create({
   container: {
     flex: 1,
@@ -95,28 +91,6 @@ const createProductDynamicStyles = (currentTheme: any, themeName: string) => Sty
     marginTop: -20,
     borderWidth: themeName === 'dark' ? 1 : 0,
     borderColor: themeName === 'dark' ? currentTheme.border : 'transparent',
-  },
-  categoryBadge: {
-    backgroundColor: currentTheme.primary + '20',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  categoryBadgeText: {
-    color: currentTheme.primary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  stockBadge: {
-    backgroundColor: currentTheme.warning + '20',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  stockBadgeText: {
-    color: currentTheme.warning,
-    fontSize: 12,
-    fontWeight: '600',
   },
   productName: {
     fontSize: 26,
@@ -180,23 +154,39 @@ const createProductDynamicStyles = (currentTheme: any, themeName: string) => Sty
     color: currentTheme.textSecondary,
     lineHeight: 22,
   },
-  specItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: currentTheme.border,
+  stockBadge: {
+    backgroundColor: currentTheme.warning + '20',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  specLabel: {
-    fontSize: 15,
-    color: currentTheme.textSecondary,
-    fontWeight: '500',
-  },
-  specValue: {
-    fontSize: 15,
-    color: currentTheme.text,
+  stockBadgeText: {
+    color: currentTheme.warning,
+    fontSize: 12,
     fontWeight: '600',
+  },
+  modernStockSection: {
+    marginBottom: 24,
+  },
+  stockIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  stockDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  stockText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  descriptionCard: {
+    marginBottom: 24,
   },
   bottomBar: {
     backgroundColor: currentTheme.surface,
@@ -288,7 +278,6 @@ const createProductDynamicStyles = (currentTheme: any, themeName: string) => Sty
   },
 });
 
-// Helper function to handle product actions - extracted to reduce complexity
 const useProductActions = (product: Product | null, quantity: number, selectedWeight: number, addItem: any) => {
   const [isFavorite, setIsFavorite] = useState(false);
   
@@ -314,7 +303,7 @@ const useProductActions = (product: Product | null, quantity: number, selectedWe
       
       addItem(product, quantityToUse, weightToUse);
       
-      const weightText = weightToUse ? ` (${weightToUse}kg)` : '';
+      const weightText = weightToUse ? ` (${selectedWeight}kg)` : '';
       const quantityText = product.kilograms ? '' : `${quantity}x `;
       
       ToastService.showSuccess(
@@ -341,6 +330,18 @@ const useProductActions = (product: Product | null, quantity: number, selectedWe
   return { isFavorite, handleQuantityChange, addToCart, toggleFavorite, shareProduct };
 };
 
+// Weight increment function: 0.5kg -> 1kg -> 2kg -> 3kg -> 4kg...
+const getNextWeight = (currentWeight: number, increment: boolean): number => {
+  if (increment) {
+    if (currentWeight < 1) return 1;
+    return currentWeight + 1;
+  } else {
+    if (currentWeight <= 1) return 0.5;
+    if (currentWeight === 1.5) return 1;
+    return currentWeight - 1;
+  }
+};
+
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const [product, setProduct] = useState<Product | null>(null);
@@ -350,10 +351,7 @@ export default function ProductDetailScreen() {
   const { addItem } = useCart();
   const { currentTheme, themeName } = useTheme();
 
-  // Dynamic styles based on theme
   const dynamicStyles = createProductDynamicStyles(currentTheme, themeName);
-  
-  // Product actions hook
   const productActions = useProductActions(product, quantity, selectedWeight, addItem);
   const { isFavorite, handleQuantityChange, addToCart, toggleFavorite, shareProduct } = productActions;
 
@@ -368,6 +366,9 @@ export default function ProductDetailScreen() {
       setLoading(true);
       const productData = await productsApi.getProduct(Number(id));
       setProduct(productData);
+      if (productData.kilograms) {
+        setSelectedWeight(0.5);
+      }
     } catch (error) {
       ToastService.showApiError(error, 'Failed to load product');
       router.back();
@@ -376,10 +377,18 @@ export default function ProductDetailScreen() {
     }
   };
 
-  // Update quantity using extracted handler
   const updateQuantity = (change: number) => {
     const newQuantity = handleQuantityChange(change);
     setQuantity(newQuantity);
+  };
+
+  const handleWeightChange = (increment: boolean) => {
+    if (!product || !product.kilograms) return;
+    const newWeight = getNextWeight(selectedWeight, increment);
+    const maxWeight = product.in_stock;
+    if (newWeight <= maxWeight && newWeight >= 0.5) {
+      setSelectedWeight(newWeight);
+    }
   };
 
   if (loading) {
@@ -405,12 +414,12 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const hasDiscount = product.cost_price && product.sale_price > product.cost_price;
+  const hasDiscount = product.cost_price && product.sale_price < product.cost_price;
   const discountPercent = hasDiscount ? 
-    Math.round(((product.sale_price - product.cost_price) / product.cost_price) * 100) : 0;
+    Math.round(((product.cost_price - product.sale_price) / product.cost_price) * 100) : 0;
   
   const totalPrice = product.kilograms 
-    ? (product.sale_price / (product.kilograms || 1)) * selectedWeight
+    ? (product.sale_price * selectedWeight)
     : product.sale_price * quantity;
 
   return (
@@ -455,16 +464,11 @@ export default function ProductDetailScreen() {
         </View>
 
         <View style={dynamicStyles.productCard}>
-          <View style={styles.productHeader}>
-            <View style={dynamicStyles.categoryBadge}>
-              <Text style={dynamicStyles.categoryBadgeText}>{product.category_name}</Text>
+          {product.is_low_stock && (
+            <View style={dynamicStyles.stockBadge}>
+              <Text style={dynamicStyles.stockBadgeText}>Limited Stock</Text>
             </View>
-            {product.is_low_stock && (
-              <View style={dynamicStyles.stockBadge}>
-                <Text style={dynamicStyles.stockBadgeText}>Limited Stock</Text>
-              </View>
-            )}
-          </View>
+          )}
 
           <Text style={dynamicStyles.productName}>{product.name}</Text>
           
@@ -504,8 +508,8 @@ export default function ProductDetailScreen() {
             </View>
             {product.kilograms && (
               <View style={dynamicStyles.featureItem}>
-                <Package size={16} color={currentTheme.success} />
-                <Text style={dynamicStyles.featureText}>{product.kilograms}kg</Text>
+                <ShoppingCart size={16} color={currentTheme.success} />
+                <Text style={dynamicStyles.featureText}>Weight-based</Text>
               </View>
             )}
           </View>
@@ -556,30 +560,6 @@ export default function ProductDetailScreen() {
               <Text style={dynamicStyles.modernDescription}>{product.description}</Text>
             </View>
           )}
-
-          <View style={styles.specsCard}>
-            <Text style={dynamicStyles.sectionTitle}>Specifications</Text>
-            <View style={styles.specGrid}>
-              <View style={dynamicStyles.specItem}>
-                <Text style={dynamicStyles.specLabel}>Category</Text>
-                <Text style={dynamicStyles.specValue}>{product.category_name}</Text>
-              </View>
-              {product.kilograms && (
-                <View style={dynamicStyles.specItem}>
-                  <Text style={dynamicStyles.specLabel}>Weight</Text>
-                  <Text style={dynamicStyles.specValue}>{product.kilograms}kg</Text>
-                </View>
-              )}
-              <View style={dynamicStyles.specItem}>
-                <Text style={dynamicStyles.specLabel}>SKU</Text>
-                <Text style={dynamicStyles.specValue}>#{product.id}</Text>
-              </View>
-              <View style={dynamicStyles.specItem}>
-                <Text style={dynamicStyles.specLabel}>Stock</Text>
-                <Text style={dynamicStyles.specValue}>{product.in_stock} units</Text>
-              </View>
-            </View>
-          </View>
         </View>
       </ScrollView>
 
@@ -593,17 +573,21 @@ export default function ProductDetailScreen() {
                   dynamicStyles.modernQuantityButton, 
                   selectedWeight <= 0.5 && dynamicStyles.disabledQuantityButton
                 ]}
-                onPress={() => setSelectedWeight(Math.max(0.5, selectedWeight - 0.25))}
+                onPress={() => handleWeightChange(false)}
                 disabled={selectedWeight <= 0.5}
               >
                 <Minus size={14} color={selectedWeight <= 0.5 ? currentTheme.textSecondary : currentTheme.text} />
               </TouchableOpacity>
               <Text style={dynamicStyles.quantityValue}>{selectedWeight}kg</Text>
               <TouchableOpacity 
-                style={dynamicStyles.modernQuantityButton}
-                onPress={() => setSelectedWeight(selectedWeight + 0.25)}
+                style={[
+                  dynamicStyles.modernQuantityButton,
+                  selectedWeight >= product.in_stock && dynamicStyles.disabledQuantityButton
+                ]}
+                onPress={() => handleWeightChange(true)}
+                disabled={selectedWeight >= product.in_stock}
               >
-                <Plus size={14} color={currentTheme.text} />
+                <Plus size={14} color={selectedWeight >= product.in_stock ? currentTheme.textSecondary : currentTheme.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -660,7 +644,6 @@ export default function ProductDetailScreen() {
   );
 }
 
-// Static styles that don't change with theme
 const styles = StyleSheet.create({
   centerContainer: {
     flex: 1,
@@ -711,12 +694,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  productHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
   ratingSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -738,35 +715,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 24,
     gap: 16,
-  },
-  modernStockSection: {
-    marginBottom: 24,
-  },
-  stockIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
-  },
-  stockDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  stockText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  descriptionCard: {
-    marginBottom: 24,
-  },
-  specsCard: {
-    marginBottom: 24,
-  },
-  specGrid: {
-    gap: 12,
   },
   quantityContainer: {
     flexDirection: 'row',

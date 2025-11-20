@@ -172,3 +172,36 @@ def get_unpaid_sales(request):
             {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def get_debts(request):
+    """Get all debts (sales with due_date)"""
+    try:
+        debts = Sale.objects.filter(
+            due_date__isnull=False
+        ).exclude(
+            payment_status='fully-paid'
+        ).order_by('due_date')
+        
+        # Calculate days remaining for each debt
+        debts_data = []
+        for debt in debts:
+            debt_dict = SaleSerializer(debt).data
+            if debt.due_date:
+                days_remaining = (debt.due_date - timezone.now()).days
+                debt_dict['days_remaining'] = days_remaining
+                debt_dict['is_near_due'] = debt.is_near_due()
+                debt_dict['is_overdue'] = days_remaining < 0
+            debts_data.append(debt_dict)
+        
+        return Response({
+            'debts': debts_data,
+            'count': debts.count()
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
