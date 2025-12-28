@@ -32,6 +32,7 @@ import {
   Shield,
   ArrowRight,
 } from "lucide-react-native";
+import LottieView from "lottie-react-native";
 import { authApi, RegisterData, LoginData } from "../services/api";
 import { ToastService } from "@/utils/toastService";
 import { useAuth } from "./_layout";
@@ -39,6 +40,82 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { defaultFontFamily, headingFontFamily } from "@/constants/Fonts";
 
 const { width: screenWidth } = Dimensions.get("window");
+
+// Lottie Animation Component
+const LottieAnimation = ({
+  source,
+  size = 160,
+  autoPlay = true,
+  loop = true,
+  fallbackIcon: FallbackIcon,
+  fallbackColor,
+}: {
+  source?: any;
+  size?: number;
+  autoPlay?: boolean;
+  loop?: boolean;
+  fallbackIcon?: any;
+  fallbackColor?: string;
+}) => {
+  const animationRef = useRef<LottieView>(null);
+
+  useEffect(() => {
+    if (autoPlay && animationRef.current) {
+      setTimeout(() => {
+        animationRef.current?.play();
+      }, 100);
+    }
+  }, [autoPlay]);
+
+  if (source) {
+    try {
+      return (
+        <View
+          style={{
+            width: size,
+            height: size,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <LottieView
+            ref={animationRef}
+            source={source}
+            style={{ width: size, height: size }}
+            autoPlay={autoPlay}
+            loop={loop}
+            resizeMode="contain"
+          />
+        </View>
+      );
+    } catch (error) {
+      console.log("Lottie animation error:", error);
+      // Fallback to icon if Lottie fails
+      if (FallbackIcon) {
+        return (
+          <FallbackIcon
+            size={size * 0.5}
+            color={fallbackColor || "#000"}
+            strokeWidth={1.5}
+          />
+        );
+      }
+    }
+  }
+
+  // Default fallback
+  if (FallbackIcon) {
+    return (
+      <FallbackIcon
+        size={size * 0.5}
+        color={fallbackColor || "#000"}
+        strokeWidth={1.5}
+      />
+    );
+  }
+
+  return null;
+};
 
 type AuthScreen =
   | "register"
@@ -89,6 +166,9 @@ export default function AuthScreens() {
   // Verification state
   const [verificationCode, setVerificationCode] = useState(["", "", "", ""]);
   const [userEmail, setUserEmail] = useState("");
+  const [verificationFlow, setVerificationFlow] = useState<
+    "registration" | "password-reset" | null
+  >(null);
 
   // Reset password state
   const [resetPasswordData, setResetPasswordData] = useState({
@@ -174,6 +254,7 @@ export default function AuthScreens() {
     try {
       await authApi.register(registerData);
       setUserEmail(registerData.email);
+      setVerificationFlow("registration");
       setCurrentScreen("email-verification");
       // Reset verification code input
       setVerificationCode(["", "", "", ""]);
@@ -205,6 +286,7 @@ export default function AuthScreens() {
     try {
       await authApi.forgotPassword(forgotPasswordEmail);
       setUserEmail(forgotPasswordEmail);
+      setVerificationFlow("password-reset");
       // Reset verification code input
       setVerificationCode(["", "", "", ""]);
       setCurrentScreen("email-verification");
@@ -260,7 +342,7 @@ export default function AuthScreens() {
     setLoading(true);
     try {
       const code = verificationCode.join("");
-      const isRegistrationFlow = currentScreen === "email-verification";
+      const isRegistrationFlow = verificationFlow === "registration";
 
       if (isRegistrationFlow) {
         // Verify email code for registration
@@ -286,7 +368,7 @@ export default function AuthScreens() {
     } finally {
       setLoading(false);
     }
-  }, [verificationCode, currentScreen]);
+  }, [verificationCode, verificationFlow, userEmail]);
 
   // Handle password reset
   const handleResetPassword = useCallback(async () => {
@@ -348,7 +430,7 @@ export default function AuthScreens() {
 
     setLoading(true);
     try {
-      const isRegistrationFlow = currentScreen === "email-verification";
+      const isRegistrationFlow = verificationFlow === "registration";
 
       if (isRegistrationFlow) {
         // Resend email verification OTP
@@ -366,7 +448,7 @@ export default function AuthScreens() {
     } finally {
       setLoading(false);
     }
-  }, [userEmail, currentScreen]);
+  }, [userEmail, verificationFlow]);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -446,7 +528,10 @@ export default function AuthScreens() {
               loading={loading}
               onVerify={handleVerifyCode}
               onResend={handleResendCode}
-              onBack={() => setCurrentScreen("login")}
+              onBack={() => {
+                setVerificationFlow(null);
+                setCurrentScreen("login");
+              }}
               styles={styles}
               codeInputRefs={codeInputRefs}
               onKeyPress={handleVerificationCodeKeyPress}
@@ -921,10 +1006,14 @@ const EmailVerificationScreen = ({
 
     <View style={styles.iconContainer}>
       <View style={styles.iconWrapper}>
-        <Mail size={80} color={styles.iconColor} strokeWidth={1.5} />
-        <View style={styles.checkmarkOverlay}>
-          <CheckCircle size={40} color={styles.iconColor} />
-        </View>
+        <LottieAnimation
+          source={require("@/assets/lottie/email-verification.json")}
+          size={300}
+          autoPlay={true}
+          loop={true}
+          fallbackIcon={Mail}
+          fallbackColor={styles.iconColor}
+        />
       </View>
     </View>
 
@@ -1013,10 +1102,14 @@ const ResetPasswordScreen = ({
   <View style={styles.formContainer}>
     <View style={styles.iconContainer}>
       <View style={styles.iconWrapper}>
-        <Lock size={80} color={styles.iconColor} strokeWidth={1.5} />
-        <View style={styles.checkmarkOverlay}>
-          <CheckCircle size={40} color={styles.iconColor} />
-        </View>
+        <LottieAnimation
+          source={require("@/assets/lottie/set-password.json")}
+          size={160}
+          autoPlay={true}
+          loop={true}
+          fallbackIcon={Lock}
+          fallbackColor={styles.iconColor}
+        />
       </View>
     </View>
 
@@ -1127,10 +1220,13 @@ const PasswordChangedScreen = ({ onContinue, styles }: any) => (
   <View style={styles.successContainer}>
     <View style={styles.iconContainer}>
       <View style={styles.successIconWrapper}>
-        <CheckCircle
-          size={120}
-          color={styles.successIcon.color}
-          strokeWidth={2}
+        <LottieAnimation
+          source={require("@/assets/lottie/success.json")}
+          size={160}
+          autoPlay={true}
+          loop={false}
+          fallbackIcon={CheckCircle}
+          fallbackColor={styles.successIcon.color}
         />
       </View>
     </View>
