@@ -46,11 +46,13 @@ import { toastConfig } from "@/components/ToastConfig";
 import { ToastService } from "@/utils/toastService";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { CartProvider } from "@/contexts/CartContext";
-import { ThemeProvider as CustomThemeProvider, useTheme } from "@/contexts/ThemeContext";
+import {
+  ThemeProvider as CustomThemeProvider,
+  useTheme,
+} from "@/contexts/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export {
-  ErrorBoundary,
-} from "expo-router";
+export { ErrorBoundary } from "expo-router";
 
 export const unstable_settings = {
   initialRouteName: "(tabs)",
@@ -80,10 +82,15 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+const ONBOARDING_KEY = "has_seen_onboarding";
+
 function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(
+    null
+  );
   const router = useRouter();
   const segments = useSegments();
 
@@ -94,6 +101,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       if (!token) {
         setIsAuthenticated(false);
         setUser(null);
+        setLoading(false);
         return;
       }
 
@@ -167,21 +175,55 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     }
   }, [user, checkAuthStatus]);
 
+  // Check if user has seen onboarding
+  const checkOnboardingStatus = useCallback(async () => {
+    try {
+      // await AsyncStorage.removeItem(ONBOARDING_KEY);
+      const value = await AsyncStorage.getItem(ONBOARDING_KEY);
+      console.log("Onboarding check - AsyncStorage value:", value);
+      const hasSeen = value === "true";
+      console.log("Setting hasSeenOnboarding to:", hasSeen);
+      setHasSeenOnboarding(hasSeen);
+    } catch (error) {
+      console.log("Error checking onboarding status:", error);
+      setHasSeenOnboarding(false);
+    }
+  }, []);
+
   useEffect(() => {
     checkAuthStatus();
-  }, [checkAuthStatus]);
+    checkOnboardingStatus();
+  }, [checkAuthStatus, checkOnboardingStatus]);
 
   useEffect(() => {
-    if (loading) return;
+    // Wait for both checks to complete
+    if (loading || hasSeenOnboarding === null) return;
 
-    const inAuthGroup = segments[0] === "auth" || segments[0] === "onboarding";
+    const currentSegment = segments[0];
+    const inAuthGroup =
+      currentSegment === "auth" || currentSegment === "onboarding";
+    const inOnboarding = currentSegment === "onboarding";
+    const inAuth = currentSegment === "auth";
 
+    // If authenticated, go to tabs (and redirect away from auth/onboarding screens)
+    if (isAuthenticated) {
+      if (inAuthGroup) {
+        router.replace("/(tabs)");
+      }
+      return;
+    }
+
+    // If not authenticated and already in auth/onboarding flow, allow navigation
+    if (!isAuthenticated && inAuthGroup) {
+      return;
+    }
+
+    // If not authenticated and trying to access other screens, redirect to onboarding
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/onboarding");
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace("/(tabs)");
+      return;
     }
-  }, [isAuthenticated, loading, segments]);
+  }, [isAuthenticated, loading, hasSeenOnboarding, segments, router]);
 
   const contextValue = useMemo<AuthContextType>(
     () => ({
@@ -193,10 +235,18 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       refreshAuth,
       checkVerificationStatus,
     }),
-    [user, isAuthenticated, loading, login, logout, refreshAuth, checkVerificationStatus]
+    [
+      user,
+      isAuthenticated,
+      loading,
+      login,
+      logout,
+      refreshAuth,
+      checkVerificationStatus,
+    ]
   );
 
-  if (loading) {
+  if (loading || hasSeenOnboarding === null) {
     return (
       <View
         style={{
@@ -322,7 +372,7 @@ function RootLayoutNav() {
 
   // Create complete navigation theme with fonts
   const navigationTheme = {
-    dark: themeName === 'dark' || themeName === 'luxe',
+    dark: themeName === "dark" || themeName === "luxe",
     colors: {
       primary: currentTheme.primary,
       background: currentTheme.background,
@@ -333,20 +383,20 @@ function RootLayoutNav() {
     },
     fonts: {
       regular: {
-        fontFamily: 'System',
-        fontWeight: 'normal' as const,
+        fontFamily: "System",
+        fontWeight: "normal" as const,
       },
       medium: {
-        fontFamily: 'System',
-        fontWeight: '500' as const,
+        fontFamily: "System",
+        fontWeight: "500" as const,
       },
       bold: {
-        fontFamily: 'System',
-        fontWeight: 'bold' as const,
+        fontFamily: "System",
+        fontWeight: "bold" as const,
       },
       heavy: {
-        fontFamily: 'System',
-        fontWeight: '800' as const,
+        fontFamily: "System",
+        fontWeight: "800" as const,
       },
     },
   };

@@ -175,11 +175,16 @@ export class ToastService {
     }
 
     private static getStatusCodeMessage(status: number, data: any): string | null {
-        if (status === 400) {
+        if (status === 400 || status === 422) {
             return this.parseValidationErrors(data);
         }
 
         if (status >= 500) {
+            // Check if it's a database constraint violation that we can parse
+            const constraintError = this.parseDatabaseConstraintError(data);
+            if (constraintError) {
+                return constraintError;
+            }
             return 'Server error occurred. Please try again later.';
         }
 
@@ -190,19 +195,65 @@ export class ToastService {
     private static parseValidationErrors(data: any): string {
         const errors: string[] = [];
     
-        for (const [fieldName, fieldErrors] of Object.entries(data)) {
-            if (Array.isArray(fieldErrors)) {
-                const humanFieldName = this.humanizeFieldName(fieldName);
-            
-                fieldErrors.forEach((errorMsg: string) => {
-                    errors.push(`${humanFieldName}: ${errorMsg}`);
-                });
+        // Handle Laravel validation errors structure
+        if (data.errors) {
+            for (const [fieldName, fieldErrors] of Object.entries(data.errors)) {
+                if (Array.isArray(fieldErrors)) {
+                    const humanFieldName = this.humanizeFieldName(fieldName);
+                
+                    fieldErrors.forEach((errorMsg: string) => {
+                        errors.push(`${humanFieldName}: ${errorMsg}`);
+                    });
+                }
             }
+        } else {
+            // Handle direct field errors (fallback)
+            for (const [fieldName, fieldErrors] of Object.entries(data)) {
+                if (Array.isArray(fieldErrors)) {
+                    const humanFieldName = this.humanizeFieldName(fieldName);
+                
+                    fieldErrors.forEach((errorMsg: string) => {
+                        errors.push(`${humanFieldName}: ${errorMsg}`);
+                    });
+                } else if (typeof fieldErrors === 'string') {
+                    // Single error message for a field
+                    const humanFieldName = this.humanizeFieldName(fieldName);
+                    errors.push(`${humanFieldName}: ${fieldErrors}`);
+                }
+            }
+        }
+        
+        if (errors.length === 0 && data.message) {
+            // If no field-specific errors, use the general message
+            return data.message;
         }
         
         return errors.length > 3 
         ? `${errors.slice(0, 2).join('\n')} and ${errors.length - 2} more errors...`
         : errors.join('\n');
+    }
+
+    private static parseDatabaseConstraintError(data: any): string | null {
+        // Check if error message contains database constraint violation info
+        const errorMessage = data?.message || data?.error || '';
+        
+        if (typeof errorMessage === 'string') {
+            // Check for duplicate entry patterns
+            if (errorMessage.includes('Duplicate entry')) {
+                if (errorMessage.includes('username') || errorMessage.includes('users_username_unique')) {
+                    return 'This username is already taken. Please choose another one.';
+                }
+                if (errorMessage.includes('email') || errorMessage.includes('users_email_unique')) {
+                    return 'This email address is already registered. Please use a different email or try logging in.';
+                }
+                if (errorMessage.includes('phone_number') || errorMessage.includes('users_phone_number_unique')) {
+                    return 'This phone number is already registered. Please use a different phone number or try logging in.';
+                }
+                return 'This information is already registered. Please check your details and try again.';
+            }
+        }
+        
+        return null;
     }
 
     private static humanizeFieldName(fieldName: string): string {
@@ -211,12 +262,20 @@ export class ToastService {
             'email': 'Email',
             'password': 'Password',
             'password_confirm': 'Password confirmation',
+            'password_confirmation': 'Password confirmation',
             'phone_number': 'Phone number',
             'first_name': 'First name',
             'last_name': 'Last name',
+            'general': '',
         };
         
-        return fieldMap[fieldName] || fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const mapped = fieldMap[fieldName];
+        if (mapped === '') {
+            // For general errors, don't prefix with field name
+            return '';
+        }
+        
+        return mapped || fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
     
     static showApiError(error: unknown, customTitle?: string) {

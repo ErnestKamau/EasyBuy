@@ -133,12 +133,9 @@ export const authApi = {
       return data;
     } catch (error: any) {
       console.error("Registration API error:", error);
-      if (error.response) {
-        const errorData = error.response.data;
-        const errorMsg = errorData?.message || errorData?.error || 'Registration failed';
-        throw new Error(errorMsg);
-      }
-      throw new Error(error?.message || 'Registration failed. Please try again.');
+      // Preserve the full error object so ToastService can parse validation errors
+      // ToastService expects the axios error structure with response.data
+      throw error;
     }
   },
 
@@ -243,6 +240,19 @@ export const authApi = {
         throw new Error(errorMsg);
       }
       throw new Error('Failed to resend verification email');
+    }
+  },
+
+  async resendEmailVerificationCode(email: string): Promise<void> {
+    try {
+      await api.post("/resend-email-verification-code", { email });
+    } catch (error: any) {
+      if (error.response) {
+        const errorData = error.response.data;
+        const errorMsg = errorData?.message || errorData?.error || 'Failed to resend verification code';
+        throw new Error(errorMsg);
+      }
+      throw new Error('Failed to resend verification code');
     }
   },
 

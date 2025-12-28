@@ -1,5 +1,5 @@
 // app/auth.tsx - Complete Auth Flow with All Screens
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -99,6 +99,9 @@ export default function AuthScreens() {
   const styles = createStyles(currentTheme, isDark);
   const [screenKey, setScreenKey] = useState(0);
 
+  // Refs for OTP inputs
+  const codeInputRefs = useRef<(TextInput | null)[]>([]);
+
   // Update screen key when screen changes for animation
   useEffect(() => {
     setScreenKey((prev) => prev + 1);
@@ -117,8 +120,7 @@ export default function AuthScreens() {
       // Navigation handled by auth context
     } catch (error: any) {
       console.log("Login error:", error);
-      const errorMessage =
-        error.message || "Login failed. Please try again.";
+      const errorMessage = error.message || "Login failed. Please try again.";
       ToastService.showError("Login Failed", errorMessage);
     } finally {
       setLoading(false);
@@ -173,9 +175,11 @@ export default function AuthScreens() {
       await authApi.register(registerData);
       setUserEmail(registerData.email);
       setCurrentScreen("email-verification");
+      // Reset verification code input
+      setVerificationCode(["", "", "", ""]);
       ToastService.showSuccess(
         "Registration Successful!",
-        "Please check your email for verification code"
+        "Please check your email for the OTP verification code"
       );
     } catch (error) {
       ToastService.showApiError(error, "Registration Failed");
@@ -201,10 +205,12 @@ export default function AuthScreens() {
     try {
       await authApi.forgotPassword(forgotPasswordEmail);
       setUserEmail(forgotPasswordEmail);
+      // Reset verification code input
+      setVerificationCode(["", "", "", ""]);
       setCurrentScreen("email-verification");
       ToastService.showSuccess(
         "Code Sent",
-        "Please check your email for verification code"
+        "Please check your email for the OTP verification code"
       );
     } catch (error) {
       ToastService.showApiError(error, "Failed to send code");
@@ -215,14 +221,31 @@ export default function AuthScreens() {
 
   // Handle verification code input
   const handleVerificationCodeChange = (index: number, value: string) => {
-    if (value.length > 1) return;
+    // Only allow single digit
+    if (value.length > 1) {
+      // If pasted multiple digits, take only the first one
+      value = value[0];
+    }
+
+    // Only allow numbers
+    if (value && !/^\d$/.test(value)) {
+      return;
+    }
+
     const newCode = [...verificationCode];
     newCode[index] = value;
     setVerificationCode(newCode);
 
     // Auto-focus next input
     if (value && index < 3) {
-      // Focus next input (handled by refs in component)
+      codeInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  // Handle backspace to go to previous input
+  const handleVerificationCodeKeyPress = (index: number, key: string) => {
+    if (key === "Backspace" && !verificationCode[index] && index > 0) {
+      codeInputRefs.current[index - 1]?.focus();
     }
   };
 
@@ -238,18 +261,28 @@ export default function AuthScreens() {
     try {
       const code = verificationCode.join("");
       const isRegistrationFlow = currentScreen === "email-verification";
-      
+
       if (isRegistrationFlow) {
         // Verify email code for registration
         await authApi.verifyEmailCode(userEmail, code);
+        ToastService.showSuccess(
+          "Email Verified!",
+          "Your email has been verified successfully"
+        );
         setCurrentScreen("account-created");
       } else {
         // Verify reset code for password reset
         await authApi.verifyResetCode(userEmail, code);
+        ToastService.showSuccess(
+          "Code Verified!",
+          "Please set your new password"
+        );
         setCurrentScreen("reset-password");
       }
     } catch (error) {
       ToastService.showApiError(error, "Verification Failed");
+      // Clear code inputs on error
+      setVerificationCode(["", "", "", ""]);
     } finally {
       setLoading(false);
     }
@@ -265,7 +298,9 @@ export default function AuthScreens() {
       return;
     }
 
-    if (resetPasswordData.password !== resetPasswordData.password_confirmation) {
+    if (
+      resetPasswordData.password !== resetPasswordData.password_confirmation
+    ) {
       ToastService.showError("Password Mismatch", "Passwords do not match");
       return;
     }
@@ -287,6 +322,11 @@ export default function AuthScreens() {
         resetPasswordData.password,
         resetPasswordData.password_confirmation
       );
+      // Clear password fields
+      setResetPasswordData({
+        password: "",
+        password_confirmation: "",
+      });
       setCurrentScreen("password-changed");
       ToastService.showSuccess(
         "Password Reset",
@@ -301,16 +341,32 @@ export default function AuthScreens() {
 
   // Resend verification code
   const handleResendCode = useCallback(async () => {
+    if (!userEmail) {
+      ToastService.showError("Error", "Email address not found");
+      return;
+    }
+
     setLoading(true);
     try {
-      await authApi.resendVerificationEmail();
-      ToastService.showSuccess("Code Sent", "Verification code resent");
+      const isRegistrationFlow = currentScreen === "email-verification";
+
+      if (isRegistrationFlow) {
+        // Resend email verification OTP
+        await authApi.resendEmailVerificationCode(userEmail);
+      } else {
+        // Resend password reset OTP
+        await authApi.forgotPassword(userEmail);
+      }
+      ToastService.showSuccess(
+        "Code Sent",
+        "Verification code resent to your email"
+      );
     } catch (error) {
       ToastService.showApiError(error, "Failed to resend code");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userEmail, currentScreen]);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -322,19 +378,19 @@ export default function AuthScreens() {
             key={screenKey}
           >
             <RegisterScreen
-            registerData={registerData}
-            setRegisterData={setRegisterData}
-            privacyAccepted={privacyAccepted}
-            setPrivacyAccepted={setPrivacyAccepted}
-            showPassword={showPassword}
-            setShowPassword={setShowPassword}
-            showConfirmPassword={showConfirmPassword}
-            setShowConfirmPassword={setShowConfirmPassword}
-            loading={loading}
-            onRegister={handleRegister}
-            onSwitchToLogin={() => setCurrentScreen("login")}
-            styles={styles}
-          />
+              registerData={registerData}
+              setRegisterData={setRegisterData}
+              privacyAccepted={privacyAccepted}
+              setPrivacyAccepted={setPrivacyAccepted}
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+              showConfirmPassword={showConfirmPassword}
+              setShowConfirmPassword={setShowConfirmPassword}
+              loading={loading}
+              onRegister={handleRegister}
+              onSwitchToLogin={() => setCurrentScreen("login")}
+              styles={styles}
+            />
           </Animated.View>
         );
       case "login":
@@ -345,18 +401,18 @@ export default function AuthScreens() {
             key={screenKey}
           >
             <LoginScreen
-            loginData={loginData}
-            setLoginData={setLoginData}
-            rememberMe={rememberMe}
-            setRememberMe={setRememberMe}
-            showPassword={showPassword}
-            setShowPassword={setShowPassword}
-            loading={loading}
-            onLogin={handleLogin}
-            onSwitchToRegister={() => setCurrentScreen("register")}
-            onForgotPassword={() => setCurrentScreen("forgot-password")}
-            styles={styles}
-          />
+              loginData={loginData}
+              setLoginData={setLoginData}
+              rememberMe={rememberMe}
+              setRememberMe={setRememberMe}
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+              loading={loading}
+              onLogin={handleLogin}
+              onSwitchToRegister={() => setCurrentScreen("register")}
+              onForgotPassword={() => setCurrentScreen("forgot-password")}
+              styles={styles}
+            />
           </Animated.View>
         );
       case "forgot-password":
@@ -367,13 +423,13 @@ export default function AuthScreens() {
             key={screenKey}
           >
             <ForgotPasswordScreen
-            email={forgotPasswordEmail}
-            setEmail={setForgotPasswordEmail}
-            loading={loading}
-            onSendCode={handleForgotPassword}
-            onBack={() => setCurrentScreen("login")}
-            styles={styles}
-          />
+              email={forgotPasswordEmail}
+              setEmail={setForgotPasswordEmail}
+              loading={loading}
+              onSendCode={handleForgotPassword}
+              onBack={() => setCurrentScreen("login")}
+              styles={styles}
+            />
           </Animated.View>
         );
       case "email-verification":
@@ -384,15 +440,17 @@ export default function AuthScreens() {
             key={screenKey}
           >
             <EmailVerificationScreen
-            email={userEmail}
-            code={verificationCode}
-            onCodeChange={handleVerificationCodeChange}
-            loading={loading}
-            onVerify={handleVerifyCode}
-            onResend={handleResendCode}
-            onBack={() => setCurrentScreen("login")}
-            styles={styles}
-          />
+              email={userEmail}
+              code={verificationCode}
+              onCodeChange={handleVerificationCodeChange}
+              loading={loading}
+              onVerify={handleVerifyCode}
+              onResend={handleResendCode}
+              onBack={() => setCurrentScreen("login")}
+              styles={styles}
+              codeInputRefs={codeInputRefs}
+              onKeyPress={handleVerificationCodeKeyPress}
+            />
           </Animated.View>
         );
       case "reset-password":
@@ -403,16 +461,16 @@ export default function AuthScreens() {
             key={screenKey}
           >
             <ResetPasswordScreen
-            passwordData={resetPasswordData}
-            setPasswordData={setResetPasswordData}
-            showPassword={showPassword}
-            setShowPassword={setShowPassword}
-            showConfirmPassword={showConfirmPassword}
-            setShowConfirmPassword={setShowConfirmPassword}
-            loading={loading}
-            onReset={handleResetPassword}
-            styles={styles}
-          />
+              passwordData={resetPasswordData}
+              setPasswordData={setResetPasswordData}
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+              showConfirmPassword={showConfirmPassword}
+              setShowConfirmPassword={setShowConfirmPassword}
+              loading={loading}
+              onReset={handleResetPassword}
+              styles={styles}
+            />
           </Animated.View>
         );
       case "account-created":
@@ -423,9 +481,23 @@ export default function AuthScreens() {
             key={screenKey}
           >
             <AccountCreatedScreen
-            onContinue={() => router.replace("/(tabs)")}
-            styles={styles}
-          />
+              onContinue={() => {
+                // Clear registration data and go to login
+                setRegisterData({
+                  username: "",
+                  first_name: "",
+                  last_name: "",
+                  email: "",
+                  phone_number: "",
+                  password: "",
+                  password_confirmation: "",
+                  gender: undefined,
+                });
+                setVerificationCode(["", "", "", ""]);
+                setCurrentScreen("login");
+              }}
+              styles={styles}
+            />
           </Animated.View>
         );
       case "password-changed":
@@ -436,9 +508,9 @@ export default function AuthScreens() {
             key={screenKey}
           >
             <PasswordChangedScreen
-            onContinue={() => setCurrentScreen("login")}
-            styles={styles}
-          />
+              onContinue={() => setCurrentScreen("login")}
+              styles={styles}
+            />
           </Animated.View>
         );
       default:
@@ -611,23 +683,18 @@ const RegisterScreen = ({
     </View>
 
     <TouchableOpacity
-      style={styles.checkboxContainer}
+      style={[styles.checkboxContainer, { marginBottom: 24 }]}
       onPress={() => setPrivacyAccepted(!privacyAccepted)}
       activeOpacity={0.7}
     >
       <View
-        style={[
-          styles.checkbox,
-          privacyAccepted && styles.checkboxChecked,
-        ]}
+        style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}
       >
         {privacyAccepted && (
           <CheckCircle size={16} color={styles.checkboxIconColor} />
         )}
       </View>
-      <Text style={styles.checkboxText}>
-        I agree with privacy policy
-      </Text>
+      <Text style={styles.checkboxText}>I agree with privacy policy</Text>
     </TouchableOpacity>
 
     <TouchableOpacity
@@ -649,8 +716,7 @@ const RegisterScreen = ({
       activeOpacity={0.7}
     >
       <Text style={styles.linkText}>
-        Already have an account?{" "}
-        <Text style={styles.linkTextBold}>Login</Text>
+        Already have an account? <Text style={styles.linkTextBold}>Login</Text>
       </Text>
     </TouchableOpacity>
   </View>
@@ -683,9 +749,7 @@ const LoginScreen = ({
         placeholder="Username or Email"
         placeholderTextColor={styles.placeholderColor}
         value={loginData.username}
-        onChangeText={(text) =>
-          setLoginData({ ...loginData, username: text })
-        }
+        onChangeText={(text) => setLoginData({ ...loginData, username: text })}
         autoCapitalize="none"
         autoComplete="username"
       />
@@ -698,9 +762,7 @@ const LoginScreen = ({
         placeholder="Password"
         placeholderTextColor={styles.placeholderColor}
         value={loginData.password}
-        onChangeText={(text) =>
-          setLoginData({ ...loginData, password: text })
-        }
+        onChangeText={(text) => setLoginData({ ...loginData, password: text })}
         secureTextEntry={!showPassword}
         autoCapitalize="none"
         autoComplete="password"
@@ -723,9 +785,7 @@ const LoginScreen = ({
         onPress={() => setRememberMe(!rememberMe)}
         activeOpacity={0.7}
       >
-        <View
-          style={[styles.checkbox, rememberMe && styles.checkboxChecked]}
-        >
+        <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
           {rememberMe && (
             <CheckCircle size={16} color={styles.checkboxIconColor} />
           )}
@@ -733,7 +793,11 @@ const LoginScreen = ({
         <Text style={styles.checkboxText}>Keep me logged in</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={onForgotPassword} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onForgotPassword}
+        activeOpacity={0.7}
+        style={{ marginLeft: "auto", marginRight: 12, alignItems: "center" }}
+      >
         <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
       </TouchableOpacity>
     </View>
@@ -757,8 +821,7 @@ const LoginScreen = ({
       activeOpacity={0.7}
     >
       <Text style={styles.linkText}>
-        Don't have an account?{" "}
-        <Text style={styles.linkTextBold}>Sign Up</Text>
+        Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text>
       </Text>
     </TouchableOpacity>
   </View>
@@ -844,6 +907,8 @@ const EmailVerificationScreen = ({
   onResend,
   onBack,
   styles,
+  codeInputRefs,
+  onKeyPress,
 }: any) => (
   <View style={styles.formContainer}>
     <TouchableOpacity
@@ -869,25 +934,32 @@ const EmailVerificationScreen = ({
     </View>
 
     <Text style={styles.emailText}>
-      We sent a code to{" "}
-      <Text style={styles.emailHighlight}>{email}</Text>
+      We sent a code to <Text style={styles.emailHighlight}>{email}</Text>
     </Text>
 
     <View style={styles.codeContainer}>
-      {code.map((digit: string, index: number) => {
-        const inputId = `code-input-${index}-${Date.now()}`;
-        return (
-          <TextInput
-            key={inputId}
-            style={styles.codeInput}
-            value={digit}
-            onChangeText={(value) => onCodeChange(index, value)}
-            keyboardType="number-pad"
-            maxLength={1}
-            selectTextOnFocus
-          />
-        );
-      })}
+      {code.map((digit: string, index: number) => (
+        <TextInput
+          key={`code-input-${index}`}
+          ref={(ref) => {
+            if (codeInputRefs?.current) {
+              codeInputRefs.current[index] = ref;
+            }
+          }}
+          style={styles.codeInput}
+          value={digit}
+          onChangeText={(value) => onCodeChange(index, value)}
+          onKeyPress={({ nativeEvent }) => {
+            if (onKeyPress) {
+              onKeyPress(index, nativeEvent.key);
+            }
+          }}
+          keyboardType="number-pad"
+          maxLength={1}
+          selectTextOnFocus
+          autoFocus={index === 0}
+        />
+      ))}
     </View>
 
     <TouchableOpacity
@@ -1023,7 +1095,11 @@ const AccountCreatedScreen = ({ onContinue, styles }: any) => (
   <View style={styles.successContainer}>
     <View style={styles.iconContainer}>
       <View style={styles.successIconWrapper}>
-        <CheckCircle size={120} color={styles.successIcon.color} strokeWidth={2} />
+        <CheckCircle
+          size={120}
+          color={styles.successIcon.color}
+          strokeWidth={2}
+        />
       </View>
     </View>
 
@@ -1032,9 +1108,7 @@ const AccountCreatedScreen = ({ onContinue, styles }: any) => (
       <Text style={styles.subtitle}>Welcome to EasyBuy.</Text>
     </View>
 
-    <Text style={styles.successMessage}>
-      Your account has been created
-    </Text>
+    <Text style={styles.successMessage}>Your account has been created</Text>
     <Text style={styles.successTitle}>Successfully!</Text>
 
     <TouchableOpacity
@@ -1053,7 +1127,11 @@ const PasswordChangedScreen = ({ onContinue, styles }: any) => (
   <View style={styles.successContainer}>
     <View style={styles.iconContainer}>
       <View style={styles.successIconWrapper}>
-        <CheckCircle size={120} color={styles.successIcon.color} strokeWidth={2} />
+        <CheckCircle
+          size={120}
+          color={styles.successIcon.color}
+          strokeWidth={2}
+        />
       </View>
     </View>
 
@@ -1062,9 +1140,7 @@ const PasswordChangedScreen = ({ onContinue, styles }: any) => (
       <Text style={styles.subtitle}>No hassle anymore.</Text>
     </View>
 
-    <Text style={styles.successMessage}>
-      Your password has been reset
-    </Text>
+    <Text style={styles.successMessage}>Your password has been reset</Text>
     <Text style={styles.successTitle}>Successfully!</Text>
 
     <TouchableOpacity
@@ -1177,15 +1253,18 @@ const createStyles = (theme: any, isDark: boolean) =>
     linkText: {
       fontSize: 16,
       color: theme.textSecondary,
+      fontFamily: defaultFontFamily,
     },
     linkTextBold: {
+      fontSize: 16,
       color: theme.primary,
       fontWeight: "600",
+      fontFamily: defaultFontFamily,
     },
     checkboxContainer: {
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: 24,
+      flex: 1,
     },
     checkbox: {
       width: 24,
@@ -1208,9 +1287,12 @@ const createStyles = (theme: any, isDark: boolean) =>
     },
     rememberForgotContainer: {
       flexDirection: "row",
-      justifyContent: "space-between",
+      justifyContent: "flex-start",
       alignItems: "center",
       marginBottom: 24,
+      paddingHorizontal: 8,
+      paddingVertical: 12,
+      overflow: "hidden",
     },
     forgotPasswordText: {
       fontSize: 14,

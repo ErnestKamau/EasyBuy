@@ -11,8 +11,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Mail\EmailVerificationCode;
+use App\Mail\PasswordResetCode;
 
 class AuthController extends Controller
 {
@@ -24,21 +27,70 @@ class AuthController extends Controller
             'last_name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'phone_number' => 'nullable|string|max:20',
+            'phone_number' => 'nullable|string|max:20|unique:users',
             'gender' => 'nullable|string|in:male,female,other',
             'date_of_birth' => 'nullable|date',
         ]);
 
-        $user = User::create([
-            'username' => $validated['username'],
-            'first_name' => $validated['first_name'],
-            'last_name' => $validated['last_name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'phone_number' => $validated['phone_number'] ?? null,
-            'gender' => $validated['gender'] ?? null,
-            'date_of_birth' => $validated['date_of_birth'] ?? null,
-        ]);
+        try {
+            $user = User::create([
+                'username' => $validated['username'],
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'phone_number' => $validated['phone_number'] ?? null,
+                'gender' => $validated['gender'] ?? null,
+                'date_of_birth' => $validated['date_of_birth'] ?? null,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle database constraint violations
+            $errorCode = $e->getCode();
+            
+            // MySQL error code 23000 is integrity constraint violation
+            if ($errorCode == 23000 || str_contains($e->getMessage(), 'Duplicate entry')) {
+                $message = $e->getMessage();
+                
+                // Extract which field has the duplicate
+                if (str_contains($message, 'users_username_unique') || str_contains($message, 'username')) {
+                    return response()->json([
+                        'message' => 'Registration failed',
+                        'errors' => [
+                            'username' => ['This username is already taken. Please choose another one.']
+                        ]
+                    ], 422);
+                }
+                
+                if (str_contains($message, 'users_email_unique') || str_contains($message, 'email')) {
+                    return response()->json([
+                        'message' => 'Registration failed',
+                        'errors' => [
+                            'email' => ['This email address is already registered. Please use a different email or try logging in.']
+                        ]
+                    ], 422);
+                }
+                
+                if (str_contains($message, 'users_phone_number_unique') || str_contains($message, 'phone_number')) {
+                    return response()->json([
+                        'message' => 'Registration failed',
+                        'errors' => [
+                            'phone_number' => ['This phone number is already registered. Please use a different phone number or try logging in.']
+                        ]
+                    ], 422);
+                }
+                
+                // Generic duplicate entry message
+                return response()->json([
+                    'message' => 'Registration failed',
+                    'errors' => [
+                        'general' => ['This information is already registered. Please check your details and try again.']
+                    ]
+                ], 422);
+            }
+            
+            // Re-throw if it's not a constraint violation
+            throw $e;
+        }
 
         event(new Registered($user));
 
@@ -53,8 +105,15 @@ class AuthController extends Controller
         ]);
 
         // Send email with code
-        // TODO: Implement email sending with the code
-        // In production, send email: $user->sendEmailVerificationCode($code);
+        try {
+            Mail::to($user->email)->send(new EmailVerificationCode(
+                $code,
+                $user->first_name ?: $user->username
+            ));
+        } catch (\Exception $e) {
+            // Log error but don't fail registration
+            \Log::error('Failed to send verification email: ' . $e->getMessage());
+        }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -225,24 +284,31 @@ class AuthController extends Controller
         );
 
         // Send email with code
-        // TODO: Implement email sending with the code
-        // For now, we'll just return success
-        // In production, send email: $user->sendPasswordResetCode($code);
+        try {
+            Mail::to($user->email)->send(new PasswordResetCode(
+                $code,
+                $user->first_name ?: $user->username
+            ));
+        } catch (\Exception $e) {
+            // Log error but don't fail the request
+            \Log::error('Failed to send password reset email: ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Password reset code has been sent to your email address.',
-            'code' => $code, // Remove this in production - only for testing
+            // Remove 'code' in production - only for testing
+            'code' => $code,
         ], 200);
     }
 
     /**
-     * Verify email verification code (for registration)
+     * Verify email verification OTP code (for registration)
      */
     public function verifyEmailCode(Request $request)
     {
         $validated = $request->validate([
             'email' => 'required|string|email',
-            'code' => 'required|string|size:4',
+            'code' => 'required|string|size:4|regex:/^\d{4}$/',
         ]);
 
         $user = User::where('email', $validated['email'])->first();
@@ -255,20 +321,29 @@ class AuthController extends Controller
 
         if ($user->hasVerifiedEmail()) {
             return response()->json([
-                'message' => 'Email already verified.'
+                'message' => 'Email already verified.',
+                'user' => $user->fresh(),
             ], 400);
         }
 
-        // Check if code matches (stored in email_verification_codes table)
+        // Check if code exists and hasn't expired (10 minutes)
         $storedCode = DB::table('email_verification_codes')
             ->where('email', $validated['email'])
             ->where('created_at', '>', Carbon::now()->subMinutes(10))
-            ->latest()
+            ->latest('created_at')
             ->first();
 
-        if (!$storedCode || !Hash::check($validated['code'], $storedCode->code)) {
+        // Check if code exists
+        if (!$storedCode) {
             return response()->json([
-                'message' => 'Invalid or expired verification code.'
+                'message' => 'Verification code not found or has expired. Please request a new code.'
+            ], 400);
+        }
+
+        // Verify the OTP code matches
+        if (!Hash::check($validated['code'], $storedCode->code)) {
+            return response()->json([
+                'message' => 'Invalid verification code. Please check and try again.'
             ], 400);
         }
 
@@ -281,36 +356,105 @@ class AuthController extends Controller
                 ->where('email', $validated['email'])
                 ->delete();
 
+            // Refresh user to get updated email_verified_at
+            $user->refresh();
+
             return response()->json([
                 'message' => 'Email verified successfully.',
                 'user' => $user,
+                'email_verified' => true,
             ], 200);
         }
 
         return response()->json([
-            'message' => 'Failed to verify email.'
+            'message' => 'Failed to verify email. Please try again.'
         ], 500);
     }
 
     /**
-     * Verify password reset code
+     * Resend email verification OTP code
+     */
+    public function resendEmailVerificationCode(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|string|email|exists:users,email',
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'We could not find a user with that email address.'
+            ], 404);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Email already verified.'
+            ], 400);
+        }
+
+        // Generate new 4-digit verification code
+        $code = str_pad((string) rand(0, 9999), 4, '0', STR_PAD_LEFT);
+
+        // Delete old codes for this email
+        DB::table('email_verification_codes')
+            ->where('email', $validated['email'])
+            ->delete();
+
+        // Store new code in database with expiration (10 minutes)
+        DB::table('email_verification_codes')->insert([
+            'email' => $user->email,
+            'code' => Hash::make($code),
+            'created_at' => Carbon::now(),
+        ]);
+
+        // Send email with code
+        try {
+            Mail::to($user->email)->send(new EmailVerificationCode(
+                $code,
+                $user->first_name ?: $user->username
+            ));
+        } catch (\Exception $e) {
+            // Log error but don't fail the request
+            \Log::error('Failed to send verification email: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'message' => 'Verification code has been resent to your email address.',
+            // Remove 'code' in production - only for testing
+            'code' => $code,
+        ], 200);
+    }
+
+    /**
+     * Verify password reset OTP code
      */
     public function verifyResetCode(Request $request)
     {
         $validated = $request->validate([
-            'email' => 'required|string|email',
-            'code' => 'required|string|size:4',
+            'email' => 'required|string|email|exists:users,email',
+            'code' => 'required|string|size:4|regex:/^\d{4}$/',
         ]);
 
+        // Check if code exists and hasn't expired (10 minutes)
         $resetToken = DB::table('password_reset_tokens')
             ->where('email', $validated['email'])
             ->where('created_at', '>', Carbon::now()->subMinutes(10))
-            ->latest()
+            ->latest('created_at')
             ->first();
 
-        if (!$resetToken || !Hash::check($validated['code'], $resetToken->token)) {
+        // Check if code exists
+        if (!$resetToken) {
             return response()->json([
-                'message' => 'Invalid or expired reset code.'
+                'message' => 'Reset code not found or has expired. Please request a new code.'
+            ], 400);
+        }
+
+        // Verify the OTP code matches
+        if (!Hash::check($validated['code'], $resetToken->token)) {
+            return response()->json([
+                'message' => 'Invalid reset code. Please check and try again.'
             ], 400);
         }
 
@@ -321,13 +465,13 @@ class AuthController extends Controller
     }
 
     /**
-     * Reset password with verification code
+     * Reset password with OTP verification code
      */
     public function resetPassword(Request $request)
     {
         $validated = $request->validate([
             'email' => 'required|string|email|exists:users,email',
-            'code' => 'required|string|size:4',
+            'code' => 'required|string|size:4|regex:/^\d{4}$/',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
@@ -339,16 +483,24 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // Verify reset code
+        // Verify reset OTP code exists and hasn't expired (10 minutes)
         $resetToken = DB::table('password_reset_tokens')
             ->where('email', $validated['email'])
             ->where('created_at', '>', Carbon::now()->subMinutes(10))
-            ->latest()
+            ->latest('created_at')
             ->first();
 
-        if (!$resetToken || !Hash::check($validated['code'], $resetToken->token)) {
+        // Check if code exists
+        if (!$resetToken) {
             return response()->json([
-                'message' => 'Invalid or expired reset code.'
+                'message' => 'Reset code not found or has expired. Please request a new code.'
+            ], 400);
+        }
+
+        // Verify the OTP code matches
+        if (!Hash::check($validated['code'], $resetToken->token)) {
+            return response()->json([
+                'message' => 'Invalid reset code. Please check and try again.'
             ], 400);
         }
 
@@ -365,7 +517,7 @@ class AuthController extends Controller
         $user->tokens()->delete();
 
         return response()->json([
-            'message' => 'Password has been reset successfully.'
+            'message' => 'Password has been reset successfully. Please login with your new password.'
         ], 200);
     }
 }
