@@ -8,7 +8,10 @@ import {
   Dimensions,
   ScrollView,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { ArrowRight, ArrowLeft } from "lucide-react-native";
 import LottieView from "lottie-react-native";
@@ -81,6 +84,7 @@ const LottieAnimation = ({
 export default function OnboardingScreen() {
   const { currentTheme, themeName } = useTheme();
   const isDark = themeName === "dark";
+  const insets = useSafeAreaInsets();
   const [currentScreen, setCurrentScreen] = useState(0);
   const [screenKey, setScreenKey] = useState(0);
 
@@ -114,7 +118,13 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: Math.max(insets.top, 20),
+            paddingBottom: Math.max(insets.bottom, 40),
+          },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Skip Button */}
@@ -150,7 +160,7 @@ export default function OnboardingScreen() {
             <View style={styles.iconContainer}>
               <LottieAnimation
                 source={require("@/assets/lottie/delivery-boy.json")}
-                size={280}
+                size={300}
                 autoPlay={true}
                 loop={true}
               />
@@ -193,7 +203,7 @@ export default function OnboardingScreen() {
             <View style={[styles.iconContainer, styles.iconContainerLarge]}>
               <LottieAnimation
                 source={require("@/assets/lottie/skeleton-playing-guitar.json")}
-                size={350}
+                size={300}
                 autoPlay={true}
                 loop={true}
               />
@@ -234,12 +244,11 @@ const createStyles = (theme: any, isDark: boolean) =>
     container: {
       flex: 1,
       backgroundColor: theme.background,
+      marginTop: -20,
     },
     scrollContent: {
       flexGrow: 1,
       paddingHorizontal: 24,
-      paddingTop: 20,
-      paddingBottom: 40,
     },
     skipButton: {
       alignSelf: "flex-end",
@@ -279,7 +288,7 @@ const createStyles = (theme: any, isDark: boolean) =>
     },
     textContainer: {
       alignItems: "center",
-      marginBottom: 40,
+      marginBottom: 30,
     },
     title: {
       fontSize: 36,
@@ -312,7 +321,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       justifyContent: "center",
       alignItems: "center",
       gap: 8,
-      marginBottom: 32,
+      marginBottom: 24,
     },
     indicator: {
       width: 8,
@@ -339,7 +348,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       shadowOpacity: 0.2,
       shadowRadius: 8,
       elevation: 4,
-      marginBottom: 20,
+      marginBottom: 40,
     },
     nextButtonText: {
       color: theme.surface,

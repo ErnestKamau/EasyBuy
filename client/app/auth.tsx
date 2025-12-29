@@ -12,7 +12,10 @@ import {
   ActivityIndicator,
   Dimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import Animated, {
   FadeIn,
@@ -157,6 +160,7 @@ export default function AuthScreens() {
     password: "",
     password_confirmation: "",
     gender: undefined,
+    date_of_birth: "",
   });
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
@@ -177,6 +181,7 @@ export default function AuthScreens() {
   });
 
   const styles = createStyles(currentTheme, isDark);
+  const insets = useSafeAreaInsets();
   const [screenKey, setScreenKey] = useState(0);
 
   // Refs for OTP inputs
@@ -214,7 +219,8 @@ export default function AuthScreens() {
       !registerData.first_name ||
       !registerData.last_name ||
       !registerData.email ||
-      !registerData.password
+      !registerData.password ||
+      !registerData.date_of_birth
     ) {
       ToastService.showError(
         "Validation Error",
@@ -247,6 +253,31 @@ export default function AuthScreens() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(registerData.email)) {
       ToastService.showError("Invalid Email", "Please enter a valid email");
+      return;
+    }
+
+    // Validate date of birth format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(registerData.date_of_birth)) {
+      ToastService.showError(
+        "Invalid Date",
+        "Please enter date of birth in YYYY-MM-DD format"
+      );
+      return;
+    }
+
+    // Validate date is valid and not in the future
+    const birthDate = new Date(registerData.date_of_birth);
+    const today = new Date();
+    if (isNaN(birthDate.getTime())) {
+      ToastService.showError("Invalid Date", "Please enter a valid date");
+      return;
+    }
+    if (birthDate > today) {
+      ToastService.showError(
+        "Invalid Date",
+        "Date of birth cannot be in the future"
+      );
       return;
     }
 
@@ -577,6 +608,7 @@ export default function AuthScreens() {
                   password: "",
                   password_confirmation: "",
                   gender: undefined,
+                  date_of_birth: "",
                 });
                 setVerificationCode(["", "", "", ""]);
                 setCurrentScreen("login");
@@ -612,7 +644,13 @@ export default function AuthScreens() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: Math.max(insets.top, 0), // Reduce top margin by 10px
+              paddingBottom: Math.max(insets.bottom, 20),
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -714,6 +752,32 @@ const RegisterScreen = ({
           setRegisterData({ ...registerData, phone_number: text })
         }
         keyboardType="phone-pad"
+      />
+    </View>
+
+    <View style={styles.inputWithIcon}>
+      <User size={20} color={styles.inputIcon.color} />
+      <TextInput
+        style={styles.input}
+        placeholder="Date of Birth (YYYY-MM-DD)"
+        placeholderTextColor={styles.placeholderColor}
+        value={registerData.date_of_birth}
+        onChangeText={(text) => {
+          // Allow only numbers and dashes, format as user types
+          let formatted = text.replaceAll(/[^\d-]/g, "");
+          // Auto-format as YYYY-MM-DD
+          if (formatted.length > 4 && !formatted.includes("-")) {
+            formatted = formatted.slice(0, 4) + "-" + formatted.slice(4);
+          }
+          if (formatted.length > 7 && formatted.split("-").length === 2) {
+            formatted = formatted.slice(0, 7) + "-" + formatted.slice(7);
+          }
+          // Limit to 10 characters (YYYY-MM-DD)
+          formatted = formatted.slice(0, 10);
+          setRegisterData({ ...registerData, date_of_birth: formatted });
+        }}
+        keyboardType="numeric"
+        maxLength={10}
       />
     </View>
 
@@ -1256,6 +1320,7 @@ const createStyles = (theme: any, isDark: boolean) =>
     container: {
       flex: 1,
       backgroundColor: theme.background,
+      marginTop: -24,
     },
     keyboardAvoid: {
       flex: 1,
@@ -1264,7 +1329,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       flexGrow: 1,
       justifyContent: "center",
       paddingHorizontal: 24,
-      paddingVertical: 20,
+      marginTop: -15,
     },
     formContainer: {
       backgroundColor: theme.surface,
@@ -1274,7 +1339,7 @@ const createStyles = (theme: any, isDark: boolean) =>
     },
     headerContainer: {
       alignItems: "center",
-      marginBottom: 32,
+      marginBottom: 28,
     },
     title: {
       fontSize: 32,
@@ -1322,7 +1387,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       paddingVertical: 18,
       alignItems: "center",
       justifyContent: "center",
-      marginBottom: 24,
+      marginBottom: 20,
       minHeight: 56,
       flexDirection: "row",
       gap: 8,

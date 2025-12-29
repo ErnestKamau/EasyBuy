@@ -44,7 +44,11 @@ import { useColorScheme } from "@/components/useColorScheme";
 import { authApi, tokenManager, User } from "@/services/api";
 import { toastConfig } from "@/components/ToastConfig";
 import { ToastService } from "@/utils/toastService";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { CartProvider } from "@/contexts/CartContext";
 import {
   ThemeProvider as CustomThemeProvider,
@@ -178,7 +182,6 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   // Check if user has seen onboarding
   const checkOnboardingStatus = useCallback(async () => {
     try {
-      // await AsyncStorage.removeItem(ONBOARDING_KEY);
       const value = await AsyncStorage.getItem(ONBOARDING_KEY);
       console.log("Onboarding check - AsyncStorage value:", value);
       const hasSeen = value === "true";
@@ -314,6 +317,23 @@ export default function RootLayout() {
   );
 }
 
+// Safe Area Wrapper Component
+function SafeAreaWrapper({ children }: { readonly children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        paddingTop: insets.top - 40,
+        paddingBottom: insets.bottom - 20,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const { currentTheme, themeName } = useTheme();
@@ -404,99 +424,101 @@ function RootLayoutNav() {
   return (
     <ThemeProvider value={navigationTheme}>
       <SafeAreaProvider>
-        <Stack>
-          <Stack.Screen
-            name="onboarding"
-            options={{
-              headerShown: false,
-              gestureEnabled: false,
-            }}
-          />
+        <SafeAreaWrapper>
+          <Stack>
+            <Stack.Screen
+              name="onboarding"
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
 
-          <Stack.Screen
-            name="auth"
-            options={{
-              headerShown: false,
-              gestureEnabled: false,
-            }}
-          />
+            <Stack.Screen
+              name="auth"
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
 
-          <Stack.Screen
-            name="(tabs)"
-            options={{
-              headerShown: false,
-            }}
-          />
+            <Stack.Screen
+              name="(tabs)"
+              options={{
+                headerShown: false,
+              }}
+            />
 
-          <Stack.Screen
-            name="categories"
-            options={{
-              title: "Categories",
-              presentation: "card",
-              headerShown: true,
-            }}
-          />
+            <Stack.Screen
+              name="categories"
+              options={{
+                title: "Categories",
+                presentation: "card",
+                headerShown: true,
+              }}
+            />
 
-          <Stack.Screen
-            name="search"
-            options={{
-              title: "Search",
-              presentation: "card",
-              headerShown: true,
-            }}
-          />
+            <Stack.Screen
+              name="search"
+              options={{
+                title: "Search",
+                presentation: "card",
+                headerShown: true,
+              }}
+            />
 
-          <Stack.Screen
-            name="product/[id]"
-            options={{
-              title: "Product Details",
-              presentation: "card",
-              headerShown: false,
-            }}
-          />
+            <Stack.Screen
+              name="product/[id]"
+              options={{
+                title: "Product Details",
+                presentation: "card",
+                headerShown: false,
+              }}
+            />
 
-          <Stack.Screen
-            name="admin"
-            options={{
-              title: "Admin Panel",
-              presentation: "card",
-              headerShown: false,
-            }}
-          />
+            <Stack.Screen
+              name="admin"
+              options={{
+                title: "Admin Panel",
+                presentation: "card",
+                headerShown: false,
+              }}
+            />
 
-          <Stack.Screen
-            name="checkout"
-            options={{
-              title: "Checkout",
-              presentation: "card",
-              headerShown: false,
-            }}
-          />
+            <Stack.Screen
+              name="checkout"
+              options={{
+                title: "Checkout",
+                presentation: "card",
+                headerShown: false,
+              }}
+            />
 
-          <Stack.Screen
-            name="settings"
-            options={{
-              title: "Settings",
-              presentation: "card",
-            }}
-          />
+            <Stack.Screen
+              name="settings"
+              options={{
+                title: "Settings",
+                presentation: "card",
+              }}
+            />
 
-          <Stack.Screen
-            name="theme-selector"
-            options={{
-              title: "Theme Selection",
-              presentation: "card",
-              headerShown: false,
-            }}
-          />
+            <Stack.Screen
+              name="theme-selector"
+              options={{
+                title: "Theme Selection",
+                presentation: "card",
+                headerShown: false,
+              }}
+            />
 
-          <Stack.Screen
-            name="modal"
-            options={{
-              presentation: "modal",
-            }}
-          />
-        </Stack>
+            <Stack.Screen
+              name="modal"
+              options={{
+                presentation: "modal",
+              }}
+            />
+          </Stack>
+        </SafeAreaWrapper>
       </SafeAreaProvider>
     </ThemeProvider>
   );
