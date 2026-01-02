@@ -55,9 +55,13 @@ class Payment extends Model
         });
 
         static::saved(function ($payment) {
-            // Update sale payment status when payment is saved
+            // Update sale's total_paid and payment status when payment is saved
             if ($payment->sale) {
-                $payment->sale->updatePaymentStatus();
+                // Update if payment status is completed or refunded, or if status changed
+                if (in_array($payment->status, ['completed', 'refunded']) || $payment->wasChanged('status')) {
+                    $payment->sale->recalculateTotalPaid();
+                    $payment->sale->updatePaymentStatus();
+                }
             }
         });
     }
@@ -114,10 +118,21 @@ class Payment extends Model
      */
     public function markAsCompleted(): bool
     {
-        if ($this->status === 'pending') {
-            $this->status = 'completed';
-            return $this->save();
+        if ($this->status === 'completed') {
+            return false; // Already completed
         }
+        
+        $this->status = 'completed';
+        
+        if ($this->save()) {
+            // Update sale's total_paid
+            if ($this->sale) {
+                $this->sale->recalculateTotalPaid();
+                $this->sale->updatePaymentStatus();
+            }
+            return true;
+        }
+        
         return false;
     }
 
@@ -147,8 +162,11 @@ class Payment extends Model
         $this->status = 'refunded';
         
         if ($this->save()) {
-            // Update sale balance
-            $this->sale->updatePaymentStatus();
+            // Update sale's total_paid (refunded payments don't count)
+            if ($this->sale) {
+                $this->sale->recalculateTotalPaid();
+                $this->sale->updatePaymentStatus();
+            }
             return true;
         }
         

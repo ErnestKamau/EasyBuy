@@ -363,12 +363,12 @@ export const productsApi = {
     await api.delete(`/categories/${id}`);
   },
 
-  async createProduct(productData: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category_name' | 'profit_margin' | 'is_low_stock'>): Promise<Product> {
+  async createProduct(productData: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category_name' | 'profit_margin' | 'is_low_stock' | 'category' | 'image_url'> & { category_id: number; image_url?: string | null }): Promise<Product> {
     const { data } = await api.post<{ success: boolean; data: Product }>("/products", productData);
     return data.data;
   },
 
-  async updateProduct(id: number, productData: Partial<Product>): Promise<Product> {
+  async updateProduct(id: number, productData: Partial<Product> & { image_url?: string | null }): Promise<Product> {
     const { data } = await api.put<{ success: boolean; data: Product }>(`/products/${id}`, productData);
     return data.data;
   },
@@ -380,6 +380,26 @@ export const productsApi = {
   async getLowStockProducts(): Promise<Product[]> {
     const { data } = await api.get<{ success: boolean; data: Product[] }>("/products/low-stock");
     return data.data;
+  },
+
+  async uploadImage(imageUri: string): Promise<string> {
+    const formData = new FormData();
+    const filename = imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+    formData.append('image', {
+      uri: imageUri,
+      name: filename,
+      type: type,
+    } as any);
+
+    const { data } = await api.post<{ success: boolean; data: { url: string } }>('/images/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return data.data.url;
   }
 };
 

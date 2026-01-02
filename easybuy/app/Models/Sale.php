@@ -16,6 +16,7 @@ class Sale extends Model
         'sale_number',
         'order_id',
         'total_amount',
+        'total_paid',
         'cost_amount',
         'profit_amount',
         'payment_status',
@@ -26,6 +27,7 @@ class Sale extends Model
 
     protected $casts = [
         'total_amount' => 'decimal:2',
+        'total_paid' => 'decimal:2',
         'cost_amount' => 'decimal:2',
         'profit_amount' => 'decimal:2',
         'due_date' => 'datetime',
@@ -102,11 +104,25 @@ class Sale extends Model
     }
 
     /**
-     * Calculate total paid amount
+     * Calculate total paid amount (use stored column, fallback to calculation)
      */
     public function getTotalPaidAttribute(): float
     {
+        // If total_paid column exists and is set, use it
+        if (isset($this->attributes['total_paid'])) {
+            return (float) $this->attributes['total_paid'];
+        }
+        // Fallback: calculate from payments
         return (float) $this->completedPayments()->sum('amount');
+    }
+
+    /**
+     * Recalculate and update total_paid from payments
+     */
+    public function recalculateTotalPaid(): void
+    {
+        $this->total_paid = (float) $this->completedPayments()->sum('amount');
+        $this->save();
     }
 
     /**
@@ -193,10 +209,12 @@ class Sale extends Model
     }
 
     /**
-     * Update payment status based on payments
+     * Update payment status based on total_paid
      */
     public function updatePaymentStatus(): void
     {
+        // Ensure total_paid is up to date
+        $this->recalculateTotalPaid();
         $totalPaid = $this->total_paid;
 
         if ($totalPaid >= $this->total_amount) {

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\MpesaController;
+use App\Http\Controllers\Api\ImageController;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -32,6 +33,8 @@ Route::prefix('categories')->group(function () {
 
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
+    // Define low-stock before parameterized route to avoid route conflicts
+    Route::get('/low-stock', [ProductController::class, 'lowStock'])->middleware('auth:sanctum');
     Route::get('/{product}', [ProductController::class, 'show']);
 });
 
@@ -50,9 +53,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{category}', [CategoryController::class, 'destroy']);
     });
 
+    // Image upload
+    Route::post('/images/upload', [ImageController::class, 'upload']);
+
     // Products (admin operations)
     Route::prefix('products')->group(function () {
-        Route::get('/low-stock', [ProductController::class, 'lowStock']);
         Route::post('/', [ProductController::class, 'store']);
         Route::put('/{product}', [ProductController::class, 'update']);
         Route::delete('/{product}', [ProductController::class, 'destroy']);

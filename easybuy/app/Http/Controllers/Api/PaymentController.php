@@ -84,17 +84,17 @@ class PaymentController extends Controller
             // Validate amount doesn't exceed balance
             Payment::validateAmount($sale, (float) $validated['amount']);
 
-            // Create payment
+            // Create payment (set status to pending initially)
             $payment = Payment::create([
                 'sale_id' => $sale->id,
                 'payment_method' => $validated['payment_method'],
                 'amount' => $validated['amount'],
                 'reference' => $validated['reference'] ?? null,
                 'notes' => $validated['notes'] ?? null,
-                'status' => $validated['payment_method'] === 'cash' ? 'completed' : 'pending',
+                'status' => 'pending',
             ]);
 
-            // If cash payment, mark as completed immediately
+            // If cash payment, mark as completed immediately (this will update total_paid)
             if ($validated['payment_method'] === 'cash') {
                 $payment->markAsCompleted();
             }

@@ -16,8 +16,8 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "@/app/_layout";
-import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'react-native';
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "react-native";
 import {
   productsApi,
   Category,
@@ -78,7 +78,7 @@ export default function AdminScreen() {
   >("orders");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const sidebarAnimation = useRef(new Animated.Value(0)).current;
-  
+
   useEffect(() => {
     Animated.timing(sidebarAnimation, {
       toValue: sidebarOpen ? 1 : 0,
@@ -86,12 +86,12 @@ export default function AdminScreen() {
       useNativeDriver: true,
     }).start();
   }, [sidebarOpen, sidebarAnimation]);
-  
+
   const sidebarTranslateX = sidebarAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [-280, 0],
   });
-  
+
   const overlayOpacity = sidebarAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
@@ -186,10 +186,12 @@ export default function AdminScreen() {
 
     try {
       if (editingCategory) {
-        await productsApi.updateCategory(editingCategory.id, categoryForm.name);
+        await productsApi.updateCategory(editingCategory.id, {
+          name: categoryForm.name,
+        });
         ToastService.showSuccess("Success", "Category updated successfully");
       } else {
-        await productsApi.createCategory(categoryForm.name);
+        await productsApi.createCategory({ name: categoryForm.name });
         ToastService.showSuccess("Success", "Category created successfully");
       }
       setShowCategoryModal(false);
@@ -203,12 +205,26 @@ export default function AdminScreen() {
   const openProductModal = (product?: Product) => {
     if (product) {
       setEditingProduct(product);
+
+      // Check if the product's category still exists
+      const categoryExists = categories.some(
+        (cat) => cat.id === product.category
+      );
+      const categoryValue = categoryExists ? product.category.toString() : "";
+
+      if (!categoryExists && product.category) {
+        ToastService.showError(
+          "Category Not Found",
+          "The product's category no longer exists. Please select a new category."
+        );
+      }
+
       setProductForm({
         name: product.name,
         description: product.description,
         image_url: product.image_url,
         image_uri: null,
-        category: product.category.toString(),
+        category: categoryValue,
         kilograms: product.kilograms?.toString() || "",
         sale_price: product.sale_price.toString(),
         cost_price: product.cost_price.toString(),
@@ -236,14 +252,17 @@ export default function AdminScreen() {
   const pickImage = async () => {
     // Request permission
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      ToastService.showError('Permission Denied', 'We need camera roll permissions to add images');
+    if (status !== "granted") {
+      ToastService.showError(
+        "Permission Denied",
+        "We need camera roll permissions to add images"
+      );
       return;
     }
 
     // Launch image picker
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: "images",
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -274,11 +293,45 @@ export default function AdminScreen() {
     }
 
     try {
-      const productData = {
+      // Upload image if it's a local URI (file:// or content://)
+      let imageUrl = productForm.image_url;
+      if (
+        productForm.image_uri &&
+        (productForm.image_uri.startsWith("file://") ||
+          productForm.image_uri.startsWith("content://"))
+      ) {
+        try {
+          imageUrl = await productsApi.uploadImage(productForm.image_uri);
+        } catch (uploadError) {
+          ToastService.showApiError(uploadError, "Failed to upload image");
+          return;
+        }
+      }
+
+      const categoryId = parseInt(productForm.category);
+      if (Number.isNaN(categoryId) || !productForm.category) {
+        ToastService.showError(
+          "Validation Error",
+          "Please select a valid category"
+        );
+        return;
+      }
+
+      // Verify the category exists in the categories list
+      const categoryExists = categories.some((cat) => cat.id === categoryId);
+      if (!categoryExists) {
+        ToastService.showError(
+          "Validation Error",
+          "Selected category is invalid or no longer exists"
+        );
+        return;
+      }
+
+      const productData: any = {
         name: productForm.name,
         description: productForm.description,
-        image_url: productForm.image_url,
-        category: parseInt(productForm.category),
+        image_url: imageUrl || undefined,
+        category_id: categoryId,
         kilograms: productForm.kilograms
           ? parseFloat(productForm.kilograms)
           : null,
@@ -362,12 +415,26 @@ export default function AdminScreen() {
 
   // Order Management
   const confirmOrder = async (order: Order) => {
-    const paymentStatus = order.payment_status || 'pending';
-    const isDebt = paymentStatus === 'debt';
-    
+    const paymentStatus = order.payment_status || "pending";
+    const isDebt = paymentStatus === "debt";
+
     Alert.alert(
       "Confirm Order",
-      `Confirm order ${order.order_number || `#${order.id}`}?\n\nPayment Status: ${paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'debt' ? 'Debt' : paymentStatus === 'failed' ? 'Failed' : 'Pending'}\nAmount: KES ${order.total_amount?.toLocaleString() || 0}\n\n${isDebt ? 'This will mark the order as debt with 7 days payment deadline.' : 'This will create a sale and update stock.'}`,
+      `Confirm order ${
+        order.order_number || `#${order.id}`
+      }?\n\nPayment Status: ${
+        paymentStatus === "paid"
+          ? "Paid"
+          : paymentStatus === "debt"
+          ? "Debt"
+          : paymentStatus === "failed"
+          ? "Failed"
+          : "Pending"
+      }\nAmount: KES ${order.total_amount?.toLocaleString() || 0}\n\n${
+        isDebt
+          ? "This will mark the order as debt with 7 days payment deadline."
+          : "This will create a sale and update stock."
+      }`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -378,13 +445,13 @@ export default function AdminScreen() {
               try {
                 // Update order status to confirmed - this will automatically create a sale
                 await ordersApi.updateOrder(order.id, {
-                  order_status: 'confirmed',
+                  order_status: "confirmed",
                 });
-                
+
                 ToastService.showSuccess(
                   "Success",
-                  isDebt 
-                    ? "Order confirmed and marked as debt (7 days)" 
+                  isDebt
+                    ? "Order confirmed and marked as debt (7 days)"
                     : "Order confirmed and sale created"
                 );
                 loadAdminData();
@@ -399,12 +466,15 @@ export default function AdminScreen() {
   };
 
   const cancelOrder = async (order: Order) => {
-    const customerName = order.user 
-      ? `${order.user.first_name || ''} ${order.user.last_name || ''}`.trim() || order.user.username
-      : 'Customer';
+    const customerName = order.user
+      ? `${order.user.first_name || ""} ${order.user.last_name || ""}`.trim() ||
+        order.user.username
+      : "Customer";
     Alert.alert(
       "Cancel Order",
-      `Cancel order ${order.order_number || `#${order.id}`} from ${customerName}?`,
+      `Cancel order ${
+        order.order_number || `#${order.id}`
+      } from ${customerName}?`,
       [
         { text: "No", style: "cancel" },
         {
@@ -431,7 +501,7 @@ export default function AdminScreen() {
     setSelectedSale(sale);
     setPaymentForm({
       method: "cash",
-      amount: sale.balance.toString(),
+      amount: (sale.balance || 0).toString(),
       phone_number: sale.customer_phone || "",
       reference: "",
       notes: "",
@@ -446,19 +516,22 @@ export default function AdminScreen() {
     }
 
     if (paymentForm.method === "mpesa" && !paymentForm.phone_number) {
-      ToastService.showError("Validation Error", "Phone number is required for M-Pesa payments");
+      ToastService.showError(
+        "Validation Error",
+        "Phone number is required for M-Pesa payments"
+      );
       return;
     }
 
     try {
       const paymentData: {
-        payment_method: 'mpesa' | 'cash' | 'card';
+        payment_method: "mpesa" | "cash" | "card";
         amount: number;
         phone_number?: string;
         reference?: string;
         notes?: string;
       } = {
-        payment_method: paymentForm.method as 'mpesa' | 'cash' | 'card',
+        payment_method: paymentForm.method as "mpesa" | "cash" | "card",
         amount: parseFloat(paymentForm.amount),
         reference: paymentForm.reference || undefined,
         notes: paymentForm.notes || undefined,
@@ -468,8 +541,11 @@ export default function AdminScreen() {
         paymentData.phone_number = paymentForm.phone_number;
       }
 
-      const response = await paymentsApi.addPayment(selectedSale.id, paymentData);
-      
+      const response = await paymentsApi.addPayment(
+        selectedSale.id,
+        paymentData
+      );
+
       // If M-Pesa payment, initiate STK push
       if (paymentForm.method === "mpesa" && response.data) {
         const { mpesaApi } = await import("@/services/api");
@@ -480,17 +556,26 @@ export default function AdminScreen() {
             parseFloat(paymentForm.amount)
           );
           if (stkResponse.success) {
-            ToastService.showSuccess("Success", "M-Pesa payment request sent to customer's phone");
+            ToastService.showSuccess(
+              "Success",
+              "M-Pesa payment request sent to customer's phone"
+            );
           } else {
-            ToastService.showError("M-Pesa Error", stkResponse.message || "Failed to initiate M-Pesa payment");
+            ToastService.showError(
+              "M-Pesa Error",
+              stkResponse.message || "Failed to initiate M-Pesa payment"
+            );
           }
         } catch (mpesaError) {
-          ToastService.showApiError(mpesaError, "Payment created but M-Pesa request failed");
+          ToastService.showApiError(
+            mpesaError,
+            "Payment created but M-Pesa request failed"
+          );
         }
       } else {
         ToastService.showSuccess("Success", "Payment added successfully");
       }
-      
+
       setShowPaymentModal(false);
       loadAdminData();
     } catch (error) {
@@ -501,9 +586,12 @@ export default function AdminScreen() {
   const renderDebtItem = ({ item }: { item: Sale }) => {
     const daysRemaining = item.days_remaining ?? 0;
     const isOverdue = item.is_overdue || daysRemaining < 0;
-    const isNearDue = item.is_near_due || (daysRemaining > 0 && daysRemaining <= 2);
-    const dueDate = item.due_date ? new Date(item.due_date).toLocaleDateString() : 'N/A';
-    
+    const isNearDue =
+      item.is_near_due || (daysRemaining > 0 && daysRemaining <= 2);
+    const dueDate = item.due_date
+      ? new Date(item.due_date).toLocaleDateString()
+      : "N/A";
+
     return (
       <View style={styles.debtCard}>
         <View style={styles.debtHeader}>
@@ -514,23 +602,32 @@ export default function AdminScreen() {
           </View>
           <View style={styles.debtAmount}>
             <Text style={styles.debtTotal}>
-              Ksh {item.balance?.toLocaleString() || item.total_amount?.toLocaleString() || 0}
+              Ksh{" "}
+              {item.balance?.toLocaleString() ||
+                item.total_amount?.toLocaleString() ||
+                0}
             </Text>
             {isOverdue ? (
-              <View style={[styles.debtStatusBadge, { backgroundColor: '#FEF2F2' }]}>
-                <Text style={[styles.debtStatusText, { color: '#EF4444' }]}>
+              <View
+                style={[styles.debtStatusBadge, { backgroundColor: "#FEF2F2" }]}
+              >
+                <Text style={[styles.debtStatusText, { color: "#EF4444" }]}>
                   OVERDUE
                 </Text>
               </View>
             ) : isNearDue ? (
-              <View style={[styles.debtStatusBadge, { backgroundColor: '#FFFBEB' }]}>
-                <Text style={[styles.debtStatusText, { color: '#F59E0B' }]}>
+              <View
+                style={[styles.debtStatusBadge, { backgroundColor: "#FFFBEB" }]}
+              >
+                <Text style={[styles.debtStatusText, { color: "#F59E0B" }]}>
                   DUE SOON
                 </Text>
               </View>
             ) : (
-              <View style={[styles.debtStatusBadge, { backgroundColor: '#F0FDF4' }]}>
-                <Text style={[styles.debtStatusText, { color: '#22C55E' }]}>
+              <View
+                style={[styles.debtStatusBadge, { backgroundColor: "#F0FDF4" }]}
+              >
+                <Text style={[styles.debtStatusText, { color: "#22C55E" }]}>
                   ACTIVE
                 </Text>
               </View>
@@ -553,20 +650,38 @@ export default function AdminScreen() {
           </View>
           <View style={styles.debtDetailRow}>
             <Text style={styles.debtDetailLabel}>Balance:</Text>
-            <Text style={[styles.debtDetailValue, { color: '#EF4444', fontWeight: '700' }]}>
+            <Text
+              style={[
+                styles.debtDetailValue,
+                { color: "#EF4444", fontWeight: "700" },
+              ]}
+            >
               Ksh {item.balance?.toLocaleString() || 0}
             </Text>
           </View>
           <View style={styles.debtDetailRow}>
             <Text style={styles.debtDetailLabel}>Due Date:</Text>
-            <Text style={[styles.debtDetailValue, isOverdue && { color: '#EF4444', fontWeight: '700' }]}>
+            <Text
+              style={[
+                styles.debtDetailValue,
+                isOverdue && { color: "#EF4444", fontWeight: "700" },
+              ]}
+            >
               {dueDate}
             </Text>
           </View>
           <View style={styles.debtDetailRow}>
             <Text style={styles.debtDetailLabel}>Days Remaining:</Text>
-            <Text style={[styles.debtDetailValue, isOverdue && { color: '#EF4444' }, isNearDue && !isOverdue && { color: '#F59E0B' }]}>
-              {isOverdue ? `${Math.abs(daysRemaining)} days overdue` : `${daysRemaining} days`}
+            <Text
+              style={[
+                styles.debtDetailValue,
+                isOverdue && { color: "#EF4444" },
+                isNearDue && !isOverdue && { color: "#F59E0B" },
+              ]}
+            >
+              {isOverdue
+                ? `${Math.abs(daysRemaining)} days overdue`
+                : `${daysRemaining} days`}
             </Text>
           </View>
           <View style={styles.debtDetailRow}>
@@ -679,84 +794,100 @@ export default function AdminScreen() {
   };
 
   const renderOrderItem = ({ item }: { item: Order }) => {
-    const customerName = item.user 
-      ? `${item.user.first_name || ''} ${item.user.last_name || ''}`.trim() || item.user.username
-      : 'Customer';
-    const paymentStatus = item.payment_status === 'cash' ? 'Cash' 
-      : item.payment_status === 'mpesa' ? 'M-Pesa' 
-      : item.payment_status === 'debt' ? 'Debt' 
-      : item.payment_status === 'paid' ? 'Paid'
-      : item.payment_status || 'Pending';
-    
+    const customerName = item.user
+      ? `${item.user.first_name || ""} ${item.user.last_name || ""}`.trim() ||
+        item.user.username
+      : "Customer";
+    const paymentStatus =
+      item.payment_status === "paid"
+        ? "Paid"
+        : item.payment_status === "debt"
+        ? "Debt"
+        : item.payment_status === "failed"
+        ? "Failed"
+        : item.payment_status === "pending"
+        ? "Pending"
+        : "Pending";
+
     return (
-    <View style={styles.orderCard}>
-      <View style={styles.orderHeader}>
-        <View style={styles.orderInfo}>
-          <Text style={styles.orderNumber}>Order {item.order_number || `#${item.id}`}</Text>
-          <Text style={styles.orderCustomer}>{customerName}</Text>
-          <Text style={styles.orderDate}>
-            {new Date(`${item.order_date}T${item.order_time || '00:00:00'}`).toLocaleString()}
-          </Text>
-          <View style={styles.orderDetailsRow}>
-            <Text style={styles.orderDetailLabel}>Payment Status:</Text>
-            <Text style={styles.orderDetailValue}>{paymentStatus}</Text>
+      <View style={styles.orderCard}>
+        <View style={styles.orderHeader}>
+          <View style={styles.orderInfo}>
+            <Text style={styles.orderNumber}>
+              Order {item.order_number || `#${item.id}`}
+            </Text>
+            <Text style={styles.orderCustomer}>{customerName}</Text>
+            <Text style={styles.orderDate}>
+              {new Date(
+                `${item.order_date}T${item.order_time || "00:00:00"}`
+              ).toLocaleString()}
+            </Text>
+            <View style={styles.orderDetailsRow}>
+              <Text style={styles.orderDetailLabel}>Payment Status:</Text>
+              <Text style={styles.orderDetailValue}>{paymentStatus}</Text>
+            </View>
           </View>
-        </View>
-        <View style={styles.orderAmount}>
-          <Text style={styles.orderTotal}>
-            Ksh {item.total_amount?.toLocaleString() || 0}
-          </Text>
-          <View
-            style={[
-              styles.statusBadge,
-              {
-                backgroundColor:
-                  item.order_status === "pending" ? "#FEF3C7" : "#F0FDF4",
-              },
-            ]}
-          >
-            <Text
+          <View style={styles.orderAmount}>
+            <Text style={styles.orderTotal}>
+              Ksh {item.total_amount?.toLocaleString() || 0}
+            </Text>
+            <View
               style={[
-                styles.statusText,
-                { color: item.order_status === "pending" ? "#D97706" : "#22C55E" },
+                styles.statusBadge,
+                {
+                  backgroundColor:
+                    item.order_status === "pending" ? "#FEF3C7" : "#F0FDF4",
+                },
               ]}
             >
-              {item.order_status.charAt(0).toUpperCase() + item.order_status.slice(1)}
-            </Text>
+              <Text
+                style={[
+                  styles.statusText,
+                  {
+                    color:
+                      item.order_status === "pending" ? "#D97706" : "#22C55E",
+                  },
+                ]}
+              >
+                {item.order_status.charAt(0).toUpperCase() +
+                  item.order_status.slice(1)}
+              </Text>
+            </View>
           </View>
         </View>
+
+        {item.items && item.items.length > 0 && (
+          <View style={styles.orderItemsSection}>
+            <Text style={styles.orderItemsTitle}>Items:</Text>
+            {item.items.map((orderItem) => (
+              <Text key={orderItem.id} style={styles.orderItemText}>
+                {orderItem.product?.name || "Product"} x {orderItem.quantity}{" "}
+                {orderItem.kilogram ? `(${orderItem.kilogram}kg)` : ""} - KES{" "}
+                {orderItem.subtotal?.toLocaleString() || 0}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {item.order_status === "pending" && (
+          <View style={styles.orderActions}>
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => confirmOrder(item)}
+            >
+              <CheckCircle size={16} color="#22C55E" />
+              <Text style={styles.confirmButtonText}>Confirm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => cancelOrder(item)}
+            >
+              <XCircle size={16} color="#EF4444" />
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-
-      {item.items && item.items.length > 0 && (
-        <View style={styles.orderItemsSection}>
-          <Text style={styles.orderItemsTitle}>Items:</Text>
-          {item.items.map((orderItem) => (
-            <Text key={orderItem.id} style={styles.orderItemText}>
-              {orderItem.product?.name || 'Product'} x {orderItem.quantity} {orderItem.kilogram ? `(${orderItem.kilogram}kg)` : ''} - KES {orderItem.subtotal?.toLocaleString() || 0}
-            </Text>
-          ))}
-        </View>
-      )}
-
-      {item.order_status === "pending" && (
-        <View style={styles.orderActions}>
-          <TouchableOpacity
-            style={styles.confirmButton}
-            onPress={() => confirmOrder(item)}
-          >
-            <CheckCircle size={16} color="#22C55E" />
-            <Text style={styles.confirmButtonText}>Confirm</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => cancelOrder(item)}
-          >
-            <XCircle size={16} color="#EF4444" />
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
     );
   };
 
@@ -785,6 +916,17 @@ export default function AdminScreen() {
 
   const renderProductItem = ({ item }: { item: Product }) => (
     <View style={styles.itemCard}>
+      {item.image_url ? (
+        <Image
+          source={{ uri: item.image_url }}
+          style={styles.productListImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.productListImagePlaceholder}>
+          <Package size={24} color="#94A3B8" />
+        </View>
+      )}
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.name}</Text>
         <Text style={styles.itemSubtitle}>
@@ -821,24 +963,54 @@ export default function AdminScreen() {
   }
 
   const menuItems = [
-    { id: "orders", label: "Orders", icon: ShoppingBag, count: pendingOrders.length, color: "#3B82F6" },
-    { id: "debts", label: "Debts", icon: AlertTriangle, count: debts.length, color: "#EF4444" },
-    { id: "products", label: "Products", icon: Package, count: products.length, color: "#22C55E" },
-    { id: "categories", label: "Categories", icon: Tag, count: categories.length, color: "#8B5CF6" },
-    { id: "alerts", label: "Low Stock", icon: AlertTriangle, count: lowStockProducts.length, color: "#F59E0B" },
+    {
+      id: "orders",
+      label: "Orders",
+      icon: ShoppingBag,
+      count: pendingOrders.length,
+      color: "#3B82F6",
+    },
+    {
+      id: "debts",
+      label: "Debts",
+      icon: AlertTriangle,
+      count: debts.length,
+      color: "#EF4444",
+    },
+    {
+      id: "products",
+      label: "Products",
+      icon: Package,
+      count: products.length,
+      color: "#22C55E",
+    },
+    {
+      id: "categories",
+      label: "Categories",
+      icon: Tag,
+      count: categories.length,
+      color: "#8B5CF6",
+    },
+    {
+      id: "alerts",
+      label: "Low Stock",
+      icon: AlertTriangle,
+      count: lowStockProducts.length,
+      color: "#F59E0B",
+    },
   ];
 
   return (
     <View style={styles.container}>
       {/* Sidebar */}
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.sidebar, 
+          styles.sidebar,
           {
             transform: [{ translateX: sidebarTranslateX }],
             shadowOpacity: sidebarOpen ? 0.2 : 0,
             elevation: sidebarOpen ? 8 : 0,
-          }
+          },
         ]}
       >
         <View style={styles.sidebarHeader}>
@@ -849,7 +1021,10 @@ export default function AdminScreen() {
           <Text style={styles.sidebarSubtitle}>Admin Panel</Text>
         </View>
 
-        <ScrollView style={styles.sidebarMenu} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.sidebarMenu}
+          showsVerticalScrollIndicator={false}
+        >
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -862,15 +1037,35 @@ export default function AdminScreen() {
                   setSidebarOpen(false);
                 }}
               >
-                <View style={[styles.menuIcon, isActive && { backgroundColor: `${item.color}20` }]}>
+                <View
+                  style={[
+                    styles.menuIcon,
+                    isActive && { backgroundColor: `${item.color}20` },
+                  ]}
+                >
                   <Icon size={20} color={isActive ? item.color : "#94A3B8"} />
                 </View>
-                <Text style={[styles.menuLabel, isActive && { color: item.color, fontWeight: '700' }]}>
+                <Text
+                  style={[
+                    styles.menuLabel,
+                    isActive && { color: item.color, fontWeight: "700" },
+                  ]}
+                >
                   {item.label}
                 </Text>
                 {item.count > 0 && (
-                  <View style={[styles.badge, { backgroundColor: isActive ? item.color : "#E2E8F0" }]}>
-                    <Text style={[styles.badgeText, { color: isActive ? "#FFFFFF" : "#64748B" }]}>
+                  <View
+                    style={[
+                      styles.badge,
+                      { backgroundColor: isActive ? item.color : "#E2E8F0" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        { color: isActive ? "#FFFFFF" : "#64748B" },
+                      ]}
+                    >
                       {item.count}
                     </Text>
                   </View>
@@ -898,7 +1093,7 @@ export default function AdminScreen() {
             styles.overlay,
             {
               opacity: overlayOpacity,
-            }
+            },
           ]}
           pointerEvents="auto"
         >
@@ -922,16 +1117,18 @@ export default function AdminScreen() {
           </TouchableOpacity>
           <View style={styles.topBarContent}>
             <Text style={styles.topBarTitle}>
-              {menuItems.find(m => m.id === activeTab)?.label || "Admin Panel"}
+              {menuItems.find((m) => m.id === activeTab)?.label ||
+                "Admin Panel"}
             </Text>
             {activeTab === "orders" && (
               <Text style={styles.topBarSubtitle}>
-                {pendingOrders.length} pending {pendingOrders.length === 1 ? 'order' : 'orders'}
+                {pendingOrders.length} pending{" "}
+                {pendingOrders.length === 1 ? "order" : "orders"}
               </Text>
             )}
             {activeTab === "debts" && (
               <Text style={styles.topBarSubtitle}>
-                {debts.length} active {debts.length === 1 ? 'debt' : 'debts'}
+                {debts.length} active {debts.length === 1 ? "debt" : "debts"}
               </Text>
             )}
           </View>
@@ -943,119 +1140,111 @@ export default function AdminScreen() {
           </TouchableOpacity>
         </View>
 
-      {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {activeTab === "categories" && (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                Categories ({categories.length})
-              </Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => openCategoryModal()}
-              >
-                <Plus size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-            {categories.map((item) => (
-              <View key={item.id}>
-                {renderCategoryItem({ item })}
+        {/* Content */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {activeTab === "categories" && (
+            <View style={styles.tabContent}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  Categories ({categories.length})
+                </Text>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => openCategoryModal()}
+                >
+                  <Plus size={20} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
-            ))}
-          </View>
-        )}
-
-        {activeTab === "products" && (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                Products ({products.length})
-              </Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => openProductModal()}
-              >
-                <Plus size={20} color="#FFFFFF" />
-              </TouchableOpacity>
+              {categories.map((item) => (
+                <View key={item.id}>{renderCategoryItem({ item })}</View>
+              ))}
             </View>
-            {products.map((item) => (
-              <View key={item.id}>
-                {renderProductItem({ item })}
+          )}
+
+          {activeTab === "products" && (
+            <View style={styles.tabContent}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  Products ({products.length})
+                </Text>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => openProductModal()}
+                >
+                  <Plus size={20} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
-            ))}
-          </View>
-        )}
-
-        {activeTab === "orders" && (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                Pending Orders ({pendingOrders.length})
-              </Text>
+              {products.map((item) => (
+                <View key={item.id}>{renderProductItem({ item })}</View>
+              ))}
             </View>
-            {pendingOrders.length > 0 ? (
-              pendingOrders.map((item) => (
-                <View key={item.id}>
-                  {renderOrderItem({ item })}
-                </View>
-              ))
-            ) : (
-              <View style={styles.noOrders}>
-                <ShoppingBag size={48} color="#94A3B8" />
-                <Text style={styles.noOrdersText}>No pending orders</Text>
-                <Text style={styles.noOrdersSubtext}>
-                  Orders will appear here when customers place them
+          )}
+
+          {activeTab === "orders" && (
+            <View style={styles.tabContent}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  Pending Orders ({pendingOrders.length})
                 </Text>
               </View>
-            )}
-          </View>
-        )}
-
-        {activeTab === "debts" && (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Debt Tracking ({debts.length})</Text>
+              {pendingOrders.length > 0 ? (
+                pendingOrders.map((item) => (
+                  <View key={item.id}>{renderOrderItem({ item })}</View>
+                ))
+              ) : (
+                <View style={styles.noOrders}>
+                  <ShoppingBag size={48} color="#94A3B8" />
+                  <Text style={styles.noOrdersText}>No pending orders</Text>
+                  <Text style={styles.noOrdersSubtext}>
+                    Orders will appear here when customers place them
+                  </Text>
+                </View>
+              )}
             </View>
-            {debts.length > 0 ? (
-              debts.map((item) => (
-                <View key={item.id}>
-                  {renderDebtItem({ item })}
-                </View>
-              ))
-            ) : (
-              <View style={styles.noSales}>
-                <AlertTriangle size={48} color="#22C55E" />
-                <Text style={styles.noSalesText}>No debts</Text>
-                <Text style={styles.noSalesSubtext}>
-                  All customers have paid their debts
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+          )}
 
-        {activeTab === "alerts" && (
-          <View style={styles.tabContent}>
-            <Text style={styles.sectionTitle}>Low Stock Alerts</Text>
-            {lowStockProducts.length > 0 ? (
-              lowStockProducts.map((item) => (
-                <View key={item.id}>
-                  {renderProductItem({ item })}
-                </View>
-              ))
-            ) : (
-              <View style={styles.noAlerts}>
-                <AlertTriangle size={48} color="#22C55E" />
-                <Text style={styles.noAlertsText}>No low stock alerts</Text>
-                <Text style={styles.noAlertsSubtext}>
-                  All products are well stocked
+          {activeTab === "debts" && (
+            <View style={styles.tabContent}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  Debt Tracking ({debts.length})
                 </Text>
               </View>
-            )}
-          </View>
-        )}
-      </ScrollView>
+              {debts.length > 0 ? (
+                debts.map((item) => (
+                  <View key={item.id}>{renderDebtItem({ item })}</View>
+                ))
+              ) : (
+                <View style={styles.noSales}>
+                  <AlertTriangle size={48} color="#22C55E" />
+                  <Text style={styles.noSalesText}>No debts</Text>
+                  <Text style={styles.noSalesSubtext}>
+                    All customers have paid their debts
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {activeTab === "alerts" && (
+            <View style={styles.tabContent}>
+              <Text style={styles.sectionTitle}>Low Stock Alerts</Text>
+              {lowStockProducts.length > 0 ? (
+                lowStockProducts.map((item) => (
+                  <View key={item.id}>{renderProductItem({ item })}</View>
+                ))
+              ) : (
+                <View style={styles.noAlerts}>
+                  <AlertTriangle size={48} color="#22C55E" />
+                  <Text style={styles.noAlertsText}>No low stock alerts</Text>
+                  <Text style={styles.noAlertsSubtext}>
+                    All products are well stocked
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </ScrollView>
       </View>
 
       {/* Category Modal */}
@@ -1151,12 +1340,20 @@ export default function AdminScreen() {
                   {productForm.image_uri || productForm.image_url ? (
                     <View style={styles.imagePreviewContainer}>
                       <Image
-                        source={{ uri: productForm.image_uri || productForm.image_url }}
+                        source={{
+                          uri: productForm.image_uri || productForm.image_url,
+                        }}
                         style={styles.imagePreview}
                       />
                       <TouchableOpacity
                         style={styles.removeImageButton}
-                        onPress={() => setProductForm({ ...productForm, image_uri: null, image_url: '' })}
+                        onPress={() =>
+                          setProductForm({
+                            ...productForm,
+                            image_uri: null,
+                            image_url: "",
+                          })
+                        }
                       >
                         <X size={16} color="#FFFFFF" />
                       </TouchableOpacity>
@@ -1167,7 +1364,9 @@ export default function AdminScreen() {
                     onPress={pickImage}
                   >
                     <Text style={styles.imagePickerButtonText}>
-                      {productForm.image_uri || productForm.image_url ? 'Change Image' : 'Pick Image from Gallery'}
+                      {productForm.image_uri || productForm.image_url
+                        ? "Change Image"
+                        : "Pick Image from Gallery"}
                     </Text>
                   </TouchableOpacity>
                   <Text style={styles.imagePickerHint}>
@@ -1176,9 +1375,17 @@ export default function AdminScreen() {
                   <TextInput
                     style={styles.textInput}
                     placeholder="Enter image URL"
-                    value={productForm.image_url && !productForm.image_uri ? productForm.image_url : ''}
+                    value={
+                      productForm.image_url && !productForm.image_uri
+                        ? productForm.image_url
+                        : ""
+                    }
                     onChangeText={(text) =>
-                      setProductForm({ ...productForm, image_url: text, image_uri: null })
+                      setProductForm({
+                        ...productForm,
+                        image_url: text,
+                        image_uri: null,
+                      })
                     }
                   />
                 </View>
@@ -1695,6 +1902,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+  },
+  productListImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: "#F1F5F9",
+  },
+  productListImagePlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
   },
   itemInfo: {
     flex: 1,
@@ -2314,43 +2537,43 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   imagePreviewContainer: {
-    position: 'relative',
+    position: "relative",
     marginBottom: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   imagePreview: {
     width: 200,
     height: 200,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
   },
   removeImageButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: '#EF4444',
+    backgroundColor: "#EF4444",
     borderRadius: 20,
     width: 32,
     height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   imagePickerButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: "#22C55E",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   imagePickerButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   imagePickerHint: {
     fontSize: 12,
-    color: '#64748B',
+    color: "#64748B",
     marginBottom: 8,
     marginTop: 4,
   },

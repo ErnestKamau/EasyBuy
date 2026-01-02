@@ -647,7 +647,7 @@ export default function AuthScreens() {
           contentContainerStyle={[
             styles.scrollContent,
             {
-              paddingTop: Math.max(insets.top, 0), // Reduce top margin by 10px
+              paddingTop: Math.max(insets.top, 20), // Reduce top margin by 10px
               paddingBottom: Math.max(insets.bottom, 20),
             },
           ]}
