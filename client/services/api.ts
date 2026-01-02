@@ -317,98 +317,98 @@ export const authApi = {
 };
 
 export const productsApi = {
-  async getCategories(): Promise<Category[]> {
-    const token = await tokenManager.getAccessToken();
-    if (!token) {
-      throw new Error("No authentication token found");
-    }
-
-    const { data } = await api.get<{ results: Category[] } | Category[]>("/categories/");
-    // Handle both paginated and non-paginated responses
-    return Array.isArray(data) ? data : data.results;
+  async getCategories(activeOnly?: boolean): Promise<Category[]> {
+    const params = activeOnly ? '?active_only=true' : '';
+    const { data } = await api.get<{ success: boolean; data: Category[] }>(`/categories${params}`);
+    return data.data;
   },
 
-  async getProducts(search?: string, categoryId?: number): Promise<Product[]> {
-    const token = await tokenManager.getAccessToken();
-    if (!token) {
-      throw new Error("No authentication token found");
-    }
-
+  async getProducts(filters?: {
+    search?: string;
+    category_id?: number;
+    active_only?: boolean;
+    low_stock_only?: boolean;
+    min_price?: number;
+    max_price?: number;
+  }): Promise<Product[]> {
     const params = new URLSearchParams();
-    if (search) params.append('search', search);
-    if (categoryId) params.append('category', categoryId.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.category_id) params.append('category_id', filters.category_id.toString());
+    if (filters?.active_only) params.append('active_only', 'true');
+    if (filters?.low_stock_only) params.append('low_stock_only', 'true');
+    if (filters?.min_price) params.append('min_price', filters.min_price.toString());
+    if (filters?.max_price) params.append('max_price', filters.max_price.toString());
 
-    const { data } = await api.get<{ results: Product[] } | Product[]>(`/products/?${params.toString()}`);
-    // Handle both paginated and non-paginated responses
-    return Array.isArray(data) ? data : data.results;
+    const { data } = await api.get<{ success: boolean; data: { data: Product[] } }>(`/products?${params.toString()}`);
+    return Array.isArray(data.data) ? data.data : data.data.data || [];
   },
 
   async getProduct(id: number): Promise<Product> {
-    const { data } = await api.get<Product>(`/products/${id}/`);
-    return data;
+    const { data } = await api.get<{ success: boolean; data: Product }>(`/products/${id}`);
+    return data.data;
   },
 
   // Admin functions
-  async createCategory(name: string): Promise<Category> {
-    const { data } = await api.post<Category>("/admin/categories/", { name });
-    return data;
+  async createCategory(categoryData: { name: string; is_active?: boolean }): Promise<Category> {
+    const { data } = await api.post<{ success: boolean; data: Category }>("/categories", categoryData);
+    return data.data;
   },
 
-  async updateCategory(id: number, name: string): Promise<Category> {
-    const { data } = await api.put<Category>(`/admin/categories/${id}/`, { name });
-    return data;
+  async updateCategory(id: number, categoryData: { name?: string; is_active?: boolean }): Promise<Category> {
+    const { data } = await api.put<{ success: boolean; data: Category }>(`/categories/${id}`, categoryData);
+    return data.data;
   },
 
   async deleteCategory(id: number): Promise<void> {
-    await api.delete(`/admin/categories/${id}/`);
+    await api.delete(`/categories/${id}`);
   },
 
   async createProduct(productData: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category_name' | 'profit_margin' | 'is_low_stock'>): Promise<Product> {
-    const { data } = await api.post<Product>("/admin/products/", productData);
-    return data;
+    const { data } = await api.post<{ success: boolean; data: Product }>("/products", productData);
+    return data.data;
   },
 
   async updateProduct(id: number, productData: Partial<Product>): Promise<Product> {
-    const { data } = await api.put<Product>(`/admin/products/${id}/`, productData);
-    return data;
+    const { data } = await api.put<{ success: boolean; data: Product }>(`/products/${id}`, productData);
+    return data.data;
   },
 
   async deleteProduct(id: number): Promise<void> {
-    await api.delete(`/admin/products/${id}/`);
+    await api.delete(`/products/${id}`);
   },
 
-  async getLowStockProducts(): Promise<{ count: number; products: Product[] }> {
-    const { data } = await api.get("/admin/products/low-stock/");
-    return data;
+  async getLowStockProducts(): Promise<Product[]> {
+    const { data } = await api.get<{ success: boolean; data: Product[] }>("/products/low-stock");
+    return data.data;
   }
 };
 
 // Order interfaces
 export interface OrderItem {
   id: number;
+  order_id: number;
   product_id: number;
-  product_name: string;
   quantity: number;
-  weight?: number;
+  kilogram?: number | null;
   unit_price: number;
   subtotal: number;
+  product?: Product;
 }
 
 export interface Order {
   id: number;
-  user: number;
-  customer_name: string;
-  customer_phone: string;
-  notes: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  order_number: string;
+  user_id?: number;
+  user?: User;
+  order_status: 'pending' | 'confirmed' | 'cancelled';
+  payment_status: 'pending' | 'paid' | 'debt' | 'failed';
   order_date: string;
   order_time: string;
+  notes?: string;
   updated_at: string;
   total_amount: number;
-  payment_status?: 'PENDING' | 'PAID' | 'DEBT' | 'FAILED';
-  delivery_type?: 'pickup' | 'delivery';
-  payment_method?: 'cash' | 'mpesa' | 'debt';
   items?: OrderItem[];
+  sale?: Sale;
 }
 
 export interface CartItemForOrder {
@@ -422,66 +422,60 @@ export const ordersApi = {
   async createOrder(
     items: CartItemForOrder[],
     notes?: string,
-    deliveryType?: 'pickup' | 'delivery',
     paymentMethod?: 'cash' | 'mpesa' | 'debt'
   ): Promise<Order> {
-    const { data } = await api.post('/orders/create/', {
+    const { data } = await api.post<{ success: boolean; data: Order }>('/orders', {
       items,
       notes: notes || '',
-      delivery_type: deliveryType || 'pickup',
-      payment_method: paymentMethod || 'cash'
+      payment_status: paymentMethod === 'debt' ? 'debt' : paymentMethod === 'mpesa' ? 'pending' : 'pending',
     });
-    return data.order;
+    return data.data;
   },
 
-  async getOrders(): Promise<Order[]> {
-    const { data } = await api.get('/orders/orders/');
-    return Array.isArray(data) ? data : data.results || [];
+  async getOrders(filters?: {
+    order_status?: string;
+    payment_status?: string;
+    user_id?: number;
+  }): Promise<Order[]> {
+    const params = new URLSearchParams();
+    if (filters?.order_status) params.append('order_status', filters.order_status);
+    if (filters?.payment_status) params.append('payment_status', filters.payment_status);
+    if (filters?.user_id) params.append('user_id', filters.user_id.toString());
+
+    const { data } = await api.get<{ success: boolean; data: { data: Order[] } }>(`/orders?${params.toString()}`);
+    return Array.isArray(data.data) ? data.data : data.data.data || [];
   },
 
-  async getOrderDetails(orderId: number): Promise<{ order: Order; items: OrderItem[] }> {
-    const { data } = await api.get(`/orders/${orderId}/details/`);
-    return data;
+  async getOrderDetails(orderId: number): Promise<Order> {
+    const { data } = await api.get<{ success: boolean; data: Order }>(`/orders/${orderId}`);
+    return data.data;
   },
 
-  async getPendingOrders(): Promise<{ orders: Order[]; count: number }> {
-    const { data } = await api.get('/orders/admin/pending/');
-    return data;
+  async getPendingOrders(): Promise<Order[]> {
+    const orders = await this.getOrders({ order_status: 'pending' });
+    return orders;
   },
 
-  async confirmOrder(orderId: number): Promise<{ message: string; sale_id: number }> {
-    const { data } = await api.post(`/orders/orders/${orderId}/confirm/`);
-    return data;
+  async confirmOrder(orderId: number): Promise<Order> {
+    const { data } = await api.put<{ success: boolean; data: Order }>(`/orders/${orderId}`, {
+      order_status: 'confirmed'
+    });
+    return data.data;
   },
 
-  async cancelOrder(orderId: number): Promise<void> {
-    await api.patch(`/orders/orders/${orderId}/`, { status: 'cancelled' });
+  async cancelOrder(orderId: number): Promise<Order> {
+    const { data } = await api.post<{ success: boolean; data: Order }>(`/orders/${orderId}/cancel`);
+    return data.data;
   },
 
-  async initiatePayment(orderId: number): Promise<{ success: boolean; message: string; MerchantRequestID?: string; CheckoutRequestID?: string }> {
-    try {
-      // fetch order details
-      const { data: order } = await api.get(`/orders/${orderId}/`);
-      const payload = {
-        order_id: order.id,
-        phone_number: order.customer_phone,
-        amount: order.total_amount,
-      };
-
-      const { data } = await api.post('/mpesa/initiate/', payload);
-      return {
-        success: true,
-        message: data.ResponseDescription || data.message || 'Payment request sent',
-        MerchantRequestID: data.MerchantRequestID,
-        CheckoutRequestID: data.CheckoutRequestID,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: error.response?.data?.error || error.message || 'Failed to initiate payment',
-      };
-    }
-  }
+  async updateOrder(orderId: number, updates: {
+    order_status?: 'pending' | 'confirmed' | 'cancelled';
+    payment_status?: 'pending' | 'paid' | 'debt' | 'failed';
+    notes?: string;
+  }): Promise<Order> {
+    const { data } = await api.put<{ success: boolean; data: Order }>(`/orders/${orderId}`, updates);
+    return data.data;
+  },
 };
 
 export type PingResponse = { ok: boolean; message: string };
@@ -493,47 +487,59 @@ export async function ping(): Promise<PingResponse> {
 // Sales interfaces
 export interface SaleItem {
   id: number;
-  product: number;
-  product_name: string;
-  product_image: string;
-  category_name: string;
+  sale_id: number;
+  product_id: number;
   quantity: number;
+  kilogram?: number | null;
   unit_price: number;
-  sale_price: number;
+  cost_price: number;
   subtotal: number;
-  profit_total: number;
+  profit?: number;
+  product?: Product;
 }
 
 export interface Payment {
   id: number;
-  method: 'cash' | 'mpesa' | 'bank_transfer' | 'card';
+  payment_number: string;
+  sale_id: number;
+  payment_method: 'mpesa' | 'cash' | 'card';
   amount: number;
-  reference: string;
-  notes: string;
+  mpesa_transaction_id?: string;
+  stripe_payment_intent_id?: string;
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  reference?: string;
+  notes?: string;
   paid_at: string;
+  refunded_at?: string;
+  refund_amount?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Sale {
   id: number;
-  order_id: number;
   sale_number: string;
-  customer_name: string;
-  customer_phone: string;
+  order_id: number;
   total_amount: number;
   cost_amount: number;
   profit_amount: number;
-  payment_status: 'fully-paid' | 'partial' | 'no-payment' | 'overdue';
+  payment_status: 'fully-paid' | 'partial-payment' | 'no-payment' | 'overdue';
   due_date?: string;
+  receipt_generated: boolean;
   made_on: string;
-  updated_on: string;
+  updated_at: string;
   total_paid: number;
   balance: number;
   is_fully_paid: boolean;
   items?: SaleItem[];
   payments?: Payment[];
+  order?: Order;
   days_remaining?: number;
   is_near_due?: boolean;
   is_overdue?: boolean;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
 }
 
 export interface SalesAnalytics {
@@ -542,8 +548,7 @@ export interface SalesAnalytics {
   total_cost: number;
   total_profit: number;
   profit_margin: number;
-  payment_status_breakdown: Record<string, { name: string; count: number }>;
-  recent_sales: Sale[];
+  payment_status_breakdown: Record<string, number>;
   daily_sales: Array<{
     date: string;
     sales_count: number;
@@ -557,57 +562,177 @@ export interface PaymentSummary {
   total_payments: number;
   cash_total: number;
   mpesa_total: number;
-  other_total: number;
+  card_total: number;
   transaction_count: number;
   recent_payments: Payment[];
 }
 
 // Sales API
 export const salesApi = {
-  async getSales(): Promise<Sale[]> {
-    const { data } = await api.get('/sales/sales/');
-    return Array.isArray(data) ? data : data.results || [];
+  async getSales(filters?: {
+    payment_status?: string;
+    date_from?: string;
+    date_to?: string;
+    overdue_only?: boolean;
+    unpaid_only?: boolean;
+  }): Promise<Sale[]> {
+    const params = new URLSearchParams();
+    if (filters?.payment_status) params.append('payment_status', filters.payment_status);
+    if (filters?.date_from) params.append('date_from', filters.date_from);
+    if (filters?.date_to) params.append('date_to', filters.date_to);
+    if (filters?.overdue_only) params.append('overdue_only', 'true');
+    if (filters?.unpaid_only) params.append('unpaid_only', 'true');
+
+    const { data } = await api.get<{ success: boolean; data: { data: Sale[] } }>(`/sales?${params.toString()}`);
+    return Array.isArray(data.data) ? data.data : data.data.data || [];
   },
 
   async getSaleDetails(saleId: number): Promise<Sale> {
-    const { data } = await api.get(`/sales/sales/${saleId}/`);
-    return data;
+    const { data } = await api.get<{ success: boolean; data: Sale }>(`/sales/${saleId}`);
+    return data.data;
   },
 
-  async addPayment(saleId: number, payment: {
-    method: string;
-    amount: number;
-    reference?: string;
-    notes?: string;
-  }): Promise<{ message: string; payment: Payment; sale: Sale }> {
-    const { data } = await api.post(`/sales/sales/${saleId}/add_payment/`, payment);
-    return data;
+  async downloadReceipt(saleId: number): Promise<void> {
+    const response = await api.get(`/sales/${saleId}/receipt`, {
+      responseType: 'blob',
+    });
+    // Handle file download in React Native (you might need a library for this)
+    return response.data;
   },
 
   async getAnalytics(days: number = 30): Promise<SalesAnalytics> {
-    const { data } = await api.get(`/sales/analytics/?days=${days}`);
+    const { data } = await api.get<{ success: boolean; data: SalesAnalytics }>(`/sales/analytics?days=${days}`);
+    return data.data;
+  },
+
+  async getOverduePayments(): Promise<{ data: Sale[]; count: number }> {
+    const { data } = await api.get<{ success: boolean; data: Sale[]; count: number }>('/sales/overdue');
+    return { data: data.data, count: data.count };
+  },
+
+  async getUnpaidSales(): Promise<{ data: Sale[]; count: number }> {
+    const { data } = await api.get<{ success: boolean; data: Sale[]; count: number }>('/sales/unpaid');
+    return { data: data.data, count: data.count };
+  },
+
+  async getDebts(): Promise<{ data: Sale[]; count: number }> {
+    const { data } = await api.get<{ success: boolean; data: Sale[]; count: number }>('/sales/debts');
+    return { data: data.data, count: data.count };
+  },
+};
+
+// Payments API
+export const paymentsApi = {
+  async getPayments(filters?: {
+    sale_id?: number;
+    payment_method?: string;
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+  }): Promise<Payment[]> {
+    const params = new URLSearchParams();
+    if (filters?.sale_id) params.append('sale_id', filters.sale_id.toString());
+    if (filters?.payment_method) params.append('payment_method', filters.payment_method);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.date_from) params.append('date_from', filters.date_from);
+    if (filters?.date_to) params.append('date_to', filters.date_to);
+
+    const { data } = await api.get<{ success: boolean; data: { data: Payment[] } }>(`/payments?${params.toString()}`);
+    return Array.isArray(data.data) ? data.data : data.data.data || [];
+  },
+
+  async getPaymentDetails(paymentId: number): Promise<Payment> {
+    const { data } = await api.get<{ success: boolean; data: Payment }>(`/payments/${paymentId}`);
+    return data.data;
+  },
+
+  async addPayment(saleId: number, payment: {
+    payment_method: 'mpesa' | 'cash' | 'card';
+    amount: number;
+    phone_number?: string;
+    reference?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; message: string; data: Payment }> {
+    const { data } = await api.post<{ success: boolean; message: string; data: Payment }>(
+      `/payments/sales/${saleId}/payments`,
+      payment
+    );
     return data;
   },
 
-  async getOverduePayments(): Promise<{ overdue_sales: Sale[]; count: number }> {
-    const { data } = await api.get('/sales/overdue/');
-    return data;
+  async verifyPayment(paymentId: number): Promise<Payment> {
+    const { data } = await api.post<{ success: boolean; data: { payment: Payment; is_verified: boolean } }>(
+      `/payments/${paymentId}/verify`
+    );
+    return data.data.payment;
   },
 
-  async getPaymentSummary(): Promise<PaymentSummary> {
-    const { data } = await api.get('/sales/payments/summary/');
-    return data;
+  async refundPayment(paymentId: number): Promise<Payment> {
+    const { data } = await api.post<{ success: boolean; message: string; data: Payment }>(
+      `/payments/${paymentId}/refund`
+    );
+    return data.data;
   },
 
-  async getDebts(): Promise<{ debts: Sale[]; count: number }> {
-    const { data } = await api.get('/sales/debts/');
-    return data;
+  async getPaymentSummary(date?: string): Promise<PaymentSummary> {
+    const params = date ? `?date=${date}` : '';
+    const { data } = await api.get<{ success: boolean; data: PaymentSummary }>(`/payments/summary${params}`);
+    return data.data;
+  },
+};
+
+// M-Pesa API
+export const mpesaApi = {
+  async initiateStkPush(saleId: number, phoneNumber: string, amount: number): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      merchant_request_id?: string;
+      checkout_request_id?: string;
+      response_description?: string;
+      payment_id: number;
+    };
+  }> {
+    try {
+      const { data } = await api.post<{
+        success: boolean;
+        message: string;
+        data: {
+          merchant_request_id?: string;
+          checkout_request_id?: string;
+          response_description?: string;
+          payment_id: number;
+        };
+      }>('/mpesa/initiate', {
+        sale_id: saleId,
+        phone_number: phoneNumber,
+        amount: amount,
+      });
+      return data;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to initiate payment',
+      };
+    }
   },
 
-  async getUnpaidSales(): Promise<{ unpaid_sales: Sale[]; count: number }> {
-    const { data } = await api.get('/sales/unpaid/');
-    return data;
-  }
+  async getTransactions(filters?: {
+    status?: string;
+    payment_id?: number;
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.payment_id) params.append('payment_id', filters.payment_id.toString());
+
+    const { data } = await api.get<{ success: boolean; data: { data: any[] } }>(`/mpesa/transactions?${params.toString()}`);
+    return Array.isArray(data.data) ? data.data : data.data.data || [];
+  },
+
+  async verifyTransaction(transactionId: number): Promise<any> {
+    const { data } = await api.get<{ success: boolean; data: any }>(`/mpesa/transactions/${transactionId}/verify`);
+    return data.data;
+  },
 };
 
 export async function isAuthenticated(): Promise<boolean> {

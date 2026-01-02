@@ -28,6 +28,7 @@ import {
   Sale,
   SalesAnalytics,
   Payment,
+  paymentsApi,
   api,
 } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
@@ -113,6 +114,7 @@ export default function AdminScreen() {
   const [paymentForm, setPaymentForm] = useState({
     method: "cash",
     amount: "",
+    phone_number: "",
     reference: "",
     notes: "",
   });
@@ -142,29 +144,21 @@ export default function AdminScreen() {
         productsApi.getCategories(),
         productsApi.getProducts(),
         productsApi.getLowStockProducts(),
-        ordersApi.getPendingOrders().catch(() => ({ orders: [], count: 0 })),
+        ordersApi.getPendingOrders().catch(() => []),
         salesApi.getSales().catch(() => []),
         salesApi.getAnalytics().catch(() => null),
-        salesApi.getUnpaidSales().catch(() => ({ unpaid_sales: [], count: 0 })),
-        salesApi.getDebts().catch(() => ({ debts: [], count: 0 })),
+        salesApi.getUnpaidSales().catch(() => ({ data: [], count: 0 })),
+        salesApi.getDebts().catch(() => ({ data: [], count: 0 })),
       ]);
 
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
       setProducts(Array.isArray(productsData) ? productsData : []);
-      setLowStockProducts(
-        Array.isArray(lowStockData?.products) ? lowStockData.products : []
-      );
-      setPendingOrders(
-        Array.isArray(ordersData?.orders) ? ordersData.orders : []
-      );
+      setLowStockProducts(Array.isArray(lowStockData) ? lowStockData : []);
+      setPendingOrders(Array.isArray(ordersData) ? ordersData : []);
       setSales(Array.isArray(salesData) ? salesData : []);
       setSalesAnalytics(analyticsData);
-      setUnpaidSales(
-        Array.isArray(unpaidData?.unpaid_sales) ? unpaidData.unpaid_sales : []
-      );
-      setDebts(
-        Array.isArray(debtsData?.debts) ? debtsData.debts : []
-      );
+      setUnpaidSales(Array.isArray(unpaidData?.data) ? unpaidData.data : []);
+      setDebts(Array.isArray(debtsData?.data) ? debtsData.data : []);
     } catch (error) {
       ToastService.showApiError(error, "Failed to load admin data");
     } finally {
@@ -368,12 +362,12 @@ export default function AdminScreen() {
 
   // Order Management
   const confirmOrder = async (order: Order) => {
-    const paymentMethod = order.payment_method || 'cash';
-    const isDebt = paymentMethod === 'debt';
+    const paymentStatus = order.payment_status || 'pending';
+    const isDebt = paymentStatus === 'debt';
     
     Alert.alert(
       "Confirm Order",
-      `Confirm order #${order.id} from ${order.customer_name}?\n\nPayment: ${paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'mpesa' ? 'M-Pesa' : 'Debt'}\nDelivery: ${order.delivery_type === 'pickup' ? 'Pickup' : 'Delivery'}\nAmount: KES ${order.total_amount?.toLocaleString() || 0}\n\n${isDebt ? 'This will mark the order as debt with 7 days payment deadline.' : ''}`,
+      `Confirm order ${order.order_number || `#${order.id}`}?\n\nPayment Status: ${paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'debt' ? 'Debt' : paymentStatus === 'failed' ? 'Failed' : 'Pending'}\nAmount: KES ${order.total_amount?.toLocaleString() || 0}\n\n${isDebt ? 'This will mark the order as debt with 7 days payment deadline.' : 'This will create a sale and update stock.'}`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -382,22 +376,16 @@ export default function AdminScreen() {
           onPress: () => {
             (async () => {
               try {
-                // Use the ordersApi.confirmOrder method which handles the endpoint correctly
-                if (isDebt) {
-                  // For debt orders, we need to call the confirm endpoint with debt parameters
-                  await api.post(`/orders/orders/${order.id}/confirm/`, {
-                    payment_method: 'debt',
-                    mark_as_debt_days: 7
-                  });
-                } else {
-                  // For cash/mpesa, use the ordersApi method
-                  await ordersApi.confirmOrder(order.id);
-                }
+                // Update order status to confirmed - this will automatically create a sale
+                await ordersApi.updateOrder(order.id, {
+                  order_status: 'confirmed',
+                });
+                
                 ToastService.showSuccess(
                   "Success",
                   isDebt 
                     ? "Order confirmed and marked as debt (7 days)" 
-                    : "Order confirmed and converted to sale"
+                    : "Order confirmed and sale created"
                 );
                 loadAdminData();
               } catch (error) {
@@ -411,9 +399,12 @@ export default function AdminScreen() {
   };
 
   const cancelOrder = async (order: Order) => {
+    const customerName = order.user 
+      ? `${order.user.first_name || ''} ${order.user.last_name || ''}`.trim() || order.user.username
+      : 'Customer';
     Alert.alert(
       "Cancel Order",
-      `Cancel order #${order.id} from ${order.customer_name}?`,
+      `Cancel order ${order.order_number || `#${order.id}`} from ${customerName}?`,
       [
         { text: "No", style: "cancel" },
         {
@@ -441,6 +432,7 @@ export default function AdminScreen() {
     setPaymentForm({
       method: "cash",
       amount: sale.balance.toString(),
+      phone_number: sale.customer_phone || "",
       reference: "",
       notes: "",
     });
@@ -453,16 +445,52 @@ export default function AdminScreen() {
       return;
     }
 
+    if (paymentForm.method === "mpesa" && !paymentForm.phone_number) {
+      ToastService.showError("Validation Error", "Phone number is required for M-Pesa payments");
+      return;
+    }
+
     try {
-      const paymentData = {
-        method: paymentForm.method,
+      const paymentData: {
+        payment_method: 'mpesa' | 'cash' | 'card';
+        amount: number;
+        phone_number?: string;
+        reference?: string;
+        notes?: string;
+      } = {
+        payment_method: paymentForm.method as 'mpesa' | 'cash' | 'card',
         amount: parseFloat(paymentForm.amount),
-        reference: paymentForm.reference,
-        notes: paymentForm.notes,
+        reference: paymentForm.reference || undefined,
+        notes: paymentForm.notes || undefined,
       };
 
-      await salesApi.addPayment(selectedSale.id, paymentData);
-      ToastService.showSuccess("Success", "Payment added successfully");
+      if (paymentForm.method === "mpesa") {
+        paymentData.phone_number = paymentForm.phone_number;
+      }
+
+      const response = await paymentsApi.addPayment(selectedSale.id, paymentData);
+      
+      // If M-Pesa payment, initiate STK push
+      if (paymentForm.method === "mpesa" && response.data) {
+        const { mpesaApi } = await import("@/services/api");
+        try {
+          const stkResponse = await mpesaApi.initiateStkPush(
+            selectedSale.id,
+            paymentForm.phone_number,
+            parseFloat(paymentForm.amount)
+          );
+          if (stkResponse.success) {
+            ToastService.showSuccess("Success", "M-Pesa payment request sent to customer's phone");
+          } else {
+            ToastService.showError("M-Pesa Error", stkResponse.message || "Failed to initiate M-Pesa payment");
+          }
+        } catch (mpesaError) {
+          ToastService.showApiError(mpesaError, "Payment created but M-Pesa request failed");
+        }
+      } else {
+        ToastService.showSuccess("Success", "Payment added successfully");
+      }
+      
       setShowPaymentModal(false);
       loadAdminData();
     } catch (error) {
@@ -569,6 +597,7 @@ export default function AdminScreen() {
       switch (status) {
         case "fully-paid":
           return "#22C55E";
+        case "partial-payment":
         case "partial":
           return "#F59E0B";
         case "overdue":
@@ -582,6 +611,7 @@ export default function AdminScreen() {
       switch (status) {
         case "fully-paid":
           return "#F0FDF4";
+        case "partial-payment":
         case "partial":
           return "#FFFBEB";
         case "overdue":
@@ -649,25 +679,27 @@ export default function AdminScreen() {
   };
 
   const renderOrderItem = ({ item }: { item: Order }) => {
-    const paymentMethod = item.payment_method === 'cash' ? 'Cash' : item.payment_method === 'mpesa' ? 'M-Pesa' : item.payment_method === 'debt' ? 'Debt' : 'Cash';
-    const deliveryType = item.delivery_type === 'pickup' ? 'Pickup' : item.delivery_type === 'delivery' ? 'Delivery' : 'Pickup';
+    const customerName = item.user 
+      ? `${item.user.first_name || ''} ${item.user.last_name || ''}`.trim() || item.user.username
+      : 'Customer';
+    const paymentStatus = item.payment_status === 'cash' ? 'Cash' 
+      : item.payment_status === 'mpesa' ? 'M-Pesa' 
+      : item.payment_status === 'debt' ? 'Debt' 
+      : item.payment_status === 'paid' ? 'Paid'
+      : item.payment_status || 'Pending';
     
     return (
     <View style={styles.orderCard}>
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>
-          <Text style={styles.orderNumber}>Order #{item.id}</Text>
-          <Text style={styles.orderCustomer}>{item.customer_name}</Text>
+          <Text style={styles.orderNumber}>Order {item.order_number || `#${item.id}`}</Text>
+          <Text style={styles.orderCustomer}>{customerName}</Text>
           <Text style={styles.orderDate}>
-            {new Date(`${item.order_date}T${item.order_time}`).toLocaleString()}
+            {new Date(`${item.order_date}T${item.order_time || '00:00:00'}`).toLocaleString()}
           </Text>
           <View style={styles.orderDetailsRow}>
-            <Text style={styles.orderDetailLabel}>Payment:</Text>
-            <Text style={styles.orderDetailValue}>{paymentMethod}</Text>
-          </View>
-          <View style={styles.orderDetailsRow}>
-            <Text style={styles.orderDetailLabel}>Delivery:</Text>
-            <Text style={styles.orderDetailValue}>{deliveryType}</Text>
+            <Text style={styles.orderDetailLabel}>Payment Status:</Text>
+            <Text style={styles.orderDetailValue}>{paymentStatus}</Text>
           </View>
         </View>
         <View style={styles.orderAmount}>
@@ -679,17 +711,17 @@ export default function AdminScreen() {
               styles.statusBadge,
               {
                 backgroundColor:
-                  item.status === "pending" ? "#FEF3C7" : "#F0FDF4",
+                  item.order_status === "pending" ? "#FEF3C7" : "#F0FDF4",
               },
             ]}
           >
             <Text
               style={[
                 styles.statusText,
-                { color: item.status === "pending" ? "#D97706" : "#22C55E" },
+                { color: item.order_status === "pending" ? "#D97706" : "#22C55E" },
               ]}
             >
-              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+              {item.order_status.charAt(0).toUpperCase() + item.order_status.slice(1)}
             </Text>
           </View>
         </View>
@@ -700,57 +732,30 @@ export default function AdminScreen() {
           <Text style={styles.orderItemsTitle}>Items:</Text>
           {item.items.map((orderItem) => (
             <Text key={orderItem.id} style={styles.orderItemText}>
-              {orderItem.product_name} x {orderItem.quantity} {orderItem.weight ? `(${orderItem.weight}kg)` : ''} - KES {orderItem.subtotal}
+              {orderItem.product?.name || 'Product'} x {orderItem.quantity} {orderItem.kilogram ? `(${orderItem.kilogram}kg)` : ''} - KES {orderItem.subtotal?.toLocaleString() || 0}
             </Text>
           ))}
         </View>
       )}
 
-      <View style={styles.orderActions}>
-        <TouchableOpacity
-          style={styles.confirmButton}
-          onPress={() => confirmOrder(item)}
-        >
-          <CheckCircle size={16} color="#22C55E" />
-          <Text style={styles.confirmButtonText}>Confirm</Text>
-        </TouchableOpacity>
-        {item.payment_status === "PENDING" && item.payment_method === "mpesa" && (
+      {item.order_status === "pending" && (
+        <View style={styles.orderActions}>
           <TouchableOpacity
-            style={styles.addPaymentButton}
-            onPress={() =>
-              (async () => {
-                try {
-                  const response = await ordersApi.initiatePayment(item.id);
-                  if (response.success) {
-                    ToastService.showSuccess("Success", "Payment request sent");
-                  } else {
-                    ToastService.showError(
-                      "Payment Error",
-                      response.message || "Failed to send payment request"
-                    );
-                  }
-                  loadAdminData();
-                } catch (error) {
-                  ToastService.showApiError(
-                    error,
-                    "Failed to initiate payment"
-                  );
-                }
-              })()
-            }
+            style={styles.confirmButton}
+            onPress={() => confirmOrder(item)}
           >
-            <CreditCard size={16} color="#2563EB" />
-            <Text style={styles.addPaymentButtonText}>Paybill</Text>
+            <CheckCircle size={16} color="#22C55E" />
+            <Text style={styles.confirmButtonText}>Confirm</Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => cancelOrder(item)}
-        >
-          <XCircle size={16} color="#EF4444" />
-          <Text style={styles.orderCancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => cancelOrder(item)}
+          >
+            <XCircle size={16} color="#EF4444" />
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
     );
   };
@@ -1360,6 +1365,21 @@ export default function AdminScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {paymentForm.method === "mpesa" && (
+                <>
+                  <Text style={styles.fieldLabel}>Phone Number *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="254712345678"
+                    value={paymentForm.phone_number}
+                    onChangeText={(text) =>
+                      setPaymentForm({ ...paymentForm, phone_number: text })
+                    }
+                    keyboardType="phone-pad"
+                  />
+                </>
+              )}
 
               <Text style={styles.fieldLabel}>Amount *</Text>
               <TextInput

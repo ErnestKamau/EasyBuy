@@ -55,8 +55,7 @@ export default function CheckoutScreen() {
       // Create the order
       const order = await ordersApi.createOrder(
         orderItems,
-        `Payment method: ${selectedPayment === 'cash' ? 'Cash' : selectedPayment === 'mpesa' ? 'M-Pesa' : 'Debt'} | Delivery: ${selectedDelivery === 'pickup' ? 'Pickup' : 'Delivery'}`,
-        selectedDelivery,
+        `Payment method: ${selectedPayment === 'cash' ? 'Cash' : selectedPayment === 'mpesa' ? 'M-Pesa' : 'Debt'}`,
         selectedPayment
       );
 
@@ -66,7 +65,7 @@ export default function CheckoutScreen() {
 
       ToastService.showSuccess(
         'Order Placed!',
-        `Your order #${order.id} has been placed successfully`
+        `Your order ${order.order_number || `#${order.id}`} has been placed successfully`
       );
 
       // Navigate to success screen or back to home
