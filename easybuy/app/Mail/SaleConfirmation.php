@@ -58,7 +58,10 @@ class SaleConfirmation extends Mailable
 
         // Attach receipt if generated
         if ($this->sale->receipt_generated) {
-            $receiptPath = "receipts/{$this->sale->sale_number}.pdf";
+            $filename = "{$this->sale->sale_number}.pdf";
+            $receiptPath = "receipts/{$filename}";
+            
+            // Check if file exists in storage (using default disk, same as ReceiptService)
             if (Storage::exists($receiptPath)) {
                 $attachments[] = Attachment::fromStorage($receiptPath)
                     ->as("receipt-{$this->sale->sale_number}.pdf")
