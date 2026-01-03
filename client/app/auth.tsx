@@ -945,7 +945,7 @@ const LoginScreen = ({
       <TouchableOpacity
         onPress={onForgotPassword}
         activeOpacity={0.7}
-        style={{ marginLeft: "auto", marginRight: 12, alignItems: "center" }}
+        style={{ marginLeft: "auto", marginRight: - 14, alignItems: "center" }}
       >
         <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
       </TouchableOpacity>

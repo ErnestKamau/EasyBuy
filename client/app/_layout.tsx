@@ -325,8 +325,8 @@ function SafeAreaWrapper({ children }: { readonly children: React.ReactNode }) {
     <View
       style={{
         flex: 1,
-        paddingTop: insets.top - 40,
-        paddingBottom: insets.bottom - 20,
+        paddingTop: insets.top - 50,
+        paddingBottom: insets.bottom - 40,
       }}
     >
       {children}
@@ -489,6 +489,15 @@ function RootLayoutNav() {
               name="checkout"
               options={{
                 title: "Checkout",
+                presentation: "card",
+                headerShown: false,
+              }}
+            />
+
+            <Stack.Screen
+              name="order/[id]"
+              options={{
+                title: "Order Details",
                 presentation: "card",
                 headerShown: false,
               }}

@@ -36,6 +36,11 @@ class Sale extends Model
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     */
+    protected $appends = ['balance', 'is_fully_paid', 'is_overdue', 'days_remaining', 'is_near_due', 'customer_name', 'customer_phone', 'customer_email'];
+
+    /**
      * Boot the model
      */
     protected static function boot()

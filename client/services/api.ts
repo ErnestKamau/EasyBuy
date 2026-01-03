@@ -534,6 +534,7 @@ export interface Payment {
   refund_amount?: number;
   created_at: string;
   updated_at: string;
+  sale?: Sale; // Include sale in payment response
 }
 
 export interface Sale {

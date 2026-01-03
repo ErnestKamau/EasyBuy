@@ -64,6 +64,10 @@ class SaleController extends Controller
     {
         $sale->load(['order.user', 'items.product', 'payments.mpesaTransaction']);
 
+        // Refresh to ensure total_paid is up to date
+        $sale->refresh();
+        $sale->recalculateTotalPaid();
+
         return response()->json([
             'success' => true,
             'data' => $sale
@@ -268,9 +272,17 @@ class SaleController extends Controller
                 ->orderBy('due_date')
                 ->get();
 
+            // Ensure balance and total_paid are included for each sale
+            $overdueSalesData = $overdueSales->map(function ($sale) {
+                $saleData = $sale->toArray();
+                $saleData['balance'] = $sale->balance;
+                $saleData['total_paid'] = $sale->total_paid;
+                return $saleData;
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => $overdueSales,
+                'data' => $overdueSalesData,
                 'count' => $overdueSales->count()
             ]);
 
@@ -293,9 +305,17 @@ class SaleController extends Controller
                 ->orderBy('made_on')
                 ->get();
 
+            // Ensure balance and total_paid are included for each sale
+            $unpaidSalesData = $unpaidSales->map(function ($sale) {
+                $saleData = $sale->toArray();
+                $saleData['balance'] = $sale->balance;
+                $saleData['total_paid'] = $sale->total_paid;
+                return $saleData;
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => $unpaidSales,
+                'data' => $unpaidSalesData,
                 'count' => $unpaidSales->count()
             ]);
 
@@ -319,12 +339,14 @@ class SaleController extends Controller
                 ->orderBy('due_date')
                 ->get();
 
-            // Add days remaining for each debt
+            // Add days remaining and balance for each debt
             $debtsData = $debts->map(function ($debt) {
                 $debtData = $debt->toArray();
                 $debtData['days_remaining'] = $debt->days_remaining;
                 $debtData['is_near_due'] = $debt->is_near_due;
                 $debtData['is_overdue'] = $debt->is_overdue;
+                $debtData['balance'] = $debt->balance; // Ensure balance is included
+                $debtData['total_paid'] = $debt->total_paid; // Ensure total_paid is included
                 return $debtData;
             });
 

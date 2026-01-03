@@ -56,9 +56,14 @@ class Payment extends Model
 
         static::saved(function ($payment) {
             // Update sale's total_paid and payment status when payment is saved
+            // Reload the sale relationship to ensure we have the latest data
+            $payment->load('sale');
             if ($payment->sale) {
-                // Update if payment status is completed or refunded, or if status changed
+                // Always update if payment status is completed or refunded
+                // Also update if status changed (for new payments that are immediately completed)
                 if (in_array($payment->status, ['completed', 'refunded']) || $payment->wasChanged('status')) {
+                    // Refresh the sale to get latest data
+                    $payment->sale->refresh();
                     $payment->sale->recalculateTotalPaid();
                     $payment->sale->updatePaymentStatus();
                 }
@@ -123,10 +128,14 @@ class Payment extends Model
         }
         
         $this->status = 'completed';
+        $this->paid_at = $this->paid_at ?? Carbon::now();
         
         if ($this->save()) {
-            // Update sale's total_paid
+            // Ensure sale relationship is loaded
+            $this->load('sale');
+            // Update sale's total_paid (the saved event will also trigger, but we do it explicitly here too)
             if ($this->sale) {
+                $this->sale->refresh();
                 $this->sale->recalculateTotalPaid();
                 $this->sale->updatePaymentStatus();
             }
@@ -165,7 +174,7 @@ class Payment extends Model
             // Update sale's total_paid (refunded payments don't count)
             if ($this->sale) {
                 $this->sale->recalculateTotalPaid();
-                $this->sale->updatePaymentStatus();
+            $this->sale->updatePaymentStatus();
             }
             return true;
         }

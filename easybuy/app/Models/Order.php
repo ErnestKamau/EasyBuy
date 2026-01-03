@@ -116,17 +116,26 @@ class Order extends Model
             $product = $item->product;
             if ($item->kilogram) {
                 // For items sold by weight, check if we have enough stock (decimal comparison)
-                if ($product->in_stock < $item->kilogram) {
+                $kilogramValue = (float) $item->kilogram;
+                $currentStock = (float) $product->in_stock;
+                
+                if ($currentStock < $kilogramValue) {
                     throw new InsufficientStockException($product->name);
                 }
-                // Decrement with decimal precision
-                $product->update(['in_stock' => $product->in_stock - $item->kilogram]);
+                // Decrement with decimal precision - ensure proper decimal arithmetic
+                $newStock = $currentStock - $kilogramValue;
+                $product->in_stock = round($newStock, 3); // Round to 3 decimal places to match database precision
+                $product->save();
             } else {
                 // For quantity-based products
                 if ($product->in_stock < $item->quantity) {
                     throw new InsufficientStockException($product->name);
                 }
-                $product->update(['in_stock' => $product->in_stock - $item->quantity]);
+                // For quantity-based, in_stock should be integer, but handle as decimal for consistency
+                $currentStock = (float) $product->in_stock;
+                $newStock = $currentStock - (float) $item->quantity;
+                $product->in_stock = round($newStock, 3);
+                $product->save();
             }
         }
 

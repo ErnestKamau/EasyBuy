@@ -97,16 +97,29 @@ class PaymentController extends Controller
             // If cash payment, mark as completed immediately (this will update total_paid)
             if ($validated['payment_method'] === 'cash') {
                 $payment->markAsCompleted();
+                // Refresh payment and sale to get updated data
+                $payment->refresh();
+                $payment->sale->refresh();
             }
             // For M-Pesa, the MpesaController will handle the STK push and update status
 
             DB::commit();
+
+            // Refresh payment and sale to ensure we have the latest data after transaction commit
+            $payment->refresh();
+            if ($payment->sale) {
+                $payment->sale->refresh();
+                // Ensure total_paid is recalculated after transaction commit
+                $payment->sale->recalculateTotalPaid();
+                $payment->sale->updatePaymentStatus();
+            }
 
             // Dispatch event for email notification
             if ($payment->status === 'completed') {
                 event(new PaymentReceived($payment));
             }
 
+            // Reload all relationships including refreshed sale data
             $payment->load(['sale.order.user', 'mpesaTransaction']);
 
             return response()->json([

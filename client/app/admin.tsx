@@ -52,6 +52,8 @@ import {
   CreditCard,
   Menu,
   Home,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react-native";
 
 export default function AdminScreen() {
@@ -74,10 +76,16 @@ export default function AdminScreen() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "categories" | "products" | "orders" | "debts" | "alerts"
+    "categories" | "products" | "orders" | "debts" | "alerts" | "sales"
   >("orders");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const sidebarAnimation = useRef(new Animated.Value(0)).current;
+
+  // Pagination state
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [salesPage, setSalesPage] = useState(1);
+  const [debtsPage, setDebtsPage] = useState(1);
+  const itemsPerPage = 4;
 
   useEffect(() => {
     Animated.timing(sidebarAnimation, {
@@ -131,6 +139,13 @@ export default function AdminScreen() {
     }
     loadAdminData();
   }, [user]);
+
+  // Reset pagination when switching tabs
+  useEffect(() => {
+    setOrdersPage(1);
+    setSalesPage(1);
+    setDebtsPage(1);
+  }, [activeTab]);
 
   const loadAdminData = async () => {
     try {
@@ -642,7 +657,20 @@ export default function AdminScreen() {
       }
 
       setShowPaymentModal(false);
-      loadAdminData();
+
+      // Reload admin data to refresh debts list with updated balances
+      await loadAdminData();
+
+      // Refresh the selected sale from the updated debts list
+      if (selectedSale) {
+        const updatedDebts = await salesApi.getDebts();
+        const updatedSale = updatedDebts.data.find(
+          (s) => s.id === selectedSale.id
+        );
+        if (updatedSale) {
+          setSelectedSale(updatedSale);
+        }
+      }
     } catch (error) {
       ToastService.showApiError(error, "Failed to add payment");
     }
@@ -661,8 +689,10 @@ export default function AdminScreen() {
       <View style={styles.debtCard}>
         <View style={styles.debtHeader}>
           <View style={styles.debtInfo}>
-            <Text style={styles.debtCustomer}>{item.customer_name}</Text>
-            <Text style={styles.debtPhone}>{item.customer_phone}</Text>
+            <Text style={styles.debtCustomer}>
+              {item.customer_name || "N/A"}
+            </Text>
+            <Text style={styles.debtPhone}>{item.customer_phone || "N/A"}</Text>
             <Text style={styles.debtSaleNumber}>{item.sale_number}</Text>
           </View>
           <View style={styles.debtAmount}>
@@ -702,6 +732,12 @@ export default function AdminScreen() {
 
         <View style={styles.debtDetails}>
           <View style={styles.debtDetailRow}>
+            <Text style={styles.debtDetailLabel}>Customer Email:</Text>
+            <Text style={styles.debtDetailValue}>
+              {item.customer_email || "N/A"}
+            </Text>
+          </View>
+          <View style={styles.debtDetailRow}>
             <Text style={styles.debtDetailLabel}>Total Amount:</Text>
             <Text style={styles.debtDetailValue}>
               Ksh {item.total_amount?.toLocaleString() || 0}
@@ -722,6 +758,12 @@ export default function AdminScreen() {
               ]}
             >
               Ksh {item.balance?.toLocaleString() || 0}
+            </Text>
+          </View>
+          <View style={styles.debtDetailRow}>
+            <Text style={styles.debtDetailLabel}>Payment Status:</Text>
+            <Text style={styles.debtDetailValue}>
+              {item.payment_status?.replace("-", " ").toUpperCase() || "N/A"}
             </Text>
           </View>
           <View style={styles.debtDetailRow}>
@@ -755,6 +797,23 @@ export default function AdminScreen() {
               {new Date(item.made_on).toLocaleDateString()}
             </Text>
           </View>
+          {item.payments && item.payments.length > 0 && (
+            <View style={styles.paymentHistorySection}>
+              <Text style={styles.paymentHistoryTitle}>Payment History:</Text>
+              {item.payments
+                .filter((p: Payment) => p.status === "completed")
+                .map((payment: Payment) => (
+                  <View key={payment.id} style={styles.paymentHistoryItem}>
+                    <Text style={styles.paymentHistoryText}>
+                      {payment.payment_number} -{" "}
+                      {payment.payment_method.toUpperCase()} - KES{" "}
+                      {payment.amount.toLocaleString()} -{" "}
+                      {new Date(payment.paid_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          )}
         </View>
 
         {!item.is_fully_paid && (
@@ -806,7 +865,9 @@ export default function AdminScreen() {
         <View style={styles.salesHeader}>
           <View style={styles.salesInfo}>
             <Text style={styles.saleNumber}>{item.sale_number}</Text>
-            <Text style={styles.saleCustomer}>{item.customer_name}</Text>
+            <Text style={styles.saleCustomer}>
+              {item.customer_name || "N/A"}
+            </Text>
             <Text style={styles.saleDate}>
               {new Date(item.made_on).toLocaleDateString()}
             </Text>
@@ -836,11 +897,77 @@ export default function AdminScreen() {
           </View>
         </View>
 
-        <View style={styles.paymentInfo}>
-          <Text style={styles.paymentInfoText}>
-            Paid: Ksh {item.total_paid?.toLocaleString() || 0} | Balance: Ksh{" "}
-            {item.balance?.toLocaleString() || 0}
-          </Text>
+        <View style={styles.salesDetailsSection}>
+          <View style={styles.salesDetailRow}>
+            <Text style={styles.salesDetailLabel}>Customer Name:</Text>
+            <Text style={styles.salesDetailValue}>
+              {item.customer_name || "N/A"}
+            </Text>
+          </View>
+          <View style={styles.salesDetailRow}>
+            <Text style={styles.salesDetailLabel}>Customer Phone:</Text>
+            <Text style={styles.salesDetailValue}>
+              {item.customer_phone || "N/A"}
+            </Text>
+          </View>
+          <View style={styles.salesDetailRow}>
+            <Text style={styles.salesDetailLabel}>Customer Email:</Text>
+            <Text style={styles.salesDetailValue}>
+              {item.customer_email || "N/A"}
+            </Text>
+          </View>
+          <View style={styles.salesDetailRow}>
+            <Text style={styles.salesDetailLabel}>Sale Date:</Text>
+            <Text style={styles.salesDetailValue}>
+              {new Date(item.made_on).toLocaleDateString()}
+            </Text>
+          </View>
+          <View style={styles.salesDetailRow}>
+            <Text style={styles.salesDetailLabel}>Total Amount:</Text>
+            <Text style={styles.salesDetailValue}>
+              Ksh {item.total_amount?.toLocaleString() || 0}
+            </Text>
+          </View>
+          <View style={styles.salesDetailRow}>
+            <Text style={styles.salesDetailLabel}>Total Paid:</Text>
+            <Text style={styles.salesDetailValue}>
+              Ksh {item.total_paid?.toLocaleString() || 0}
+            </Text>
+          </View>
+          <View style={styles.salesDetailRow}>
+            <Text style={styles.salesDetailLabel}>Balance:</Text>
+            <Text
+              style={[
+                styles.salesDetailValue,
+                { color: "#EF4444", fontWeight: "700" },
+              ]}
+            >
+              Ksh {item.balance?.toLocaleString() || 0}
+            </Text>
+          </View>
+          <View style={styles.salesDetailRow}>
+            <Text style={styles.salesDetailLabel}>Payment Status:</Text>
+            <Text style={styles.salesDetailValue}>
+              {item.payment_status?.replace("-", " ").toUpperCase() || "N/A"}
+            </Text>
+          </View>
+          {item.payments && item.payments.length > 0 && (
+            <View style={styles.paymentHistorySection}>
+              <Text style={styles.paymentHistoryTitle}>Payment History:</Text>
+              {item.payments
+                .filter((p: Payment) => p.status === "completed")
+                .map((payment: Payment) => (
+                  <View key={payment.id} style={styles.paymentHistoryItem}>
+                    <Text style={styles.paymentHistoryText}>
+                      {payment.payment_number} -{" "}
+                      {payment.payment_method.toUpperCase()} - KES{" "}
+                      {payment.amount.toLocaleString()} -{" "}
+                      {new Date(payment.paid_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          )}
         </View>
 
         {!item.is_fully_paid && (
@@ -863,6 +990,8 @@ export default function AdminScreen() {
       ? `${item.user.first_name || ""} ${item.user.last_name || ""}`.trim() ||
         item.user.username
       : "Customer";
+    const customerPhone = item.user?.phone_number || "N/A";
+    const customerEmail = item.user?.email || "N/A";
     const paymentStatus =
       item.payment_status === "paid"
         ? "Paid"
@@ -887,10 +1016,6 @@ export default function AdminScreen() {
                 `${item.order_date}T${item.order_time || "00:00:00"}`
               ).toLocaleString()}
             </Text>
-            <View style={styles.orderDetailsRow}>
-              <Text style={styles.orderDetailLabel}>Payment Status:</Text>
-              <Text style={styles.orderDetailValue}>{paymentStatus}</Text>
-            </View>
           </View>
           <View style={styles.orderAmount}>
             <Text style={styles.orderTotal}>
@@ -919,6 +1044,71 @@ export default function AdminScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        <View style={styles.orderDetailsSection}>
+          <View style={styles.orderDetailsRow}>
+            <Text style={styles.orderDetailLabel}>Customer Phone:</Text>
+            <Text style={styles.orderDetailValue}>{customerPhone}</Text>
+          </View>
+          <View style={styles.orderDetailsRow}>
+            <Text style={styles.orderDetailLabel}>Customer Email:</Text>
+            <Text style={styles.orderDetailValue}>{customerEmail}</Text>
+          </View>
+          <View style={styles.orderDetailsRow}>
+            <Text style={styles.orderDetailLabel}>Payment Status:</Text>
+            <Text style={styles.orderDetailValue}>{paymentStatus}</Text>
+          </View>
+          {item.sale && (
+            <>
+              <View style={styles.orderDetailsRow}>
+                <Text style={styles.orderDetailLabel}>Sale Number:</Text>
+                <Text style={styles.orderDetailValue}>
+                  {item.sale.sale_number}
+                </Text>
+              </View>
+              <View style={styles.orderDetailsRow}>
+                <Text style={styles.orderDetailLabel}>
+                  Sale Payment Status:
+                </Text>
+                <Text style={styles.orderDetailValue}>
+                  {item.sale.payment_status?.replace("-", " ").toUpperCase() ||
+                    "N/A"}
+                </Text>
+              </View>
+              {item.sale.payments && item.sale.payments.length > 0 && (
+                <View style={styles.paymentHistorySection}>
+                  <Text style={styles.paymentHistoryTitle}>
+                    Payment History:
+                  </Text>
+                  {item.sale.payments
+                    .filter((p: Payment) => p.status === "completed")
+                    .map((payment: Payment) => (
+                      <View key={payment.id} style={styles.paymentHistoryItem}>
+                        <Text style={styles.paymentHistoryText}>
+                          {payment.payment_number} -{" "}
+                          {payment.payment_method.toUpperCase()} - KES{" "}
+                          {payment.amount.toLocaleString()} -{" "}
+                          {new Date(payment.paid_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    ))}
+                  <View style={styles.orderDetailsRow}>
+                    <Text style={styles.orderDetailLabel}>Total Paid:</Text>
+                    <Text style={styles.orderDetailValue}>
+                      KES {item.sale.total_paid?.toLocaleString() || 0}
+                    </Text>
+                  </View>
+                  <View style={styles.orderDetailsRow}>
+                    <Text style={styles.orderDetailLabel}>Balance:</Text>
+                    <Text style={styles.orderDetailValue}>
+                      KES {item.sale.balance?.toLocaleString() || 0}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
         </View>
 
         {item.items && item.items.length > 0 && (
@@ -1027,6 +1217,17 @@ export default function AdminScreen() {
     );
   }
 
+  // Pagination helper functions
+  const getPaginatedData = <T,>(data: T[], page: number, perPage: number) => {
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = (dataLength: number, perPage: number) => {
+    return Math.max(1, Math.ceil(dataLength / perPage));
+  };
+
   const menuItems = [
     {
       id: "orders",
@@ -1034,6 +1235,13 @@ export default function AdminScreen() {
       icon: ShoppingBag,
       count: pendingOrders.length,
       color: "#3B82F6",
+    },
+    {
+      id: "sales",
+      label: "Sales",
+      icon: TrendingUp,
+      count: sales.length,
+      color: "#8B5CF6",
     },
     {
       id: "debts",
@@ -1191,6 +1399,11 @@ export default function AdminScreen() {
                 {pendingOrders.length === 1 ? "order" : "orders"}
               </Text>
             )}
+            {activeTab === "sales" && (
+              <Text style={styles.topBarSubtitle}>
+                {sales.length} total {sales.length === 1 ? "sale" : "sales"}
+              </Text>
+            )}
             {activeTab === "debts" && (
               <Text style={styles.topBarSubtitle}>
                 {debts.length} active {debts.length === 1 ? "debt" : "debts"}
@@ -1253,15 +1466,151 @@ export default function AdminScreen() {
                 </Text>
               </View>
               {pendingOrders.length > 0 ? (
-                pendingOrders.map((item) => (
-                  <View key={item.id}>{renderOrderItem({ item })}</View>
-                ))
+                <>
+                  {getPaginatedData(
+                    pendingOrders,
+                    ordersPage,
+                    itemsPerPage
+                  ).map((item) => (
+                    <View key={item.id}>{renderOrderItem({ item })}</View>
+                  ))}
+                  {getTotalPages(pendingOrders.length, itemsPerPage) > 1 && (
+                    <View style={styles.paginationContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.paginationButton,
+                          ordersPage === 1 && styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          setOrdersPage(Math.max(1, ordersPage - 1))
+                        }
+                        disabled={ordersPage === 1}
+                      >
+                        <ChevronLeft
+                          size={20}
+                          color={ordersPage === 1 ? "#94A3B8" : "#1E293B"}
+                        />
+                      </TouchableOpacity>
+                      <Text style={styles.paginationText}>
+                        Page {ordersPage} of{" "}
+                        {getTotalPages(pendingOrders.length, itemsPerPage)}
+                      </Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.paginationButton,
+                          ordersPage >=
+                            getTotalPages(pendingOrders.length, itemsPerPage) &&
+                            styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          setOrdersPage(
+                            Math.min(
+                              getTotalPages(pendingOrders.length, itemsPerPage),
+                              ordersPage + 1
+                            )
+                          )
+                        }
+                        disabled={
+                          ordersPage >=
+                          getTotalPages(pendingOrders.length, itemsPerPage)
+                        }
+                      >
+                        <ChevronRight
+                          size={20}
+                          color={
+                            ordersPage >=
+                            getTotalPages(pendingOrders.length, itemsPerPage)
+                              ? "#94A3B8"
+                              : "#1E293B"
+                          }
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
               ) : (
                 <View style={styles.noOrders}>
                   <ShoppingBag size={48} color="#94A3B8" />
                   <Text style={styles.noOrdersText}>No pending orders</Text>
                   <Text style={styles.noOrdersSubtext}>
                     Orders will appear here when customers place them
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {activeTab === "sales" && (
+            <View style={styles.tabContent}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  All Sales ({sales.length})
+                </Text>
+              </View>
+              {sales.length > 0 ? (
+                <>
+                  {getPaginatedData(sales, salesPage, itemsPerPage).map(
+                    (item) => (
+                      <View key={item.id}>{renderSaleItem({ item })}</View>
+                    )
+                  )}
+                  {getTotalPages(sales.length, itemsPerPage) > 1 && (
+                    <View style={styles.paginationContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.paginationButton,
+                          salesPage === 1 && styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() => setSalesPage(Math.max(1, salesPage - 1))}
+                        disabled={salesPage === 1}
+                      >
+                        <ChevronLeft
+                          size={20}
+                          color={salesPage === 1 ? "#94A3B8" : "#1E293B"}
+                        />
+                      </TouchableOpacity>
+                      <Text style={styles.paginationText}>
+                        Page {salesPage} of{" "}
+                        {getTotalPages(sales.length, itemsPerPage)}
+                      </Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.paginationButton,
+                          salesPage >=
+                            getTotalPages(sales.length, itemsPerPage) &&
+                            styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          setSalesPage(
+                            Math.min(
+                              getTotalPages(sales.length, itemsPerPage),
+                              salesPage + 1
+                            )
+                          )
+                        }
+                        disabled={
+                          salesPage >= getTotalPages(sales.length, itemsPerPage)
+                        }
+                      >
+                        <ChevronRight
+                          size={20}
+                          color={
+                            salesPage >=
+                            getTotalPages(sales.length, itemsPerPage)
+                              ? "#94A3B8"
+                              : "#1E293B"
+                          }
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.noSales}>
+                  <TrendingUp size={48} color="#94A3B8" />
+                  <Text style={styles.noSalesText}>No sales</Text>
+                  <Text style={styles.noSalesSubtext}>
+                    Sales will appear here once orders are confirmed
                   </Text>
                 </View>
               )}
@@ -1276,9 +1625,63 @@ export default function AdminScreen() {
                 </Text>
               </View>
               {debts.length > 0 ? (
-                debts.map((item) => (
-                  <View key={item.id}>{renderDebtItem({ item })}</View>
-                ))
+                <>
+                  {getPaginatedData(debts, debtsPage, itemsPerPage).map(
+                    (item) => (
+                      <View key={item.id}>{renderDebtItem({ item })}</View>
+                    )
+                  )}
+                  {getTotalPages(debts.length, itemsPerPage) > 1 && (
+                    <View style={styles.paginationContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.paginationButton,
+                          debtsPage === 1 && styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() => setDebtsPage(Math.max(1, debtsPage - 1))}
+                        disabled={debtsPage === 1}
+                      >
+                        <ChevronLeft
+                          size={20}
+                          color={debtsPage === 1 ? "#94A3B8" : "#1E293B"}
+                        />
+                      </TouchableOpacity>
+                      <Text style={styles.paginationText}>
+                        Page {debtsPage} of{" "}
+                        {getTotalPages(debts.length, itemsPerPage)}
+                      </Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.paginationButton,
+                          debtsPage >=
+                            getTotalPages(debts.length, itemsPerPage) &&
+                            styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          setDebtsPage(
+                            Math.min(
+                              getTotalPages(debts.length, itemsPerPage),
+                              debtsPage + 1
+                            )
+                          )
+                        }
+                        disabled={
+                          debtsPage >= getTotalPages(debts.length, itemsPerPage)
+                        }
+                      >
+                        <ChevronRight
+                          size={20}
+                          color={
+                            debtsPage >=
+                            getTotalPages(debts.length, itemsPerPage)
+                              ? "#94A3B8"
+                              : "#1E293B"
+                          }
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
               ) : (
                 <View style={styles.noSales}>
                   <AlertTriangle size={48} color="#22C55E" />
@@ -2846,6 +3249,12 @@ const styles = StyleSheet.create({
   },
 
   // Order Details Styles
+  orderDetailsSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
   orderDetailsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -3007,5 +3416,86 @@ const styles = StyleSheet.create({
     color: "#64748B",
     marginBottom: 8,
     marginTop: 4,
+  },
+  // Sales Details Styles
+  salesDetailsSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+  salesDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  salesDetailLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  salesDetailValue: {
+    fontSize: 12,
+    color: "#1E293B",
+    fontWeight: "600",
+  },
+  // Payment History Styles
+  paymentHistorySection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+  paymentHistoryTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E293B",
+    marginBottom: 8,
+  },
+  paymentHistoryItem: {
+    marginBottom: 4,
+  },
+  paymentHistoryText: {
+    fontSize: 12,
+    color: "#64748B",
+    marginLeft: 8,
+  },
+  // Pagination Styles
+  paginationContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 20,
+    gap: 16,
+    paddingHorizontal: 16,
+  },
+  paginationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  paginationButtonDisabled: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    opacity: 0.5,
+  },
+  paginationText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E293B",
+    minWidth: 100,
+    textAlign: "center",
   },
 });

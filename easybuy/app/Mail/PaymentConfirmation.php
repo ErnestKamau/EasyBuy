@@ -31,7 +31,7 @@ class PaymentConfirmation extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Payment Confirmation - ' . $this->payment->payment_number,
+            subject: 'Payment Received - Invoice ' . $this->sale->sale_number . ' - ' . $this->payment->payment_number,
         );
     }
 
@@ -55,6 +55,20 @@ class PaymentConfirmation extends Mailable
      */
     public function attachments(): array
     {
-        return [];
+        $attachments = [];
+        
+        // Attach receipt/invoice if generated
+        if ($this->sale->receipt_generated) {
+            $filename = "{$this->sale->sale_number}.pdf";
+            $receiptPath = "receipts/{$filename}";
+            
+            if (\Storage::disk('local')->exists($receiptPath)) {
+                $attachments[] = \Illuminate\Mail\Mailables\Attachment::fromStorageDisk('local', $receiptPath)
+                    ->as("receipt-{$this->sale->sale_number}.pdf")
+                    ->withMime('application/pdf');
+            }
+        }
+        
+        return $attachments;
     }
 }

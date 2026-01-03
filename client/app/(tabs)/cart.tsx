@@ -290,22 +290,39 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
     },
 });
 
+// Weight increment function: 0 → 0.5kg → 1kg → 1.5kg → 2kg → 2.5kg...
+const getNextWeight = (currentWeight: number, increment: boolean): number => {
+  if (increment) {
+    if (currentWeight === 0) return 0.5;
+    return currentWeight + 0.5;
+  } else {
+    if (currentWeight <= 0.5) return 0;
+    return currentWeight - 0.5;
+  }
+};
+
+// Format weight as fraction: 1/2KG, 1KG, 1 1/2KG, 2KG...
+const formatWeightAsFraction = (weight: number): string => {
+  if (weight === 0) return "0KG";
+  
+  const whole = Math.floor(weight);
+  const decimal = weight - whole;
+  
+  if (decimal === 0) {
+    return `${whole}KG`;
+  } else if (decimal === 0.5) {
+    if (whole === 0) {
+      return "1/2KG";
+    } else {
+      return `${whole} 1/2KG`;
+    }
+  }
+  
+  return `${weight}KG`;
+};
+
 // Helper function for quantity changes
 const useCartHandlers = (state: any, updateItem: any, removeItem: any, clearCart: any, setIsCheckingOut: any) => {
-  const handleQuantityChange = (itemId: string, currentQuantity: number, change: number, weight?: number) => {
-    const newQuantity = currentQuantity + change;
-    if (newQuantity <= 0) {
-      handleRemoveItem(itemId);
-    } else {
-      updateItem(itemId, newQuantity, weight);
-    }
-  };
-
-  const handleWeightChange = (itemId: string, currentQuantity: number, currentWeight: number, change: number) => {
-    const newWeight = Math.max(0.25, currentWeight + change);
-    updateItem(itemId, currentQuantity, newWeight);
-  };
-
   const handleRemoveItem = (itemId: string) => {
     Alert.alert(
       'Remove Item',
@@ -322,6 +339,28 @@ const useCartHandlers = (state: any, updateItem: any, removeItem: any, clearCart
         },
       ]
     );
+  };
+
+  const handleQuantityChange = (itemId: string, currentQuantity: number, change: number, weight?: number) => {
+    const newQuantity = currentQuantity + change;
+    if (newQuantity <= 0) {
+      handleRemoveItem(itemId);
+    } else {
+      updateItem(itemId, newQuantity, weight);
+    }
+  };
+
+  const handleWeightChange = (itemId: string, currentQuantity: number, currentWeight: number, increment: boolean, maxWeight?: number) => {
+    const newWeight = getNextWeight(currentWeight, increment);
+    // If weight reaches 0, remove the item from cart
+    if (newWeight <= 0) {
+      handleRemoveItem(itemId);
+      return;
+    }
+    // Check if new weight is within bounds (0 to maxWeight)
+    if (newWeight > 0 && (!maxWeight || newWeight <= maxWeight)) {
+      updateItem(itemId, currentQuantity, newWeight);
+    }
   };
 
   const handleClearCart = () => {
@@ -406,7 +445,7 @@ export default function CartScreen(): React.ReactElement {
           <Text style={dynamicStyles.itemCategory}>{item.product.category_name}</Text>
           
           {isWeightBased && (
-            <Text style={dynamicStyles.itemWeight}>{item.weight}kg</Text>
+            <Text style={dynamicStyles.itemWeight}>{formatWeightAsFraction(item.weight)}</Text>
           )}
           
           <View style={styles.itemPriceRow}>
@@ -429,18 +468,19 @@ export default function CartScreen(): React.ReactElement {
             {isWeightBased ? (
               <>
                 <TouchableOpacity
-                  style={[dynamicStyles.quantityButton, item.weight <= 0.25 && dynamicStyles.disabledButton]}
-                  onPress={() => handleWeightChange(item.id, item.quantity, item.weight, -0.25)}
-                  disabled={item.weight <= 0.25}
+                  style={[dynamicStyles.quantityButton, item.weight <= 0 && dynamicStyles.disabledButton]}
+                  onPress={() => handleWeightChange(item.id, item.quantity, item.weight, false, item.product.in_stock)}
+                  disabled={item.weight <= 0}
                 >
-                  <Minus size={14} color={item.weight <= 0.25 ? currentTheme.textSecondary : currentTheme.text} />
+                  <Minus size={14} color={item.weight <= 0 ? currentTheme.textSecondary : currentTheme.text} />
                 </TouchableOpacity>
-                <Text style={dynamicStyles.quantityText}>{item.weight}kg</Text>
+                <Text style={dynamicStyles.quantityText}>{formatWeightAsFraction(item.weight)}</Text>
                 <TouchableOpacity
-                  style={dynamicStyles.quantityButton}
-                  onPress={() => handleWeightChange(item.id, item.quantity, item.weight, 0.25)}
+                  style={[dynamicStyles.quantityButton, item.weight >= (item.product.in_stock || 0) && dynamicStyles.disabledButton]}
+                  onPress={() => handleWeightChange(item.id, item.quantity, item.weight, true, item.product.in_stock)}
+                  disabled={item.weight >= (item.product.in_stock || 0)}
                 >
-                  <Plus size={14} color={currentTheme.text} />
+                  <Plus size={14} color={item.weight >= (item.product.in_stock || 0) ? currentTheme.textSecondary : currentTheme.text} />
                 </TouchableOpacity>
               </>
             ) : (

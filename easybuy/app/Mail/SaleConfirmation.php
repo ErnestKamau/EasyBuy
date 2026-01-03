@@ -31,7 +31,7 @@ class SaleConfirmation extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Sale Confirmation - ' . $this->sale->sale_number,
+            subject: 'Invoice - ' . $this->sale->sale_number,
         );
     }
 
@@ -61,10 +61,10 @@ class SaleConfirmation extends Mailable
             $filename = "{$this->sale->sale_number}.pdf";
             $receiptPath = "receipts/{$filename}";
             
-            // Check if file exists in storage (using default disk, same as ReceiptService)
-            if (Storage::exists($receiptPath)) {
-                $attachments[] = Attachment::fromStorage($receiptPath)
-                    ->as("receipt-{$this->sale->sale_number}.pdf")
+            // Check if file exists in storage (using local disk, same as ReceiptService)
+            if (Storage::disk('local')->exists($receiptPath)) {
+                $attachments[] = Attachment::fromStorageDisk('local', $receiptPath)
+                    ->as("invoice-{$this->sale->sale_number}.pdf")
                     ->withMime('application/pdf');
             }
         }

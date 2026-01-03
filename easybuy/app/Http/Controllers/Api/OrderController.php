@@ -18,7 +18,7 @@ class OrderController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Order::with(['user', 'items.product']);
+        $query = Order::with(['user', 'items.product', 'sale.payments']);
 
         // Status filters
         if ($request->has('order_status')) {
@@ -73,8 +73,9 @@ class OrderController extends Controller
             'user_id' => 'nullable|exists:users,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required_without:items.*.kilogram|integer|min:1',
-            'items.*.kilogram' => 'required_without:items.*.quantity|numeric|min:0.001',
+            'items.*.quantity' => 'nullable|integer|min:1',
+            'items.*.kilogram' => 'nullable|numeric|min:0.001',
+            'items.*.weight' => 'nullable|numeric|min:0.001', // Frontend sends 'weight', backend uses 'kilogram'
             'payment_status' => 'sometimes|in:pending,paid,debt,failed',
             'notes' => 'nullable|string',
         ]);
@@ -90,23 +91,35 @@ class OrderController extends Controller
             foreach ($validated['items'] as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
 
+                // Map 'weight' to 'kilogram' if provided (frontend sends 'weight', backend uses 'kilogram')
+                $kilogram = isset($itemData['kilogram']) ? $itemData['kilogram'] : (isset($itemData['weight']) ? $itemData['weight'] : null);
+                $quantity = $itemData['quantity'] ?? null;
+
+                // Validate that either quantity or kilogram/weight is provided
+                if (!$kilogram && !$quantity) {
+                    throw new \InvalidArgumentException('Each item must have either quantity or weight/kilogram');
+                }
+
                 // Check stock availability
-                if (isset($itemData['quantity'])) {
-                    if ($product->in_stock < $itemData['quantity']) {
+                if ($kilogram) {
+                    // Weight-based product - check if we have enough stock (decimal comparison)
+                    $kilogramValue = (float) $kilogram;
+                    $currentStock = (float) $product->in_stock;
+                    if ($currentStock < $kilogramValue) {
                         throw new InsufficientStockException($product->name);
                     }
-                } elseif (isset($itemData['kilogram'])) {
-                    // For items sold by weight, check if we have enough stock (decimal comparison)
-                    if ($product->in_stock < $itemData['kilogram']) {
+                } elseif ($quantity) {
+                    // Quantity-based product
+                    if ($product->in_stock < $quantity) {
                         throw new InsufficientStockException($product->name);
                     }
                 }
 
                 $order->items()->create([
                     'product_id' => $itemData['product_id'],
-                    'quantity' => $itemData['quantity'] ?? 0,
-                    'kilogram' => $itemData['kilogram'] ?? null,
-                    'unit_price' => $product->sale_price,
+                    'quantity' => $kilogram ? 1 : ($quantity ?? 0), // For weight-based, quantity is always 1
+                    'kilogram' => $kilogram ? (float) $kilogram : null,
+                    'unit_price' => $product->sale_price, // sale_price is price per kg for weight-based products
                 ]);
             }
 
@@ -202,9 +215,17 @@ class OrderController extends Controller
                     $product = $item->product;
                     if ($item->kilogram) {
                         // For items sold by weight, restore with decimal precision
-                        $product->update(['in_stock' => $product->in_stock + $item->kilogram]);
+                        $kilogramValue = (float) $item->kilogram;
+                        $currentStock = (float) $product->in_stock;
+                        $newStock = $currentStock + $kilogramValue;
+                        $product->in_stock = round($newStock, 3); // Round to 3 decimal places
+                        $product->save();
                     } else {
-                        $product->update(['in_stock' => $product->in_stock + $item->quantity]);
+                        // For quantity-based products
+                        $currentStock = (float) $product->in_stock;
+                        $newStock = $currentStock + (float) $item->quantity;
+                        $product->in_stock = round($newStock, 3);
+                        $product->save();
                     }
                 }
             }

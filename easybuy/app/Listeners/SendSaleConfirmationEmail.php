@@ -39,8 +39,15 @@ class SendSaleConfirmationEmail implements ShouldQueue
         }
         
         // Send email to customer if email exists
-        if ($sale->customer_email) {
-            Mail::to($sale->customer_email)->send(new SaleConfirmation($sale));
+        $customerEmail = $sale->customer_email;
+        if ($customerEmail) {
+            Mail::to($customerEmail)->send(new SaleConfirmation($sale));
+        }
+        
+        // Send copy to admin (only if different from customer email to avoid duplicates)
+        $adminEmail = config('app.admin_email');
+        if ($adminEmail && $adminEmail !== $customerEmail) {
+            Mail::to($adminEmail)->send(new SaleConfirmation($sale));
         }
     }
 }
