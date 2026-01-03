@@ -34,10 +34,9 @@ const initialState: CartState = {
 };
 
 const calculateSubtotal = (product: Product, quantity: number, weight?: number): number => {
-  if (product.kilograms && weight) {
-    // For weight-based products, calculate based on selected weight
-    const pricePerKg = product.sale_price / (product.kilograms || 1);
-    return pricePerKg * weight;
+  if (product.kilograms_in_stock && weight) {
+    // For weight-based products: sale_price is price per kg, multiply by weight
+    return product.sale_price * weight;
   }
   return product.sale_price * quantity;
 };

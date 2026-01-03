@@ -473,8 +473,8 @@ export default function HomeScreen() {
           </Text>
           <Text style={dynamicStyles.productCategory}>{item.category_name}</Text>
 
-          {item.kilograms && (
-            <Text style={dynamicStyles.productWeight}>{item.kilograms}kg</Text>
+          {item.kilograms_in_stock && (
+            <Text style={dynamicStyles.productWeight}>{item.kilograms_in_stock}kg in stock</Text>
           )}
 
           <View style={styles.priceRow}>
@@ -489,7 +489,7 @@ export default function HomeScreen() {
               <Text
                 style={[
                   dynamicStyles.stockText,
-                  item.in_stock <= item.minimum_stock && { color: currentTheme.error },
+                  item.minimum_stock && item.in_stock <= item.minimum_stock && { color: currentTheme.error },
                 ]}
               >
                 {item.in_stock > 0
@@ -506,8 +506,8 @@ export default function HomeScreen() {
               onPress={(e) => {
                 e.stopPropagation();
                 if (item.in_stock > 0) {
-                  const weightToUse = item.kilograms ? 0.5 : undefined;
-                  const quantityToUse = item.kilograms ? 1 : 1;
+                  const weightToUse = item.kilograms_in_stock ? 0.5 : undefined;
+                  const quantityToUse = item.kilograms_in_stock ? 1 : 1;
                   addItem(item, quantityToUse, weightToUse);
                   ToastService.showSuccess(
                     'Added to Cart',

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -76,13 +77,19 @@ class ProductController extends Controller
             'image_url' => 'nullable|string|max:500|url',
             'category_id' => 'required|exists:categories,id',
             'description' => 'nullable|string',
-            'kilograms' => 'nullable|numeric|min:0.001',
+            'kilograms_in_stock' => 'nullable|numeric|min:0.001',
             'cost_price' => 'required|numeric|min:0',
             'sale_price' => 'required|numeric|min:0',
-            'in_stock' => 'integer|min:0',
-            'minimum_stock' => 'integer|min:0',
+            'in_stock' => 'required|numeric|min:0',
+            'minimum_stock' => 'nullable|numeric|min:0',
             'is_active' => 'boolean',
         ]);
+
+        // For kilogram mode: both kilograms_in_stock and minimum_stock are allowed
+        // - kilograms_in_stock: current stock amount in kg
+        // - minimum_stock: minimum kg threshold for low stock alerts
+        // For quantity mode: only minimum_stock is used (minimum quantity threshold)
+        // No mutual exclusivity validation needed - both fields can coexist
 
         $product = Product::create($validated);
         $product->load('category');
@@ -104,13 +111,19 @@ class ProductController extends Controller
             'image_url' => 'nullable|string|max:500|url',
             'category_id' => 'sometimes|exists:categories,id',
             'description' => 'nullable|string',
-            'kilograms' => 'nullable|numeric|min:0.001',
+            'kilograms_in_stock' => 'nullable|numeric|min:0.001',
             'cost_price' => 'sometimes|numeric|min:0',
             'sale_price' => 'sometimes|numeric|min:0',
-            'in_stock' => 'sometimes|integer|min:0',
-            'minimum_stock' => 'sometimes|integer|min:0',
+            'in_stock' => 'sometimes|numeric|min:0',
+            'minimum_stock' => 'nullable|numeric|min:0',
             'is_active' => 'boolean',
         ]);
+
+        // For kilogram mode: both kilograms_in_stock and minimum_stock are allowed
+        // - kilograms_in_stock: current stock amount in kg
+        // - minimum_stock: minimum kg threshold for low stock alerts
+        // For quantity mode: only minimum_stock is used (minimum quantity threshold)
+        // No mutual exclusivity validation needed - both fields can coexist
 
         $product->update($validated);
         $product->load('category');
@@ -156,4 +169,3 @@ class ProductController extends Controller
         ]);
     }
 }
-

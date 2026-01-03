@@ -115,17 +115,18 @@ class Order extends Model
         foreach ($this->items as $item) {
             $product = $item->product;
             if ($item->kilogram) {
-                // For items sold by weight, we need to check if we have enough stock
-                // Note: in_stock is integer, so we compare as integer
-                if ($product->in_stock < (int) ceil($item->kilogram)) {
+                // For items sold by weight, check if we have enough stock (decimal comparison)
+                if ($product->in_stock < $item->kilogram) {
                     throw new InsufficientStockException($product->name);
                 }
-                $product->decrement('in_stock', (int) ceil($item->kilogram));
+                // Decrement with decimal precision
+                $product->update(['in_stock' => $product->in_stock - $item->kilogram]);
             } else {
+                // For quantity-based products
                 if ($product->in_stock < $item->quantity) {
                     throw new InsufficientStockException($product->name);
                 }
-                $product->decrement('in_stock', $item->quantity);
+                $product->update(['in_stock' => $product->in_stock - $item->quantity]);
             }
         }
 

@@ -1077,6 +1077,7 @@ const EmailVerificationScreen = ({
           loop={true}
           fallbackIcon={Mail}
           fallbackColor={styles.iconColor}
+          
         />
       </View>
     </View>

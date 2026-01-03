@@ -90,11 +90,11 @@ export interface Product {
   category: number;
   category_name: string;
   description: string;
-  kilograms?: number | null;
+  kilograms_in_stock?: number | null;
   sale_price: number;
   cost_price: number;
   in_stock: number;
-  minimum_stock: number;
+  minimum_stock?: number | null;
   is_active: boolean;
   profit_margin: number;
   is_low_stock: boolean;

@@ -96,9 +96,8 @@ class OrderController extends Controller
                         throw new InsufficientStockException($product->name);
                     }
                 } elseif (isset($itemData['kilogram'])) {
-                    // For items sold by weight, check if we have enough stock
-                    // Note: in_stock is integer, so we compare as integer
-                    if ($product->in_stock < (int) ceil($itemData['kilogram'])) {
+                    // For items sold by weight, check if we have enough stock (decimal comparison)
+                    if ($product->in_stock < $itemData['kilogram']) {
                         throw new InsufficientStockException($product->name);
                     }
                 }
@@ -202,10 +201,10 @@ class OrderController extends Controller
                 foreach ($order->items as $item) {
                     $product = $item->product;
                     if ($item->kilogram) {
-                        // For items sold by weight, restore the integer equivalent
-                        $product->increment('in_stock', (int) ceil($item->kilogram));
+                        // For items sold by weight, restore with decimal precision
+                        $product->update(['in_stock' => $product->in_stock + $item->kilogram]);
                     } else {
-                        $product->increment('in_stock', $item->quantity);
+                        $product->update(['in_stock' => $product->in_stock + $item->quantity]);
                     }
                 }
             }

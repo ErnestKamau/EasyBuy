@@ -105,12 +105,16 @@ export default function AdminScreen() {
     image_url: "",
     image_uri: null as string | null,
     category: "",
-    kilograms: "",
+    measurementType: "quantity" as "quantity" | "kilogram",
+    kilograms_in_stock: "",
     sale_price: "",
     cost_price: "",
     in_stock: "",
     minimum_stock: "",
   });
+  const [productFormErrors, setProductFormErrors] = useState<
+    Record<string, string>
+  >({});
   const [paymentForm, setPaymentForm] = useState({
     method: "cash",
     amount: "",
@@ -203,6 +207,8 @@ export default function AdminScreen() {
 
   // Product Management
   const openProductModal = (product?: Product) => {
+    setProductFormErrors({}); // Clear errors
+
     if (product) {
       setEditingProduct(product);
 
@@ -212,24 +218,25 @@ export default function AdminScreen() {
       );
       const categoryValue = categoryExists ? product.category.toString() : "";
 
-      if (!categoryExists && product.category) {
-        ToastService.showError(
-          "Category Not Found",
-          "The product's category no longer exists. Please select a new category."
-        );
-      }
+      // Determine measurement type based on product
+      const measurementType =
+        product.kilograms_in_stock !== null &&
+        product.kilograms_in_stock !== undefined
+          ? "kilogram"
+          : "quantity";
 
       setProductForm({
         name: product.name,
-        description: product.description,
-        image_url: product.image_url,
+        description: product.description || "",
+        image_url: product.image_url || "",
         image_uri: null,
         category: categoryValue,
-        kilograms: product.kilograms?.toString() || "",
+        measurementType,
+        kilograms_in_stock: product.kilograms_in_stock?.toString() || "",
         sale_price: product.sale_price.toString(),
         cost_price: product.cost_price.toString(),
         in_stock: product.in_stock.toString(),
-        minimum_stock: product.minimum_stock.toString(),
+        minimum_stock: product.minimum_stock?.toString() || "",
       });
     } else {
       setEditingProduct(null);
@@ -239,7 +246,8 @@ export default function AdminScreen() {
         image_url: "",
         image_uri: null,
         category: "",
-        kilograms: "",
+        measurementType: "quantity",
+        kilograms_in_stock: "",
         sale_price: "",
         cost_price: "",
         in_stock: "",
@@ -278,17 +286,59 @@ export default function AdminScreen() {
   };
 
   const saveProductForm = async () => {
+    // Clear previous errors
+    setProductFormErrors({});
+    const errors: Record<string, string> = {};
+
     // Validation
-    if (
-      !productForm.name.trim() ||
-      !productForm.category ||
-      !productForm.sale_price ||
-      !productForm.cost_price
-    ) {
-      ToastService.showError(
-        "Validation Error",
-        "Please fill in all required fields"
-      );
+    if (!productForm.name.trim()) {
+      errors.name = "Product name is required";
+    }
+
+    if (!productForm.category) {
+      errors.category = "Category not selected";
+    }
+
+    if (!productForm.sale_price || parseFloat(productForm.sale_price) <= 0) {
+      errors.sale_price =
+        productForm.measurementType === "kilogram"
+          ? "Price per kg is required"
+          : "Price per unit is required";
+    }
+
+    if (!productForm.cost_price || parseFloat(productForm.cost_price) <= 0) {
+      errors.cost_price = "Cost price is required";
+    }
+
+    if (!productForm.in_stock || parseFloat(productForm.in_stock) < 0) {
+      errors.in_stock = "Stock amount is required";
+    }
+
+    // Measurement type specific validation
+    if (productForm.measurementType === "kilogram") {
+      if (
+        !productForm.kilograms_in_stock ||
+        parseFloat(productForm.kilograms_in_stock) <= 0
+      ) {
+        errors.kilograms_in_stock = "Stock amount (kg) is required";
+      }
+      if (
+        !productForm.minimum_stock ||
+        parseFloat(productForm.minimum_stock) <= 0
+      ) {
+        errors.minimum_stock = "Minimum kg threshold is required";
+      }
+    } else {
+      if (
+        !productForm.minimum_stock ||
+        parseFloat(productForm.minimum_stock) <= 0
+      ) {
+        errors.minimum_stock = "Minimum stock level is required";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setProductFormErrors(errors);
       return;
     }
 
@@ -303,44 +353,47 @@ export default function AdminScreen() {
         try {
           imageUrl = await productsApi.uploadImage(productForm.image_uri);
         } catch (uploadError) {
-          ToastService.showApiError(uploadError, "Failed to upload image");
+          setProductFormErrors({ image: "Failed to upload image" });
           return;
         }
       }
 
       const categoryId = parseInt(productForm.category);
       if (Number.isNaN(categoryId) || !productForm.category) {
-        ToastService.showError(
-          "Validation Error",
-          "Please select a valid category"
-        );
+        setProductFormErrors({ category: "Please select a valid category" });
         return;
       }
 
       // Verify the category exists in the categories list
       const categoryExists = categories.some((cat) => cat.id === categoryId);
       if (!categoryExists) {
-        ToastService.showError(
-          "Validation Error",
-          "Selected category is invalid or no longer exists"
-        );
+        setProductFormErrors({
+          category: "Selected category is invalid or no longer exists",
+        });
         return;
       }
 
       const productData: any = {
-        name: productForm.name,
-        description: productForm.description,
+        name: productForm.name.trim(),
+        description: productForm.description || undefined,
         image_url: imageUrl || undefined,
         category_id: categoryId,
-        kilograms: productForm.kilograms
-          ? parseFloat(productForm.kilograms)
-          : null,
         sale_price: parseFloat(productForm.sale_price),
         cost_price: parseFloat(productForm.cost_price),
-        in_stock: parseInt(productForm.in_stock) || 0,
-        minimum_stock: parseInt(productForm.minimum_stock) || 5,
+        in_stock: parseFloat(productForm.in_stock),
         is_active: true,
       };
+
+      // Handle mutual exclusivity
+      if (productForm.measurementType === "kilogram") {
+        productData.kilograms_in_stock = parseFloat(
+          productForm.kilograms_in_stock
+        );
+        productData.minimum_stock = parseFloat(productForm.minimum_stock); // Minimum kg threshold
+      } else {
+        productData.kilograms_in_stock = null;
+        productData.minimum_stock = parseFloat(productForm.minimum_stock);
+      }
 
       if (editingProduct) {
         await productsApi.updateProduct(editingProduct.id, productData);
@@ -351,9 +404,21 @@ export default function AdminScreen() {
       }
 
       setShowProductModal(false);
+      setProductFormErrors({});
       loadAdminData();
-    } catch (error) {
-      ToastService.showApiError(error, "Failed to save product");
+    } catch (error: any) {
+      // Handle API validation errors
+      if (error.response?.data?.errors) {
+        const apiErrors: Record<string, string> = {};
+        Object.keys(error.response.data.errors).forEach((key) => {
+          apiErrors[key] = error.response.data.errors[key][0];
+        });
+        setProductFormErrors(apiErrors);
+      } else {
+        setProductFormErrors({
+          general: error.message || "Failed to save product",
+        });
+      }
     }
   };
 
@@ -1313,15 +1378,90 @@ export default function AdminScreen() {
               </View>
 
               <View style={styles.formContainer}>
+                {/* Error Display */}
+                {productFormErrors.general && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>
+                      {productFormErrors.general}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Measurement Type Segmented Control */}
+                <Text style={styles.fieldLabel}>Measurement Type *</Text>
+                <View style={styles.segmentedControl}>
+                  <TouchableOpacity
+                    style={[
+                      styles.segmentedButton,
+                      productForm.measurementType === "quantity" &&
+                        styles.segmentedButtonActive,
+                    ]}
+                    onPress={() => {
+                      setProductForm({
+                        ...productForm,
+                        measurementType: "quantity",
+                        kilograms_in_stock: "",
+                      });
+                      setProductFormErrors({});
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentedButtonText,
+                        productForm.measurementType === "quantity" &&
+                          styles.segmentedButtonTextActive,
+                      ]}
+                    >
+                      Quantity
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.segmentedButton,
+                      productForm.measurementType === "kilogram" &&
+                        styles.segmentedButtonActive,
+                    ]}
+                    onPress={() => {
+                      setProductForm({
+                        ...productForm,
+                        measurementType: "kilogram",
+                        minimum_stock: "",
+                      });
+                      setProductFormErrors({});
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentedButtonText,
+                        productForm.measurementType === "kilogram" &&
+                          styles.segmentedButtonTextActive,
+                      ]}
+                    >
+                      Kilogram
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 <Text style={styles.fieldLabel}>Product Name *</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[
+                    styles.textInput,
+                    productFormErrors.name && styles.textInputError,
+                  ]}
                   placeholder="Enter product name"
                   value={productForm.name}
-                  onChangeText={(text) =>
-                    setProductForm({ ...productForm, name: text })
-                  }
+                  onChangeText={(text) => {
+                    setProductForm({ ...productForm, name: text });
+                    if (productFormErrors.name) {
+                      setProductFormErrors({ ...productFormErrors, name: "" });
+                    }
+                  }}
                 />
+                {productFormErrors.name && (
+                  <Text style={styles.fieldErrorText}>
+                    {productFormErrors.name}
+                  </Text>
+                )}
 
                 <Text style={styles.fieldLabel}>Description</Text>
                 <TextInput
@@ -1401,12 +1541,18 @@ export default function AdminScreen() {
                           productForm.category === category.id.toString() &&
                             styles.selectedCategoryOption,
                         ]}
-                        onPress={() =>
+                        onPress={() => {
                           setProductForm({
                             ...productForm,
                             category: category.id.toString(),
-                          })
-                        }
+                          });
+                          if (productFormErrors.category) {
+                            setProductFormErrors({
+                              ...productFormErrors,
+                              category: "",
+                            });
+                          }
+                        }}
                       >
                         <Text
                           style={[
@@ -1425,71 +1571,302 @@ export default function AdminScreen() {
                     </Text>
                   )}
                 </View>
+                {productFormErrors.category && (
+                  <Text style={styles.fieldErrorText}>
+                    {productFormErrors.category}
+                  </Text>
+                )}
 
-                <View style={styles.formRow}>
-                  <View style={styles.formColumn}>
-                    <Text style={styles.fieldLabel}>Weight (kg)</Text>
+                {productForm.measurementType === "kilogram" ? (
+                  <>
+                    {/* Kilogram Mode Fields */}
+                    <Text style={styles.fieldLabel}>Stock Amount (kg) *</Text>
                     <TextInput
-                      style={styles.textInput}
-                      placeholder="0.0"
-                      value={productForm.kilograms}
-                      onChangeText={(text) =>
-                        setProductForm({ ...productForm, kilograms: text })
-                      }
+                      style={[
+                        styles.textInput,
+                        productFormErrors.kilograms_in_stock &&
+                          styles.textInputError,
+                      ]}
+                      placeholder="e.g., 20"
+                      value={productForm.kilograms_in_stock}
+                      onChangeText={(text) => {
+                        setProductForm({
+                          ...productForm,
+                          kilograms_in_stock: text,
+                        });
+                        if (productFormErrors.kilograms_in_stock) {
+                          setProductFormErrors({
+                            ...productFormErrors,
+                            kilograms_in_stock: "",
+                          });
+                        }
+                      }}
                       keyboardType="decimal-pad"
                     />
-                  </View>
-                  <View style={styles.formColumn}>
-                    <Text style={styles.fieldLabel}>Sale Price *</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="0.00"
-                      value={productForm.sale_price}
-                      onChangeText={(text) =>
-                        setProductForm({ ...productForm, sale_price: text })
-                      }
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                </View>
+                    {productFormErrors.kilograms_in_stock && (
+                      <Text style={styles.fieldErrorText}>
+                        {productFormErrors.kilograms_in_stock}
+                      </Text>
+                    )}
 
-                <View style={styles.formRow}>
-                  <View style={styles.formColumn}>
-                    <Text style={styles.fieldLabel}>Cost Price *</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="0.00"
-                      value={productForm.cost_price}
-                      onChangeText={(text) =>
-                        setProductForm({ ...productForm, cost_price: text })
-                      }
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                  <View style={styles.formColumn}>
-                    <Text style={styles.fieldLabel}>In Stock</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="0"
-                      value={productForm.in_stock}
-                      onChangeText={(text) =>
-                        setProductForm({ ...productForm, in_stock: text })
-                      }
-                      keyboardType="number-pad"
-                    />
-                  </View>
-                </View>
+                    <View style={styles.formRow}>
+                      <View style={styles.formColumn}>
+                        <Text style={styles.fieldLabel}>Price per kg *</Text>
+                        <TextInput
+                          style={[
+                            styles.textInput,
+                            productFormErrors.sale_price &&
+                              styles.textInputError,
+                          ]}
+                          placeholder="0.00"
+                          value={productForm.sale_price}
+                          onChangeText={(text) => {
+                            setProductForm({
+                              ...productForm,
+                              sale_price: text,
+                            });
+                            if (productFormErrors.sale_price) {
+                              setProductFormErrors({
+                                ...productFormErrors,
+                                sale_price: "",
+                              });
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        {productFormErrors.sale_price && (
+                          <Text style={styles.fieldErrorText}>
+                            {productFormErrors.sale_price}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.formColumn}>
+                        <Text style={styles.fieldLabel}>
+                          Cost Price per kg *
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.textInput,
+                            productFormErrors.cost_price &&
+                              styles.textInputError,
+                          ]}
+                          placeholder="0.00"
+                          value={productForm.cost_price}
+                          onChangeText={(text) => {
+                            setProductForm({
+                              ...productForm,
+                              cost_price: text,
+                            });
+                            if (productFormErrors.cost_price) {
+                              setProductFormErrors({
+                                ...productFormErrors,
+                                cost_price: "",
+                              });
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        {productFormErrors.cost_price && (
+                          <Text style={styles.fieldErrorText}>
+                            {productFormErrors.cost_price}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
 
-                <Text style={styles.fieldLabel}>Minimum Stock Level</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="5"
-                  value={productForm.minimum_stock}
-                  onChangeText={(text) =>
-                    setProductForm({ ...productForm, minimum_stock: text })
-                  }
-                  keyboardType="number-pad"
-                />
+                    <View style={styles.formRow}>
+                      <View style={styles.formColumn}>
+                        <Text style={styles.fieldLabel}>
+                          Current Stock (kg) *
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.textInput,
+                            productFormErrors.in_stock && styles.textInputError,
+                          ]}
+                          placeholder="0.0"
+                          value={productForm.in_stock}
+                          onChangeText={(text) => {
+                            setProductForm({ ...productForm, in_stock: text });
+                            if (productFormErrors.in_stock) {
+                              setProductFormErrors({
+                                ...productFormErrors,
+                                in_stock: "",
+                              });
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        {productFormErrors.in_stock && (
+                          <Text style={styles.fieldErrorText}>
+                            {productFormErrors.in_stock}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.formColumn}>
+                        <Text style={styles.fieldLabel}>
+                          Minimum kg Threshold *
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.textInput,
+                            productFormErrors.minimum_stock &&
+                              styles.textInputError,
+                          ]}
+                          placeholder="e.g., 5"
+                          value={productForm.minimum_stock}
+                          onChangeText={(text) => {
+                            setProductForm({
+                              ...productForm,
+                              minimum_stock: text,
+                            });
+                            if (productFormErrors.minimum_stock) {
+                              setProductFormErrors({
+                                ...productFormErrors,
+                                minimum_stock: "",
+                              });
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        {productFormErrors.minimum_stock && (
+                          <Text style={styles.fieldErrorText}>
+                            {productFormErrors.minimum_stock}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    {/* Quantity Mode Fields */}
+                    <View style={styles.formRow}>
+                      <View style={styles.formColumn}>
+                        <Text style={styles.fieldLabel}>Price per Unit *</Text>
+                        <TextInput
+                          style={[
+                            styles.textInput,
+                            productFormErrors.sale_price &&
+                              styles.textInputError,
+                          ]}
+                          placeholder="0.00"
+                          value={productForm.sale_price}
+                          onChangeText={(text) => {
+                            setProductForm({
+                              ...productForm,
+                              sale_price: text,
+                            });
+                            if (productFormErrors.sale_price) {
+                              setProductFormErrors({
+                                ...productFormErrors,
+                                sale_price: "",
+                              });
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        {productFormErrors.sale_price && (
+                          <Text style={styles.fieldErrorText}>
+                            {productFormErrors.sale_price}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.formColumn}>
+                        <Text style={styles.fieldLabel}>
+                          Cost Price per Unit *
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.textInput,
+                            productFormErrors.cost_price &&
+                              styles.textInputError,
+                          ]}
+                          placeholder="0.00"
+                          value={productForm.cost_price}
+                          onChangeText={(text) => {
+                            setProductForm({
+                              ...productForm,
+                              cost_price: text,
+                            });
+                            if (productFormErrors.cost_price) {
+                              setProductFormErrors({
+                                ...productFormErrors,
+                                cost_price: "",
+                              });
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        {productFormErrors.cost_price && (
+                          <Text style={styles.fieldErrorText}>
+                            {productFormErrors.cost_price}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+
+                    <View style={styles.formRow}>
+                      <View style={styles.formColumn}>
+                        <Text style={styles.fieldLabel}>In Stock *</Text>
+                        <TextInput
+                          style={[
+                            styles.textInput,
+                            productFormErrors.in_stock && styles.textInputError,
+                          ]}
+                          placeholder="0"
+                          value={productForm.in_stock}
+                          onChangeText={(text) => {
+                            setProductForm({ ...productForm, in_stock: text });
+                            if (productFormErrors.in_stock) {
+                              setProductFormErrors({
+                                ...productFormErrors,
+                                in_stock: "",
+                              });
+                            }
+                          }}
+                          keyboardType="number-pad"
+                        />
+                        {productFormErrors.in_stock && (
+                          <Text style={styles.fieldErrorText}>
+                            {productFormErrors.in_stock}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.formColumn}>
+                        <Text style={styles.fieldLabel}>
+                          Minimum Stock Level *
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.textInput,
+                            productFormErrors.minimum_stock &&
+                              styles.textInputError,
+                          ]}
+                          placeholder="5"
+                          value={productForm.minimum_stock}
+                          onChangeText={(text) => {
+                            setProductForm({
+                              ...productForm,
+                              minimum_stock: text,
+                            });
+                            if (productFormErrors.minimum_stock) {
+                              setProductFormErrors({
+                                ...productFormErrors,
+                                minimum_stock: "",
+                              });
+                            }
+                          }}
+                          keyboardType="number-pad"
+                        />
+                        {productFormErrors.minimum_stock && (
+                          <Text style={styles.fieldErrorText}>
+                            {productFormErrors.minimum_stock}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </>
+                )}
               </View>
 
               <View style={styles.modalActions}>
@@ -2070,6 +2447,60 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     textAlign: "center",
     padding: 16,
+  },
+  segmentedControl: {
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 12,
+  },
+  segmentedButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentedButtonActive: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentedButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  segmentedButtonTextActive: {
+    color: "#22C55E",
+  },
+  errorContainer: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FEE2E2",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    color: "#EF4444",
+    fontWeight: "500",
+  },
+  textInputError: {
+    borderColor: "#EF4444",
+    backgroundColor: "#FEF2F2",
+  },
+  fieldErrorText: {
+    fontSize: 12,
+    color: "#EF4444",
+    marginTop: 4,
+    marginBottom: 4,
   },
 
   // Modal Actions

@@ -298,13 +298,13 @@ const useProductActions = (product: Product | null, quantity: number, selectedWe
     }
 
     try {
-      const weightToUse = product.kilograms ? selectedWeight : undefined;
-      const quantityToUse = product.kilograms ? 1 : quantity;
+      const weightToUse = product.kilograms_in_stock ? selectedWeight : undefined;
+      const quantityToUse = product.kilograms_in_stock ? 1 : quantity;
       
       addItem(product, quantityToUse, weightToUse);
       
-      const weightText = weightToUse ? ` (${selectedWeight}kg)` : '';
-      const quantityText = product.kilograms ? '' : `${quantity}x `;
+      const weightText = weightToUse ? ` (${formatWeightAsFraction(selectedWeight)})` : '';
+      const quantityText = product.kilograms_in_stock ? '' : `${quantity}x `;
       
       ToastService.showSuccess(
         'Added to Cart', 
@@ -330,15 +330,35 @@ const useProductActions = (product: Product | null, quantity: number, selectedWe
   return { isFavorite, handleQuantityChange, addToCart, toggleFavorite, shareProduct };
 };
 
-// Weight increment function: 0.5kg -> 1kg -> 2kg -> 3kg -> 4kg...
+// Weight increment function: 0 → 0.5kg → 1kg → 1.5kg → 2kg → 2.5kg...
 const getNextWeight = (currentWeight: number, increment: boolean): number => {
   if (increment) {
-    if (currentWeight < 1) return 1;
-    return currentWeight + 1;
+    if (currentWeight === 0) return 0.5;
+    return currentWeight + 0.5;
   } else {
-    if (currentWeight <= 1) return 0.5;
-    if (currentWeight === 1.5) return 1;
-    return currentWeight - 1;
+    if (currentWeight <= 0.5) return 0;
+    return currentWeight - 0.5;
+  }
+};
+
+// Format weight as fraction: 1/2KG, 1KG, 1 1/2KG, 2KG...
+const formatWeightAsFraction = (weight: number): string => {
+  if (weight === 0) return "0KG";
+  
+  const wholePart = Math.floor(weight);
+  const decimalPart = weight - wholePart;
+  
+  if (decimalPart === 0) {
+    return `${wholePart}KG`;
+  } else if (decimalPart === 0.5) {
+    if (wholePart === 0) {
+      return "1/2KG";
+    } else {
+      return `${wholePart} 1/2KG`;
+    }
+  } else {
+    // Fallback for other decimal values (shouldn't happen with our increment logic)
+    return `${weight}KG`;
   }
 };
 
@@ -347,7 +367,7 @@ export default function ProductDetailScreen() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const [selectedWeight, setSelectedWeight] = useState<number>(0.5);
+  const [selectedWeight, setSelectedWeight] = useState<number>(0);
   const { addItem } = useCart();
   const { currentTheme, themeName } = useTheme();
 
@@ -366,8 +386,8 @@ export default function ProductDetailScreen() {
       setLoading(true);
       const productData = await productsApi.getProduct(Number(id));
       setProduct(productData);
-      if (productData.kilograms) {
-        setSelectedWeight(0.5);
+      if (productData.kilograms_in_stock) {
+        setSelectedWeight(0);
       }
     } catch (error) {
       ToastService.showApiError(error, 'Failed to load product');
@@ -383,10 +403,10 @@ export default function ProductDetailScreen() {
   };
 
   const handleWeightChange = (increment: boolean) => {
-    if (!product || !product.kilograms) return;
+    if (!product || !product.kilograms_in_stock) return;
     const newWeight = getNextWeight(selectedWeight, increment);
     const maxWeight = product.in_stock;
-    if (newWeight <= maxWeight && newWeight >= 0.5) {
+    if (newWeight <= maxWeight && newWeight >= 0) {
       setSelectedWeight(newWeight);
     }
   };
@@ -418,8 +438,8 @@ export default function ProductDetailScreen() {
   const discountPercent = hasDiscount ? 
     Math.round(((product.cost_price - product.sale_price) / product.cost_price) * 100) : 0;
   
-  const totalPrice = product.kilograms 
-    ? (product.sale_price * selectedWeight)
+  const totalPrice = product.kilograms_in_stock 
+    ? (product.sale_price * selectedWeight) // sale_price is price per kg
     : product.sale_price * quantity;
 
   return (
@@ -506,7 +526,7 @@ export default function ProductDetailScreen() {
               <Truck size={16} color={currentTheme.success} />
               <Text style={dynamicStyles.featureText}>Fast Delivery</Text>
             </View>
-            {product.kilograms && (
+            {product.kilograms_in_stock && (
               <View style={dynamicStyles.featureItem}>
                 <ShoppingCart size={16} color={currentTheme.success} />
                 <Text style={dynamicStyles.featureText}>Weight-based</Text>
@@ -564,21 +584,21 @@ export default function ProductDetailScreen() {
       </ScrollView>
 
       <View style={dynamicStyles.bottomBar}>
-        {product.kilograms ? (
+        {product.kilograms_in_stock ? (
           <View style={styles.weightContainer}>
-            <Text style={dynamicStyles.quantityLabel}>Weight (kg)</Text>
+            <Text style={dynamicStyles.quantityLabel}>Weight</Text>
             <View style={dynamicStyles.modernQuantityControls}>
               <TouchableOpacity 
                 style={[
                   dynamicStyles.modernQuantityButton, 
-                  selectedWeight <= 0.5 && dynamicStyles.disabledQuantityButton
+                  selectedWeight <= 0 && dynamicStyles.disabledQuantityButton
                 ]}
                 onPress={() => handleWeightChange(false)}
-                disabled={selectedWeight <= 0.5}
+                disabled={selectedWeight <= 0}
               >
-                <Minus size={14} color={selectedWeight <= 0.5 ? currentTheme.textSecondary : currentTheme.text} />
+                <Minus size={14} color={selectedWeight <= 0 ? currentTheme.textSecondary : currentTheme.text} />
               </TouchableOpacity>
-              <Text style={dynamicStyles.quantityValue}>{selectedWeight}kg</Text>
+              <Text style={dynamicStyles.quantityValue}>{formatWeightAsFraction(selectedWeight)}</Text>
               <TouchableOpacity 
                 style={[
                   dynamicStyles.modernQuantityButton,

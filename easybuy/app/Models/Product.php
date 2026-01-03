@@ -14,7 +14,7 @@ class Product extends Model
         'image_url',
         'category_id',
         'description',
-        'kilograms',
+        'kilograms_in_stock',
         'cost_price',
         'sale_price',
         'in_stock',
@@ -23,11 +23,11 @@ class Product extends Model
     ];
 
     protected $casts = [
-        'kilograms' => 'decimal:3',
+        'kilograms_in_stock' => 'decimal:3',
         'cost_price' => 'decimal:2',
         'sale_price' => 'decimal:2',
-        'in_stock' => 'integer',
-        'minimum_stock' => 'integer',
+        'in_stock' => 'decimal:3',
+        'minimum_stock' => 'decimal:3',
         'is_active' => 'boolean',
     ];
 
@@ -61,6 +61,7 @@ class Product extends Model
     public function scopeLowStock(Builder $query): Builder
     {
         return $query->whereColumn('in_stock', '<=', 'minimum_stock')
+            ->whereNotNull('minimum_stock')
             ->where('minimum_stock', '>', 0);
     }
 
@@ -69,7 +70,9 @@ class Product extends Model
      */
     public function isLowStock(): bool
     {
-        return $this->in_stock <= $this->minimum_stock && $this->minimum_stock > 0;
+        return $this->minimum_stock !== null 
+            && $this->minimum_stock > 0 
+            && $this->in_stock <= $this->minimum_stock;
     }
 
     /**

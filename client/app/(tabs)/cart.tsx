@@ -387,9 +387,9 @@ export default function CartScreen(): React.ReactElement {
   const { handleQuantityChange, handleWeightChange, handleRemoveItem, handleClearCart } = cartHandlers;
 
   const renderCartItem = (item: any) => {
-    const isWeightBased = item.product.kilograms && item.weight;
+    const isWeightBased = item.product.kilograms_in_stock && item.weight;
     const displayPrice = isWeightBased 
-      ? (item.product.sale_price / (item.product.kilograms || 1)) * (item.weight || 1)
+      ? item.product.sale_price * (item.weight || 1) // sale_price is price per kg
       : item.product.sale_price;
 
     return (
