@@ -250,10 +250,15 @@ export default function OrdersScreen(): React.ReactElement {
   };
 
   const getPaymentStatusBadgeStyle = (status: string) => {
-    if (status === "paid") {
+    if (status === "fully-paid") {
       return {
         backgroundColor: currentTheme.success + "20",
         color: currentTheme.success,
+      };
+    } else if (status === "partially-paid") {
+      return {
+        backgroundColor: currentTheme.warning + "20",
+        color: currentTheme.warning,
       };
     } else if (status === "pending") {
       return {
@@ -286,9 +291,35 @@ export default function OrdersScreen(): React.ReactElement {
     return timeString.substring(0, 5); // Format HH:MM
   };
 
+  const calculateOrderTotal = (order: Order): number => {
+    // Use total_amount if available and greater than 0
+    if (order.total_amount && order.total_amount > 0) {
+      return order.total_amount;
+    }
+    // Calculate from items
+    if (order.items && order.items.length > 0) {
+      return order.items.reduce((sum, item) => {
+        // Use subtotal if available
+        if (item.subtotal && item.subtotal > 0) {
+          return sum + item.subtotal;
+        }
+        // Calculate subtotal from unit_price and quantity/kilogram
+        const unitPrice = item.unit_price || 0;
+        if (item.kilogram && item.kilogram > 0) {
+          return sum + unitPrice * item.kilogram;
+        } else if (item.quantity && item.quantity > 0) {
+          return sum + unitPrice * item.quantity;
+        }
+        return sum;
+      }, 0);
+    }
+    return 0;
+  };
+
   const renderOrderCard = ({ item }: { item: Order }) => {
     const statusStyle = getStatusBadgeStyle(item.order_status);
     const paymentStyle = getPaymentStatusBadgeStyle(item.payment_status);
+    const orderTotal = calculateOrderTotal(item);
 
     return (
       <TouchableOpacity
@@ -330,9 +361,9 @@ export default function OrdersScreen(): React.ReactElement {
         </View>
 
         <View style={dynamicStyles.orderInfo}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={dynamicStyles.orderAmount}>
-              Ksh {item.total_amount?.toLocaleString() || "0"}
+              Ksh {orderTotal.toLocaleString()}
             </Text>
             <View style={dynamicStyles.paymentStatusContainer}>
               <View
@@ -347,7 +378,7 @@ export default function OrdersScreen(): React.ReactElement {
                     { color: paymentStyle.color },
                   ]}
                 >
-                  {item.payment_status}
+                  Payment: {item.payment_status.toUpperCase()}
                 </Text>
               </View>
               {item.items && item.items.length > 0 && (

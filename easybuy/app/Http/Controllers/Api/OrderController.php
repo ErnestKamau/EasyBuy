@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Events\OrderPlaced;
+use App\Events\OrderConfirmed;
+use App\Events\OrderCancelled;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -76,7 +79,7 @@ class OrderController extends Controller
             'items.*.quantity' => 'nullable|integer|min:1',
             'items.*.kilogram' => 'nullable|numeric|min:0.001',
             'items.*.weight' => 'nullable|numeric|min:0.001', // Frontend sends 'weight', backend uses 'kilogram'
-            'payment_status' => 'sometimes|in:pending,paid,debt,failed',
+            'payment_status' => 'sometimes|in:pending,fully-paid,partially-paid,debt,failed',
             'notes' => 'nullable|string',
         ]);
 
@@ -127,6 +130,9 @@ class OrderController extends Controller
 
             $order->load(['user', 'items.product']);
 
+            // Dispatch event for new order notification
+            event(new OrderPlaced($order));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Order created successfully',
@@ -157,7 +163,7 @@ class OrderController extends Controller
 
         $validated = $request->validate([
             'order_status' => 'sometimes|in:pending,confirmed,cancelled',
-            'payment_status' => 'sometimes|in:pending,paid,debt,failed',
+            'payment_status' => 'sometimes|in:pending,fully-paid,partially-paid,debt,failed',
             'notes' => 'nullable|string',
         ]);
 
@@ -235,6 +241,9 @@ class OrderController extends Controller
             DB::commit();
 
             $order->load(['user', 'items.product']);
+
+            // Dispatch event for order cancelled notification
+            event(new OrderCancelled($order));
 
             return response()->json([
                 'success' => true,

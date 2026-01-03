@@ -39,5 +39,36 @@ class AppServiceProvider extends ServiceProvider
             \App\Events\PaymentRefunded::class,
             \App\Listeners\SendRefundNotificationEmail::class
         );
+
+        // Notification listeners
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\OrderPlaced::class,
+            \App\Listeners\CreateOrderPlacedNotification::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\OrderConfirmed::class,
+            \App\Listeners\CreateOrderConfirmedNotification::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\OrderCancelled::class,
+            \App\Listeners\CreateOrderCancelledNotification::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\PaymentReceived::class,
+            \App\Listeners\CreatePaymentReceivedNotification::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\SaleFullyPaid::class,
+            \App\Listeners\CreateSaleFullyPaidNotification::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\PaymentRefunded::class,
+            \App\Listeners\CreateRefundProcessedNotification::class
+        );
     }
 }

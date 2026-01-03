@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\MpesaController;
 use App\Http\Controllers\Api\ImageController;
+use App\Http\Controllers\Api\NotificationController;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -98,6 +99,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/initiate', [MpesaController::class, 'initiateStkPush']);
         Route::get('/transactions', [MpesaController::class, 'transactions']);
         Route::get('/transactions/{mpesaTransaction}/verify', [MpesaController::class, 'verify']);
+    });
+
+    // Notifications
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('/{notification}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+        Route::delete('/{notification}', [NotificationController::class, 'destroy']);
+        Route::get('/preferences', [NotificationController::class, 'getPreferences']);
+        Route::post('/preferences', [NotificationController::class, 'updatePreference']);
+        Route::post('/device-token', [NotificationController::class, 'registerDeviceToken']);
+        Route::delete('/device-token', [NotificationController::class, 'unregisterDeviceToken']);
     });
 });
 

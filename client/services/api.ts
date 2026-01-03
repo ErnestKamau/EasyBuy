@@ -421,7 +421,7 @@ export interface Order {
   user_id?: number;
   user?: User;
   order_status: 'pending' | 'confirmed' | 'cancelled';
-  payment_status: 'pending' | 'paid' | 'debt' | 'failed';
+  payment_status: 'pending' | 'fully-paid' | 'partially-paid' | 'debt' | 'failed';
   order_date: string;
   order_time: string;
   notes?: string;
@@ -490,7 +490,7 @@ export const ordersApi = {
 
   async updateOrder(orderId: number, updates: {
     order_status?: 'pending' | 'confirmed' | 'cancelled';
-    payment_status?: 'pending' | 'paid' | 'debt' | 'failed';
+    payment_status?: 'pending' | 'fully-paid' | 'partially-paid' | 'debt' | 'failed';
     notes?: string;
   }): Promise<Order> {
     const { data } = await api.put<{ success: boolean; data: Order }>(`/orders/${orderId}`, updates);
@@ -782,3 +782,96 @@ export function handleApiError(error: any): string {
 
   return 'An unexpected error occurred';
 }
+
+// Notification interfaces
+export interface Notification {
+  id: number;
+  user_id?: number | null;
+  type: 'order_placed' | 'order_confirmed' | 'order_cancelled' | 'debt_warning_2days' | 'debt_warning_admin_2days' | 'debt_overdue' | 'debt_overdue_admin' | 'payment_received' | 'payment_received_admin' | 'sale_fully_paid' | 'low_stock_alert' | 'refund_processed' | 'new_product_available';
+  title: string;
+  message: string;
+  data?: Record<string, any>;
+  priority: 'low' | 'medium' | 'high';
+  read_at?: string | null;
+  archived_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationPreference {
+  id: number;
+  user_id: number;
+  type: string;
+  enabled: boolean;
+  push_enabled: boolean;
+}
+
+export interface DeviceToken {
+  id: number;
+  user_id: number;
+  device_token: string;
+  platform: 'ios' | 'android';
+}
+
+// Notifications API
+export const notificationsApi = {
+  async getNotifications(filters?: {
+    unread_only?: boolean;
+    per_page?: number;
+  }): Promise<{ data: Notification[]; current_page: number; last_page: number; total: number }> {
+    const params = new URLSearchParams();
+    if (filters?.unread_only) params.append('unread_only', 'true');
+    if (filters?.per_page) params.append('per_page', filters.per_page.toString());
+
+    const { data } = await api.get<{ success: boolean; data: { data: Notification[]; current_page: number; last_page: number; total: number } }>(`/notifications?${params.toString()}`);
+    return Array.isArray(data.data) 
+      ? { data: data.data, current_page: 1, last_page: 1, total: data.data.length }
+      : data.data;
+  },
+
+  async getUnreadCount(): Promise<number> {
+    const { data } = await api.get<{ success: boolean; data: { count: number } }>('/notifications/unread-count');
+    return data.data.count;
+  },
+
+  async markAsRead(notificationId: number): Promise<Notification> {
+    const { data } = await api.post<{ success: boolean; data: Notification }>(`/notifications/${notificationId}/read`);
+    return data.data;
+  },
+
+  async markAllAsRead(): Promise<void> {
+    await api.post('/notifications/mark-all-read');
+  },
+
+  async deleteNotification(notificationId: number): Promise<void> {
+    await api.delete(`/notifications/${notificationId}`);
+  },
+
+  async getPreferences(): Promise<NotificationPreference[]> {
+    const { data } = await api.get<{ success: boolean; data: NotificationPreference[] }>('/notifications/preferences');
+    return data.data;
+  },
+
+  async updatePreference(type: string, enabled?: boolean, pushEnabled?: boolean): Promise<NotificationPreference> {
+    const { data } = await api.post<{ success: boolean; data: NotificationPreference }>('/notifications/preferences', {
+      type,
+      enabled,
+      push_enabled: pushEnabled,
+    });
+    return data.data;
+  },
+
+  async registerDeviceToken(deviceToken: string, platform: 'ios' | 'android'): Promise<DeviceToken> {
+    const { data } = await api.post<{ success: boolean; data: DeviceToken }>('/notifications/device-token', {
+      device_token: deviceToken,
+      platform,
+    });
+    return data.data;
+  },
+
+  async unregisterDeviceToken(deviceToken: string): Promise<void> {
+    await api.delete('/notifications/device-token', {
+      data: { device_token: deviceToken },
+    });
+  },
+};

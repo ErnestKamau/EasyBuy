@@ -6,6 +6,8 @@ import { Pressable } from 'react-native';
 
 import { useCart } from '@/contexts/CartContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { View, Text } from 'react-native';
 
 // Extract TabBarIcon outside parent component to avoid recreation on each render
 function TabBarIcon(props: {
@@ -61,17 +63,46 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
           headerRight: () => (
             <Link href="/modal" asChild>
-              <Pressable>
+              <Pressable style={{ marginRight: 15, position: 'relative' }}>
                 {({ pressed }) => (
-                  <FontAwesome
-                    name="bell"
-                    size={25}
-                    color={currentTheme.text}
-                    style={{ 
-                      marginRight: 15, 
-                      opacity: pressed ? 0.5 : 1 
-                    }}
-                  />
+                  <>
+                    <FontAwesome
+                      name="bell"
+                      size={25}
+                      color={currentTheme.text}
+                      style={{ 
+                        opacity: pressed ? 0.5 : 1 
+                      }}
+                    />
+                    {unreadCount > 0 && (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: -4,
+                          right: -4,
+                          backgroundColor: currentTheme.error,
+                          borderRadius: 10,
+                          minWidth: 20,
+                          height: 20,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          paddingHorizontal: 6,
+                          borderWidth: 2,
+                          borderColor: currentTheme.surface,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: '#FFFFFF',
+                            fontSize: 11,
+                            fontWeight: '700',
+                          }}
+                        >
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </Text>
+                      </View>
+                    )}
+                  </>
                 )}
               </Pressable>
             </Link>

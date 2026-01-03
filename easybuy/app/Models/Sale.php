@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Carbon\Carbon;
+use App\Events\DebtOverdue;
 
 class Sale extends Model
 {
@@ -221,6 +222,7 @@ class Sale extends Model
         // Ensure total_paid is up to date
         $this->recalculateTotalPaid();
         $totalPaid = $this->total_paid;
+        $previousStatus = $this->payment_status;
 
         if ($totalPaid >= $this->total_amount) {
             $this->payment_status = 'fully-paid';
@@ -233,6 +235,61 @@ class Sale extends Model
         }
 
         $this->save();
+
+        // Dispatch overdue event if status changed to overdue
+        if ($this->payment_status === 'overdue' && $previousStatus !== 'overdue') {
+            event(new \App\Events\DebtOverdue($this, false)); // Customer
+            event(new \App\Events\DebtOverdue($this, true)); // Admin
+        }
+
+        // Sync payment status to related order
+        if ($this->order) {
+            $this->syncOrderPaymentStatus();
+        }
+    }
+
+    /**
+     * Sync payment status from sale to order
+     */
+    public function syncOrderPaymentStatus(): void
+    {
+        if (!$this->order) {
+            return;
+        }
+
+        // Map sale payment status to order payment status
+        $orderPaymentStatus = 'pending'; // Default value
+        switch ($this->payment_status) {
+            case 'no-payment':
+                // If sale has a due_date, it's a debt order - keep as 'debt'
+                // Otherwise, it's pending payment
+                if ($this->due_date) {
+                    $orderPaymentStatus = 'debt';
+                } else {
+                    $orderPaymentStatus = 'pending';
+                }
+                break;
+            case 'partial-payment':
+                $orderPaymentStatus = 'partially-paid';
+                break;
+            case 'fully-paid':
+                $orderPaymentStatus = 'fully-paid';
+                break;
+            case 'overdue':
+                // Overdue payments should show as 'debt' in orders
+                $orderPaymentStatus = 'debt';
+                break;
+            default:
+                // Default to pending for unknown statuses
+                $orderPaymentStatus = 'pending';
+                break;
+        }
+
+        // Only update if different to avoid unnecessary database writes
+        if ($this->order->payment_status !== $orderPaymentStatus) {
+            $this->order->payment_status = $orderPaymentStatus;
+            $this->order->save();
+        }
     }
 
     /**

@@ -14,22 +14,16 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
-import { ordersApi, Order, Sale, Payment } from '@/services/api';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { ordersApi, Order, Payment } from '@/services/api';
 import { ToastService } from '@/utils/toastService';
 import {
   ArrowLeft,
-  Package,
-  Calendar,
   Clock,
-  CreditCard,
   MapPin,
-  Truck,
   Phone,
   Mail,
   XCircle,
-  CheckCircle,
-  FileText,
-  ShoppingBag,
 } from 'lucide-react-native';
 
 // Helper function to create dynamic styles
@@ -274,6 +268,7 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
 export default function OrderDetailScreen(): React.ReactElement {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentTheme, themeName } = useTheme();
+  const { markOrderNotificationsAsRead } = useNotifications();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -288,8 +283,11 @@ export default function OrderDetailScreen(): React.ReactElement {
 
     try {
       setLoading(true);
-      const orderData = await ordersApi.getOrderDetails(parseInt(id));
+      const orderData = await ordersApi.getOrderDetails(Number.parseInt(id, 10));
       setOrder(orderData);
+      
+      // Mark related notifications as read when viewing order
+      await markOrderNotificationsAsRead(orderData.id);
     } catch (error) {
       console.error('Error fetching order details:', error);
       ToastService.showError('Error', 'Failed to load order details');
@@ -315,8 +313,9 @@ export default function OrderDetailScreen(): React.ReactElement {
               await ordersApi.cancelOrder(order.id);
               ToastService.showSuccess('Order Cancelled', 'Your order has been cancelled successfully');
               router.back();
-            } catch (error) {
-              ToastService.showError('Error', 'Failed to cancel order');
+            } catch (error: unknown) {
+              const errorMessage = error instanceof Error ? error.message : 'Failed to cancel order';
+              ToastService.showError('Error', errorMessage);
             }
           },
         },
@@ -352,10 +351,15 @@ export default function OrderDetailScreen(): React.ReactElement {
   };
 
   const getPaymentStatusBadgeStyle = (status: string) => {
-    if (status === 'paid') {
+    if (status === 'fully-paid') {
       return {
         backgroundColor: currentTheme.success + '20',
         color: currentTheme.success,
+      };
+    } else if (status === 'partially-paid') {
+      return {
+        backgroundColor: currentTheme.warning + '20',
+        color: currentTheme.warning,
       };
     } else if (status === 'pending') {
       return {
@@ -425,6 +429,31 @@ export default function OrderDetailScreen(): React.ReactElement {
   if (!order) {
     return null;
   }
+
+  // Calculate total from order items if total_amount is not available
+  const calculateOrderTotal = () => {
+    if (order.total_amount && order.total_amount > 0) {
+      return order.total_amount;
+    }
+    // Calculate from items
+    if (order.items && order.items.length > 0) {
+      return order.items.reduce((sum, item) => {
+        // Use subtotal if available, otherwise calculate it
+        if (item.subtotal && item.subtotal > 0) {
+          return sum + item.subtotal;
+        }
+        // Calculate subtotal from unit_price and quantity/kilogram
+        if (item.kilogram) {
+          return sum + (item.unit_price * item.kilogram);
+        } else {
+          return sum + (item.unit_price * item.quantity);
+        }
+      }, 0);
+    }
+    return 0;
+  };
+
+  const orderTotal = calculateOrderTotal();
 
   const statusStyle = getStatusBadgeStyle(order.order_status);
   const paymentStyle = getPaymentStatusBadgeStyle(order.payment_status);
@@ -519,7 +548,20 @@ export default function OrderDetailScreen(): React.ReactElement {
                     </Text>
                   )}
                   <Text style={dynamicStyles.itemPrice}>
-                    Ksh {item.subtotal?.toLocaleString()}
+                    Ksh {(() => {
+                      // Calculate item subtotal if not available
+                      if (item.subtotal && item.subtotal > 0) {
+                        return item.subtotal.toLocaleString();
+                      }
+                      // Calculate from unit_price and quantity/kilogram
+                      const unitPrice = item.unit_price || 0;
+                      if (item.kilogram && item.kilogram > 0) {
+                        return (unitPrice * item.kilogram).toLocaleString();
+                      } else if (item.quantity && item.quantity > 0) {
+                        return (unitPrice * item.quantity).toLocaleString();
+                      }
+                      return '0';
+                    })()}
                   </Text>
                 </View>
               </View>
@@ -534,14 +576,14 @@ export default function OrderDetailScreen(): React.ReactElement {
           <View style={dynamicStyles.summaryRow}>
             <Text style={dynamicStyles.summaryLabel}>Subtotal</Text>
             <Text style={dynamicStyles.summaryValue}>
-              Ksh {order.total_amount?.toLocaleString() || '0'}
+              Ksh {orderTotal.toLocaleString()}
             </Text>
           </View>
 
           <View style={dynamicStyles.totalRow}>
             <Text style={dynamicStyles.totalLabel}>Total</Text>
             <Text style={dynamicStyles.totalValue}>
-              Ksh {order.total_amount?.toLocaleString() || '0'}
+              Ksh {orderTotal.toLocaleString()}
             </Text>
           </View>
         </View>

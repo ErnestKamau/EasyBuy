@@ -54,6 +54,8 @@ import {
   Home,
   ChevronLeft,
   ChevronRight,
+  Search,
+  Filter,
 } from "lucide-react-native";
 
 export default function AdminScreen() {
@@ -86,6 +88,20 @@ export default function AdminScreen() {
   const [salesPage, setSalesPage] = useState(1);
   const [debtsPage, setDebtsPage] = useState(1);
   const itemsPerPage = 4;
+
+  // Search and Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    dateFrom: "",
+    dateTo: "",
+    timeFrom: "",
+    timeTo: "",
+    productId: "",
+    categoryId: "",
+    paymentStatus: "",
+    orderStatus: "",
+  });
 
   useEffect(() => {
     Animated.timing(sidebarAnimation, {
@@ -146,6 +162,13 @@ export default function AdminScreen() {
     setSalesPage(1);
     setDebtsPage(1);
   }, [activeTab]);
+
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setOrdersPage(1);
+    setSalesPage(1);
+    setDebtsPage(1);
+  }, [searchQuery, filters]);
 
   const loadAdminData = async () => {
     try {
@@ -503,7 +526,7 @@ export default function AdminScreen() {
       `Confirm order ${
         order.order_number || `#${order.id}`
       }?\n\nPayment Status: ${
-        paymentStatus === "paid"
+        paymentStatus === "fully-paid" || paymentStatus === "partially-paid"
           ? "Paid"
           : paymentStatus === "debt"
           ? "Debt"
@@ -794,7 +817,7 @@ export default function AdminScreen() {
           <View style={styles.debtDetailRow}>
             <Text style={styles.debtDetailLabel}>Created:</Text>
             <Text style={styles.debtDetailValue}>
-              {new Date(item.made_on).toLocaleDateString()}
+              {new Date(item.made_on).toLocaleString()}
             </Text>
           </View>
           {item.payments && item.payments.length > 0 && (
@@ -808,7 +831,7 @@ export default function AdminScreen() {
                       {payment.payment_number} -{" "}
                       {payment.payment_method.toUpperCase()} - KES{" "}
                       {payment.amount.toLocaleString()} -{" "}
-                      {new Date(payment.paid_at).toLocaleDateString()}
+                      {new Date(payment.paid_at).toLocaleString()}
                     </Text>
                   </View>
                 ))}
@@ -869,7 +892,7 @@ export default function AdminScreen() {
               {item.customer_name || "N/A"}
             </Text>
             <Text style={styles.saleDate}>
-              {new Date(item.made_on).toLocaleDateString()}
+              {new Date(item.made_on).toLocaleString()}
             </Text>
           </View>
           <View style={styles.salesAmount}>
@@ -917,9 +940,9 @@ export default function AdminScreen() {
             </Text>
           </View>
           <View style={styles.salesDetailRow}>
-            <Text style={styles.salesDetailLabel}>Sale Date:</Text>
+            <Text style={styles.salesDetailLabel}>Sale Date & Time:</Text>
             <Text style={styles.salesDetailValue}>
-              {new Date(item.made_on).toLocaleDateString()}
+              {new Date(item.made_on).toLocaleString()}
             </Text>
           </View>
           <View style={styles.salesDetailRow}>
@@ -962,7 +985,7 @@ export default function AdminScreen() {
                       {payment.payment_number} -{" "}
                       {payment.payment_method.toUpperCase()} - KES{" "}
                       {payment.amount.toLocaleString()} -{" "}
-                      {new Date(payment.paid_at).toLocaleDateString()}
+                      {new Date(payment.paid_at).toLocaleString()}
                     </Text>
                   </View>
                 ))}
@@ -993,8 +1016,10 @@ export default function AdminScreen() {
     const customerPhone = item.user?.phone_number || "N/A";
     const customerEmail = item.user?.email || "N/A";
     const paymentStatus =
-      item.payment_status === "paid"
-        ? "Paid"
+      item.payment_status === "fully-paid"
+        ? "Fully Paid"
+        : item.payment_status === "partially-paid"
+        ? "Partially Paid"
         : item.payment_status === "debt"
         ? "Debt"
         : item.payment_status === "failed"
@@ -1228,6 +1253,370 @@ export default function AdminScreen() {
     return Math.max(1, Math.ceil(dataLength / perPage));
   };
 
+  // Search and Filter functions
+  const filterOrders = (orders: Order[]) => {
+    let filtered = [...orders];
+
+    // Search by order number or customer name
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((order) => {
+        const orderNumber = order.order_number?.toLowerCase() || "";
+        const customerName = order.user
+          ? `${order.user.first_name || ""} ${order.user.last_name || ""} ${
+              order.user.username || ""
+            }`.toLowerCase()
+          : "";
+        return orderNumber.includes(query) || customerName.includes(query);
+      });
+    }
+
+    // Filter by date and time
+    if (filters.dateFrom || filters.timeFrom) {
+      filtered = filtered.filter((order) => {
+        const orderDateTime = new Date(
+          `${order.order_date}T${order.order_time || "00:00:00"}`
+        );
+        let fromDateTime = new Date();
+
+        if (filters.dateFrom) {
+          fromDateTime = new Date(filters.dateFrom);
+          if (filters.timeFrom) {
+            const [hours, minutes] = filters.timeFrom.split(":");
+            fromDateTime.setHours(
+              parseInt(hours) || 0,
+              parseInt(minutes) || 0,
+              0,
+              0
+            );
+          } else {
+            fromDateTime.setHours(0, 0, 0, 0);
+          }
+        } else if (filters.timeFrom) {
+          const today = new Date();
+          const [hours, minutes] = filters.timeFrom.split(":");
+          fromDateTime = new Date(today);
+          fromDateTime.setHours(
+            parseInt(hours) || 0,
+            parseInt(minutes) || 0,
+            0,
+            0
+          );
+        }
+
+        return orderDateTime >= fromDateTime;
+      });
+    }
+    if (filters.dateTo || filters.timeTo) {
+      filtered = filtered.filter((order) => {
+        const orderDateTime = new Date(
+          `${order.order_date}T${order.order_time || "00:00:00"}`
+        );
+        let toDateTime = new Date();
+
+        if (filters.dateTo) {
+          toDateTime = new Date(filters.dateTo);
+          if (filters.timeTo) {
+            const [hours, minutes] = filters.timeTo.split(":");
+            toDateTime.setHours(
+              parseInt(hours) || 0,
+              parseInt(minutes) || 0,
+              0,
+              0
+            );
+          } else {
+            toDateTime.setHours(23, 59, 59, 999);
+          }
+        } else if (filters.timeTo) {
+          const today = new Date();
+          const [hours, minutes] = filters.timeTo.split(":");
+          toDateTime = new Date(today);
+          toDateTime.setHours(
+            parseInt(hours) || 0,
+            parseInt(minutes) || 0,
+            0,
+            0
+          );
+        }
+
+        return orderDateTime <= toDateTime;
+      });
+    }
+
+    // Filter by order status
+    if (filters.orderStatus) {
+      filtered = filtered.filter(
+        (order) => order.order_status === filters.orderStatus
+      );
+    }
+
+    // Filter by product (check if order contains the product)
+    if (filters.productId) {
+      filtered = filtered.filter((order) =>
+        order.items?.some(
+          (item) => item.product_id === parseInt(filters.productId)
+        )
+      );
+    }
+
+    return filtered;
+  };
+
+  const filterSales = (sales: Sale[]) => {
+    let filtered = [...sales];
+
+    // Search by sale number, customer name, or payment number
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((sale) => {
+        const saleNumber = sale.sale_number?.toLowerCase() || "";
+        const customerName = (sale.customer_name || "").toLowerCase();
+        const paymentNumbers =
+          sale.payments
+            ?.map((p) => p.payment_number?.toLowerCase() || "")
+            .join(" ") || "";
+        return (
+          saleNumber.includes(query) ||
+          customerName.includes(query) ||
+          paymentNumbers.includes(query)
+        );
+      });
+    }
+
+    // Filter by date and time
+    if (filters.dateFrom || filters.timeFrom) {
+      filtered = filtered.filter((sale) => {
+        const saleDateTime = new Date(sale.made_on);
+        let fromDateTime = new Date();
+
+        if (filters.dateFrom) {
+          fromDateTime = new Date(filters.dateFrom);
+          if (filters.timeFrom) {
+            const [hours, minutes] = filters.timeFrom.split(":");
+            fromDateTime.setHours(
+              parseInt(hours) || 0,
+              parseInt(minutes) || 0,
+              0,
+              0
+            );
+          } else {
+            fromDateTime.setHours(0, 0, 0, 0);
+          }
+        } else if (filters.timeFrom) {
+          const today = new Date();
+          const [hours, minutes] = filters.timeFrom.split(":");
+          fromDateTime = new Date(today);
+          fromDateTime.setHours(
+            parseInt(hours) || 0,
+            parseInt(minutes) || 0,
+            0,
+            0
+          );
+        }
+
+        return saleDateTime >= fromDateTime;
+      });
+    }
+    if (filters.dateTo || filters.timeTo) {
+      filtered = filtered.filter((sale) => {
+        const saleDateTime = new Date(sale.made_on);
+        let toDateTime = new Date();
+
+        if (filters.dateTo) {
+          toDateTime = new Date(filters.dateTo);
+          if (filters.timeTo) {
+            const [hours, minutes] = filters.timeTo.split(":");
+            toDateTime.setHours(
+              parseInt(hours) || 0,
+              parseInt(minutes) || 0,
+              0,
+              0
+            );
+          } else {
+            toDateTime.setHours(23, 59, 59, 999);
+          }
+        } else if (filters.timeTo) {
+          const today = new Date();
+          const [hours, minutes] = filters.timeTo.split(":");
+          toDateTime = new Date(today);
+          toDateTime.setHours(
+            parseInt(hours) || 0,
+            parseInt(minutes) || 0,
+            0,
+            0
+          );
+        }
+
+        return saleDateTime <= toDateTime;
+      });
+    }
+
+    // Filter by payment status
+    if (filters.paymentStatus) {
+      filtered = filtered.filter(
+        (sale) => sale.payment_status === filters.paymentStatus
+      );
+    }
+
+    // Filter by product
+    if (filters.productId) {
+      filtered = filtered.filter((sale) =>
+        sale.items?.some(
+          (item) => item.product_id === parseInt(filters.productId)
+        )
+      );
+    }
+
+    return filtered;
+  };
+
+  const filterDebts = (debts: Sale[]) => {
+    let filtered = [...debts];
+
+    // Search by customer name or sale number
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((debt) => {
+        const saleNumber = debt.sale_number?.toLowerCase() || "";
+        const customerName = (debt.customer_name || "").toLowerCase();
+        return saleNumber.includes(query) || customerName.includes(query);
+      });
+    }
+
+    // Filter by date and time
+    if (filters.dateFrom || filters.timeFrom) {
+      filtered = filtered.filter((debt) => {
+        const debtDateTime = new Date(debt.made_on);
+        let fromDateTime = new Date();
+
+        if (filters.dateFrom) {
+          fromDateTime = new Date(filters.dateFrom);
+          if (filters.timeFrom) {
+            const [hours, minutes] = filters.timeFrom.split(":");
+            fromDateTime.setHours(
+              parseInt(hours) || 0,
+              parseInt(minutes) || 0,
+              0,
+              0
+            );
+          } else {
+            fromDateTime.setHours(0, 0, 0, 0);
+          }
+        } else if (filters.timeFrom) {
+          const today = new Date();
+          const [hours, minutes] = filters.timeFrom.split(":");
+          fromDateTime = new Date(today);
+          fromDateTime.setHours(
+            parseInt(hours) || 0,
+            parseInt(minutes) || 0,
+            0,
+            0
+          );
+        }
+
+        return debtDateTime >= fromDateTime;
+      });
+    }
+    if (filters.dateTo || filters.timeTo) {
+      filtered = filtered.filter((debt) => {
+        const debtDateTime = new Date(debt.made_on);
+        let toDateTime = new Date();
+
+        if (filters.dateTo) {
+          toDateTime = new Date(filters.dateTo);
+          if (filters.timeTo) {
+            const [hours, minutes] = filters.timeTo.split(":");
+            toDateTime.setHours(
+              parseInt(hours) || 0,
+              parseInt(minutes) || 0,
+              0,
+              0
+            );
+          } else {
+            toDateTime.setHours(23, 59, 59, 999);
+          }
+        } else if (filters.timeTo) {
+          const today = new Date();
+          const [hours, minutes] = filters.timeTo.split(":");
+          toDateTime = new Date(today);
+          toDateTime.setHours(
+            parseInt(hours) || 0,
+            parseInt(minutes) || 0,
+            0,
+            0
+          );
+        }
+
+        return debtDateTime <= toDateTime;
+      });
+    }
+
+    // Filter by payment status
+    if (filters.paymentStatus) {
+      filtered = filtered.filter(
+        (debt) => debt.payment_status === filters.paymentStatus
+      );
+    }
+
+    return filtered;
+  };
+
+  const filterProducts = (products: Product[]) => {
+    let filtered = [...products];
+
+    // Search by product name
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((product) =>
+        product.name.toLowerCase().includes(query)
+      );
+    }
+
+    // Filter by category
+    if (filters.categoryId) {
+      filtered = filtered.filter(
+        (product) => product.category === parseInt(filters.categoryId)
+      );
+    }
+
+    return filtered;
+  };
+
+  const filterCategories = (categories: Category[]) => {
+    let filtered = [...categories];
+
+    // Search by category name
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((category) =>
+        category.name.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setFilters({
+      dateFrom: "",
+      dateTo: "",
+      timeFrom: "",
+      timeTo: "",
+      productId: "",
+      categoryId: "",
+      paymentStatus: "",
+      orderStatus: "",
+    });
+  };
+
+  // Get filtered data
+  const filteredOrders = filterOrders(pendingOrders);
+  const filteredSales = filterSales(sales);
+  const filteredDebts = filterDebts(debts);
+  const filteredProducts = filterProducts(products);
+  const filteredCategories = filterCategories(categories);
+
   const menuItems = [
     {
       id: "orders",
@@ -1395,18 +1784,20 @@ export default function AdminScreen() {
             </Text>
             {activeTab === "orders" && (
               <Text style={styles.topBarSubtitle}>
-                {pendingOrders.length} pending{" "}
-                {pendingOrders.length === 1 ? "order" : "orders"}
+                {filteredOrders.length} pending{" "}
+                {filteredOrders.length === 1 ? "order" : "orders"}
               </Text>
             )}
             {activeTab === "sales" && (
               <Text style={styles.topBarSubtitle}>
-                {sales.length} total {sales.length === 1 ? "sale" : "sales"}
+                {filteredSales.length} total{" "}
+                {filteredSales.length === 1 ? "sale" : "sales"}
               </Text>
             )}
             {activeTab === "debts" && (
               <Text style={styles.topBarSubtitle}>
-                {debts.length} active {debts.length === 1 ? "debt" : "debts"}
+                {filteredDebts.length} active{" "}
+                {filteredDebts.length === 1 ? "debt" : "debts"}
               </Text>
             )}
           </View>
@@ -1418,13 +1809,342 @@ export default function AdminScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Search and Filter Bar */}
+        {(activeTab === "orders" ||
+          activeTab === "sales" ||
+          activeTab === "debts" ||
+          activeTab === "products" ||
+          activeTab === "categories") && (
+          <View style={styles.searchFilterContainer}>
+            <View style={styles.searchContainer}>
+              <Search size={20} color="#64748B" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={
+                  activeTab === "orders"
+                    ? "Search by order number or customer name..."
+                    : activeTab === "sales"
+                    ? "Search by sale number, customer name, or payment number..."
+                    : activeTab === "debts"
+                    ? "Search by customer name or sale number..."
+                    : activeTab === "products"
+                    ? "Search by product name..."
+                    : "Search by category name..."
+                }
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor="#94A3B8"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery("")}
+                  style={styles.clearSearchButton}
+                >
+                  <X size={16} color="#64748B" />
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setShowFilters(!showFilters)}
+            >
+              <Filter size={20} color={showFilters ? "#8B5CF6" : "#64748B"} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Filter Panel */}
+        {showFilters &&
+          (activeTab === "orders" ||
+            activeTab === "sales" ||
+            activeTab === "debts" ||
+            activeTab === "products") && (
+            <View style={styles.filterPanel}>
+              <View style={styles.filterHeader}>
+                <Text style={styles.filterTitle}>Filters</Text>
+                <TouchableOpacity onPress={clearFilters}>
+                  <Text style={styles.clearFiltersText}>Clear All</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Date Range Filter */}
+              {(activeTab === "orders" ||
+                activeTab === "sales" ||
+                activeTab === "debts") && (
+                <>
+                  <View style={styles.filterRow}>
+                    <Text style={styles.filterLabel}>Date Range</Text>
+                    <View style={styles.dateInputRow}>
+                      <View style={styles.dateInputContainer}>
+                        <Text style={styles.dateInputLabel}>From Date</Text>
+                        <TextInput
+                          style={styles.dateInput}
+                          placeholder="YYYY-MM-DD"
+                          value={filters.dateFrom}
+                          onChangeText={(text) =>
+                            setFilters({ ...filters, dateFrom: text })
+                          }
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={styles.dateInputContainer}>
+                        <Text style={styles.dateInputLabel}>To Date</Text>
+                        <TextInput
+                          style={styles.dateInput}
+                          placeholder="YYYY-MM-DD"
+                          value={filters.dateTo}
+                          onChangeText={(text) =>
+                            setFilters({ ...filters, dateTo: text })
+                          }
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.filterRow}>
+                    <Text style={styles.filterLabel}>Time Range</Text>
+                    <View style={styles.dateInputRow}>
+                      <View style={styles.dateInputContainer}>
+                        <Text style={styles.dateInputLabel}>From Time</Text>
+                        <TextInput
+                          style={styles.dateInput}
+                          placeholder="HH:MM (24h)"
+                          value={filters.timeFrom}
+                          onChangeText={(text) =>
+                            setFilters({ ...filters, timeFrom: text })
+                          }
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={styles.dateInputContainer}>
+                        <Text style={styles.dateInputLabel}>To Time</Text>
+                        <TextInput
+                          style={styles.dateInput}
+                          placeholder="HH:MM (24h)"
+                          value={filters.timeTo}
+                          onChangeText={(text) =>
+                            setFilters({ ...filters, timeTo: text })
+                          }
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {/* Product Filter */}
+              {(activeTab === "orders" || activeTab === "sales") && (
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Product</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.productFilterScroll}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.filterChip,
+                        !filters.productId && styles.filterChipActive,
+                      ]}
+                      onPress={() => setFilters({ ...filters, productId: "" })}
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          !filters.productId && styles.filterChipTextActive,
+                        ]}
+                      >
+                        All Products
+                      </Text>
+                    </TouchableOpacity>
+                    {products.map((product) => (
+                      <TouchableOpacity
+                        key={product.id}
+                        style={[
+                          styles.filterChip,
+                          filters.productId === product.id.toString() &&
+                            styles.filterChipActive,
+                        ]}
+                        onPress={() =>
+                          setFilters({
+                            ...filters,
+                            productId:
+                              filters.productId === product.id.toString()
+                                ? ""
+                                : product.id.toString(),
+                          })
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            filters.productId === product.id.toString() &&
+                              styles.filterChipTextActive,
+                          ]}
+                        >
+                          {product.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Payment Status Filter */}
+              {(activeTab === "sales" || activeTab === "debts") && (
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Payment Status</Text>
+                  <View style={styles.statusFilterRow}>
+                    {[
+                      { value: "", label: "All" },
+                      { value: "fully-paid", label: "Fully Paid" },
+                      { value: "partial-payment", label: "Partial" },
+                      { value: "no-payment", label: "No Payment" },
+                      { value: "overdue", label: "Overdue" },
+                    ].map((status) => (
+                      <TouchableOpacity
+                        key={status.value}
+                        style={[
+                          styles.filterChip,
+                          filters.paymentStatus === status.value &&
+                            styles.filterChipActive,
+                        ]}
+                        onPress={() =>
+                          setFilters({
+                            ...filters,
+                            paymentStatus:
+                              filters.paymentStatus === status.value
+                                ? ""
+                                : status.value,
+                          })
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            filters.paymentStatus === status.value &&
+                              styles.filterChipTextActive,
+                          ]}
+                        >
+                          {status.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Order Status Filter */}
+              {activeTab === "orders" && (
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Order Status</Text>
+                  <View style={styles.statusFilterRow}>
+                    {[
+                      { value: "", label: "All" },
+                      { value: "pending", label: "Pending" },
+                      { value: "confirmed", label: "Confirmed" },
+                      { value: "cancelled", label: "Cancelled" },
+                    ].map((status) => (
+                      <TouchableOpacity
+                        key={status.value}
+                        style={[
+                          styles.filterChip,
+                          filters.orderStatus === status.value &&
+                            styles.filterChipActive,
+                        ]}
+                        onPress={() =>
+                          setFilters({
+                            ...filters,
+                            orderStatus:
+                              filters.orderStatus === status.value
+                                ? ""
+                                : status.value,
+                          })
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            filters.orderStatus === status.value &&
+                              styles.filterChipTextActive,
+                          ]}
+                        >
+                          {status.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Category Filter for Products */}
+              {activeTab === "products" && (
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Category</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.productFilterScroll}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.filterChip,
+                        !filters.categoryId && styles.filterChipActive,
+                      ]}
+                      onPress={() => setFilters({ ...filters, categoryId: "" })}
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          !filters.categoryId && styles.filterChipTextActive,
+                        ]}
+                      >
+                        All Categories
+                      </Text>
+                    </TouchableOpacity>
+                    {categories.map((category) => (
+                      <TouchableOpacity
+                        key={category.id}
+                        style={[
+                          styles.filterChip,
+                          filters.categoryId === category.id.toString() &&
+                            styles.filterChipActive,
+                        ]}
+                        onPress={() =>
+                          setFilters({
+                            ...filters,
+                            categoryId:
+                              filters.categoryId === category.id.toString()
+                                ? ""
+                                : category.id.toString(),
+                          })
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            filters.categoryId === category.id.toString() &&
+                              styles.filterChipTextActive,
+                          ]}
+                        >
+                          {category.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          )}
+
         {/* Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {activeTab === "categories" && (
             <View style={styles.tabContent}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
-                  Categories ({categories.length})
+                  Categories ({filteredCategories.length})
                 </Text>
                 <TouchableOpacity
                   style={styles.addButton}
@@ -1433,7 +2153,7 @@ export default function AdminScreen() {
                   <Plus size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
-              {categories.map((item) => (
+              {filteredCategories.map((item) => (
                 <View key={item.id}>{renderCategoryItem({ item })}</View>
               ))}
             </View>
@@ -1443,7 +2163,7 @@ export default function AdminScreen() {
             <View style={styles.tabContent}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
-                  Products ({products.length})
+                  Products ({filteredProducts.length})
                 </Text>
                 <TouchableOpacity
                   style={styles.addButton}
@@ -1452,7 +2172,7 @@ export default function AdminScreen() {
                   <Plus size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
-              {products.map((item) => (
+              {filteredProducts.map((item) => (
                 <View key={item.id}>{renderProductItem({ item })}</View>
               ))}
             </View>
@@ -1462,19 +2182,19 @@ export default function AdminScreen() {
             <View style={styles.tabContent}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
-                  Pending Orders ({pendingOrders.length})
+                  Pending Orders ({filteredOrders.length})
                 </Text>
               </View>
-              {pendingOrders.length > 0 ? (
+              {filteredOrders.length > 0 ? (
                 <>
                   {getPaginatedData(
-                    pendingOrders,
+                    filteredOrders,
                     ordersPage,
                     itemsPerPage
                   ).map((item) => (
                     <View key={item.id}>{renderOrderItem({ item })}</View>
                   ))}
-                  {getTotalPages(pendingOrders.length, itemsPerPage) > 1 && (
+                  {getTotalPages(filteredOrders.length, itemsPerPage) > 1 && (
                     <View style={styles.paginationContainer}>
                       <TouchableOpacity
                         style={[
@@ -1493,26 +2213,31 @@ export default function AdminScreen() {
                       </TouchableOpacity>
                       <Text style={styles.paginationText}>
                         Page {ordersPage} of{" "}
-                        {getTotalPages(pendingOrders.length, itemsPerPage)}
+                        {getTotalPages(filteredOrders.length, itemsPerPage)}
                       </Text>
                       <TouchableOpacity
                         style={[
                           styles.paginationButton,
                           ordersPage >=
-                            getTotalPages(pendingOrders.length, itemsPerPage) &&
-                            styles.paginationButtonDisabled,
+                            getTotalPages(
+                              filteredOrders.length,
+                              itemsPerPage
+                            ) && styles.paginationButtonDisabled,
                         ]}
                         onPress={() =>
                           setOrdersPage(
                             Math.min(
-                              getTotalPages(pendingOrders.length, itemsPerPage),
+                              getTotalPages(
+                                filteredOrders.length,
+                                itemsPerPage
+                              ),
                               ordersPage + 1
                             )
                           )
                         }
                         disabled={
                           ordersPage >=
-                          getTotalPages(pendingOrders.length, itemsPerPage)
+                          getTotalPages(filteredOrders.length, itemsPerPage)
                         }
                       >
                         <ChevronRight
@@ -1544,17 +2269,17 @@ export default function AdminScreen() {
             <View style={styles.tabContent}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
-                  All Sales ({sales.length})
+                  All Sales ({filteredSales.length})
                 </Text>
               </View>
-              {sales.length > 0 ? (
+              {filteredSales.length > 0 ? (
                 <>
-                  {getPaginatedData(sales, salesPage, itemsPerPage).map(
+                  {getPaginatedData(filteredSales, salesPage, itemsPerPage).map(
                     (item) => (
                       <View key={item.id}>{renderSaleItem({ item })}</View>
                     )
                   )}
-                  {getTotalPages(sales.length, itemsPerPage) > 1 && (
+                  {getTotalPages(filteredSales.length, itemsPerPage) > 1 && (
                     <View style={styles.paginationContainer}>
                       <TouchableOpacity
                         style={[
@@ -1571,25 +2296,26 @@ export default function AdminScreen() {
                       </TouchableOpacity>
                       <Text style={styles.paginationText}>
                         Page {salesPage} of{" "}
-                        {getTotalPages(sales.length, itemsPerPage)}
+                        {getTotalPages(filteredSales.length, itemsPerPage)}
                       </Text>
                       <TouchableOpacity
                         style={[
                           styles.paginationButton,
                           salesPage >=
-                            getTotalPages(sales.length, itemsPerPage) &&
+                            getTotalPages(filteredSales.length, itemsPerPage) &&
                             styles.paginationButtonDisabled,
                         ]}
                         onPress={() =>
                           setSalesPage(
                             Math.min(
-                              getTotalPages(sales.length, itemsPerPage),
+                              getTotalPages(filteredSales.length, itemsPerPage),
                               salesPage + 1
                             )
                           )
                         }
                         disabled={
-                          salesPage >= getTotalPages(sales.length, itemsPerPage)
+                          salesPage >=
+                          getTotalPages(filteredSales.length, itemsPerPage)
                         }
                       >
                         <ChevronRight
@@ -1621,17 +2347,17 @@ export default function AdminScreen() {
             <View style={styles.tabContent}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
-                  Debt Tracking ({debts.length})
+                  Debt Tracking ({filteredDebts.length})
                 </Text>
               </View>
-              {debts.length > 0 ? (
+              {filteredDebts.length > 0 ? (
                 <>
-                  {getPaginatedData(debts, debtsPage, itemsPerPage).map(
+                  {getPaginatedData(filteredDebts, debtsPage, itemsPerPage).map(
                     (item) => (
                       <View key={item.id}>{renderDebtItem({ item })}</View>
                     )
                   )}
-                  {getTotalPages(debts.length, itemsPerPage) > 1 && (
+                  {getTotalPages(filteredDebts.length, itemsPerPage) > 1 && (
                     <View style={styles.paginationContainer}>
                       <TouchableOpacity
                         style={[
@@ -1648,25 +2374,26 @@ export default function AdminScreen() {
                       </TouchableOpacity>
                       <Text style={styles.paginationText}>
                         Page {debtsPage} of{" "}
-                        {getTotalPages(debts.length, itemsPerPage)}
+                        {getTotalPages(filteredDebts.length, itemsPerPage)}
                       </Text>
                       <TouchableOpacity
                         style={[
                           styles.paginationButton,
                           debtsPage >=
-                            getTotalPages(debts.length, itemsPerPage) &&
+                            getTotalPages(filteredDebts.length, itemsPerPage) &&
                             styles.paginationButtonDisabled,
                         ]}
                         onPress={() =>
                           setDebtsPage(
                             Math.min(
-                              getTotalPages(debts.length, itemsPerPage),
+                              getTotalPages(filteredDebts.length, itemsPerPage),
                               debtsPage + 1
                             )
                           )
                         }
                         disabled={
-                          debtsPage >= getTotalPages(debts.length, itemsPerPage)
+                          debtsPage >=
+                          getTotalPages(filteredDebts.length, itemsPerPage)
                         }
                       >
                         <ChevronRight
@@ -2428,6 +3155,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8FAFC",
+    marginBottom: 20,
   },
   centerContainer: {
     flex: 1,
@@ -2593,6 +3321,129 @@ const styles = StyleSheet.create({
   backButtonTop: {
     padding: 8,
     marginLeft: 12,
+  },
+
+  // Search and Filter
+  searchFilterContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    gap: 12,
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1E293B",
+  },
+  clearSearchButton: {
+    padding: 4,
+  },
+  filterButton: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  filterPanel: {
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  filterHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  filterTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+  clearFiltersText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#8B5CF6",
+  },
+  filterRow: {
+    marginBottom: 16,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 8,
+  },
+  dateInputRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  dateInputContainer: {
+    flex: 1,
+  },
+  dateInputLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    marginBottom: 4,
+  },
+  dateInput: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    fontSize: 14,
+    color: "#1E293B",
+  },
+  productFilterScroll: {
+    flexDirection: "row",
+  },
+  statusFilterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  filterChipActive: {
+    backgroundColor: "#8B5CF6",
+    borderColor: "#8B5CF6",
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  filterChipTextActive: {
+    color: "#FFFFFF",
   },
 
   // Header

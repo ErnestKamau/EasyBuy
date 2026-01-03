@@ -116,11 +116,19 @@ class SaleController extends Controller
 
             $profitAmount = $totalAmount - $costAmount;
 
-            // Determine initial payment status
+            // Determine initial payment status based on order payment status
             $paymentStatus = 'no-payment';
-            if ($order->payment_status === 'paid') {
+            $dueDate = null;
+
+            if ($order->payment_status === 'fully-paid') {
                 $paymentStatus = 'fully-paid';
+            } elseif ($order->payment_status === 'partially-paid') {
+                $paymentStatus = 'partial-payment';
             } elseif ($order->payment_status === 'debt') {
+                $paymentStatus = 'no-payment';
+                // Set due date for debt orders (default 7 days)
+                $dueDate = Carbon::now()->addDays(7);
+            } elseif ($order->payment_status === 'pending') {
                 $paymentStatus = 'no-payment';
             }
 
@@ -131,6 +139,7 @@ class SaleController extends Controller
                 'cost_amount' => $costAmount,
                 'profit_amount' => $profitAmount,
                 'payment_status' => $paymentStatus,
+                'due_date' => $dueDate,
             ]);
 
             // Create sale items from order items
@@ -146,6 +155,9 @@ class SaleController extends Controller
             }
 
             DB::commit();
+
+            // Sync payment status to order
+            $sale->syncOrderPaymentStatus();
 
             // Dispatch event for receipt generation and email
             event(new SaleCreated($sale));

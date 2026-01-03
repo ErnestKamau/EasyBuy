@@ -54,6 +54,7 @@ import {
   ThemeProvider as CustomThemeProvider,
   useTheme,
 } from "@/contexts/ThemeContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export { ErrorBoundary } from "expo-router";
@@ -309,8 +310,10 @@ export default function RootLayout() {
     <CustomThemeProvider>
       <AuthProvider>
         <CartProvider>
-          <RootLayoutNav />
-          <Toast config={toastConfig} />
+          <NotificationProvider>
+            <RootLayoutNav />
+            <Toast config={toastConfig} />
+          </NotificationProvider>
         </CartProvider>
       </AuthProvider>
     </CustomThemeProvider>
