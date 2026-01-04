@@ -14,7 +14,9 @@
   "host": "0.0.0.0",
   "port": "6001",
   "protocol": "http",
-  "socketio": {},
+  "socketio": {
+    "authorization": true
+  },
   "sslCertPath": "",
   "sslKeyPath": "",
   "sslCertChainPath": "",

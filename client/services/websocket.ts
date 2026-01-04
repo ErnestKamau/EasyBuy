@@ -54,19 +54,22 @@ class WebSocketService {
       const wsUrl = getWebSocketUrl();
       console.log('Connecting to WebSocket server:', wsUrl);
 
+      // Socket.IO v2.x compatible options
+      // Laravel Echo Server uses Socket.IO v2.x protocol
+      // Store token for use in channel subscriptions
       this.socket = io(wsUrl, {
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: this.reconnectDelay,
         reconnectionAttempts: this.maxReconnectAttempts,
-        auth: {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+        // Socket.IO v2 uses 'query' for passing data
+        // Laravel Echo Server can read token from query and forward it to Laravel
+        query: {
+          token: token,
+          bearer_token: token, // Also send as bearer_token for Echo Server
         },
-        extraHeaders: {
-          'Authorization': `Bearer ${token}`,
-        },
+        forceNew: false,
+        debug: false,
       });
 
       this.setupEventHandlers(userId, userRole);
@@ -137,33 +140,33 @@ class WebSocketService {
         return;
       }
 
-      // Laravel Echo Server uses a specific format for private channels
-      // The format is: private-channel-name
-      // Authentication happens automatically via HTTP POST to /broadcasting/auth
+      // Laravel Echo Server uses Socket.IO v2 with custom protocol
+      // For private channels, authentication happens when Echo Server
+      // makes HTTP POST to /broadcasting/auth
+      // We need to ensure the token is available for Echo Server to forward
       
       const userChannel = `private-user.${userId}.notifications`;
       const adminChannel = 'private-admin.notifications';
 
-      // Subscribe to user channel using Laravel Echo format
-      // The server will automatically authenticate via /broadcasting/auth
+      // Laravel Echo Server expects the token to be available when it authenticates
+      // The token was sent in the connection query, but we also need to ensure
+      // it's available when subscribing. Echo Server will use the token from
+      // the socket's handshake data (query parameters) when making auth requests
+      
+      // Subscribe to user channel
+      // Include token in subscription so Echo Server can forward it to Laravel
       this.socket.emit('subscribe', {
         channel: userChannel,
-        auth: {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        },
+        socket_id: this.socket.id,
+        token: token, // Include token for Echo Server to forward
       });
 
       // Subscribe to admin channel if user is admin
       if (userRole === 'admin') {
         this.socket.emit('subscribe', {
           channel: adminChannel,
-          auth: {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          },
+          socket_id: this.socket.id,
+          token: token, // Include token for Echo Server to forward
         });
       }
 
@@ -199,19 +202,8 @@ class WebSocketService {
         });
       }
 
-      // Also listen to any event that might come through (fallback)
-      this.socket.onAny((eventName: string, data: any) => {
-        if (eventName.includes('notification') || 
-            eventName.includes('order') || 
-            eventName.includes('debt') || 
-            eventName.includes('payment')) {
-          console.log('Laravel Echo event received:', eventName, data);
-          // Extract event type from event name (format: channel:eventType)
-          const parts = eventName.split(':');
-          const eventType = parts.length > 1 ? parts.at(-1) || eventName : eventName;
-          this.handleChannelEvent({ event: eventType, data });
-        }
-      });
+      // Socket.IO v2.x doesn't have onAny() - we listen to specific events above
+      // For any other events, we can add them to the eventTypes array above
     } catch (error) {
       console.error('Error subscribing to channels:', error);
     }

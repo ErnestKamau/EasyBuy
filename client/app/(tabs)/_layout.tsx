@@ -20,6 +20,7 @@ function TabBarIcon(props: {
 export default function TabLayout() {
   const { state } = useCart();
   const { currentTheme, themeName } = useTheme();
+  const { unreadCount } = useNotifications();
 
   return (
     <Tabs
