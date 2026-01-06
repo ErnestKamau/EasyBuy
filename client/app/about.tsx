@@ -11,8 +11,6 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
-  ArrowLeft,
-  Info,
   Package,
   Users,
   Shield,
@@ -26,18 +24,6 @@ export default function AboutScreen() {
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
       <StatusBar barStyle={themeName === 'dark' ? 'light-content' : 'dark-content'} />
-      
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: currentTheme.primary }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <ArrowLeft size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>About EasyBuy</Text>
-        <View style={styles.placeholder} />
-      </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* App Info Card */}
@@ -134,25 +120,6 @@ export default function AboutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 60,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  placeholder: {
-    width: 40,
   },
   scrollView: {
     flex: 1,

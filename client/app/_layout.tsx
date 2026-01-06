@@ -59,8 +59,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export { ErrorBoundary } from "expo-router";
 
+// Set initial route to onboarding - will be redirected if authenticated
 export const unstable_settings = {
-  initialRouteName: "(tabs)",
+  initialRouteName: "onboarding",
 };
 
 SplashScreen.preventAutoHideAsync();
@@ -96,6 +97,8 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(
     null
   );
+  const [initialNavigationComplete, setInitialNavigationComplete] =
+    useState(false);
   const router = useRouter();
   const segments = useSegments();
 
@@ -158,8 +161,11 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     } finally {
       setUser(null);
       setIsAuthenticated(false);
+      setInitialNavigationComplete(false);
+      // Redirect to onboarding after logout
+      router.replace("/onboarding");
     }
-  }, []);
+  }, [router]);
 
   const refreshAuth = useCallback(async () => {
     setLoading(true);
@@ -199,9 +205,42 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     checkOnboardingStatus();
   }, [checkAuthStatus, checkOnboardingStatus]);
 
+  // Immediate redirect when loading completes - prevents tabs from rendering
   useEffect(() => {
-    // Wait for both checks to complete
-    if (loading || hasSeenOnboarding === null) return;
+    if (loading) return;
+
+    const currentSegment = segments[0];
+
+    // If authenticated, redirect to tabs if on auth/onboarding
+    if (isAuthenticated) {
+      if (currentSegment === "onboarding" || currentSegment === "auth") {
+        router.replace("/(tabs)");
+        // Wait a bit for navigation, then mark complete
+        setTimeout(() => setInitialNavigationComplete(true), 100);
+      } else {
+        // Already on tabs, mark complete immediately
+        setInitialNavigationComplete(true);
+      }
+      return;
+    }
+
+    // If not authenticated, ensure we're on onboarding
+    if (!isAuthenticated) {
+      if (currentSegment !== "onboarding" && currentSegment !== "auth") {
+        router.replace("/onboarding");
+        // Wait a bit for navigation to complete, then mark as done
+        setTimeout(() => setInitialNavigationComplete(true), 100);
+      } else {
+        // Already on onboarding or auth, mark complete immediately
+        setInitialNavigationComplete(true);
+      }
+    }
+  }, [loading, isAuthenticated, segments, router]);
+
+  // Navigation guard - handles route changes
+  useEffect(() => {
+    // Wait for auth check to complete
+    if (loading) return;
 
     const currentSegment = segments[0];
     const inAuthGroup =
@@ -217,17 +256,21 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       return;
     }
 
-    // If not authenticated and already in auth/onboarding flow, allow navigation
-    if (!isAuthenticated && inAuthGroup) {
-      return;
-    }
-
-    // If not authenticated and trying to access other screens, redirect to onboarding
-    if (!isAuthenticated && !inAuthGroup) {
+    // If not authenticated, always start from onboarding first
+    // Only allow navigation to auth if user is coming from onboarding
+    if (!isAuthenticated) {
+      if (inOnboarding) {
+        // User is on onboarding, allow them to stay
+        return;
+      }
+      if (inAuth) {
+        // User is on auth screen, allow them to stay (they came from onboarding)
+        return;
+      }
+      // If not in onboarding or auth, redirect to onboarding
       router.replace("/onboarding");
-      return;
     }
-  }, [isAuthenticated, loading, hasSeenOnboarding, segments, router]);
+  }, [isAuthenticated, loading, segments, router]);
 
   const contextValue = useMemo<AuthContextType>(
     () => ({
@@ -250,7 +293,8 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
     ]
   );
 
-  if (loading || hasSeenOnboarding === null) {
+  // Show loading screen until auth check completes AND initial navigation is set
+  if (loading || !initialNavigationComplete) {
     return (
       <View
         style={{
@@ -526,6 +570,15 @@ function RootLayoutNav() {
             <Stack.Screen
               name="modal"
               options={{
+                title: "Notifications",
+                presentation: "modal",
+              }}
+            />
+
+            <Stack.Screen
+              name="about"
+              options={{
+                title: "About EasyBuy",
                 presentation: "modal",
               }}
             />

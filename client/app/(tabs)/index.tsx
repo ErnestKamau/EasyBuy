@@ -101,11 +101,11 @@ export default function HomeScreen() {
       paddingVertical: 4,
       borderWidth: 1,
       borderColor: currentTheme.border,
-      shadowColor: '#000',
+      shadowColor: "#000",
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: themeName === 'dark' ? 0.3 : 0.05,
+      shadowOpacity: themeName === "dark" ? 0.3 : 0.05,
       shadowRadius: 2,
-      elevation: themeName === 'dark' ? 5 : 0,
+      elevation: themeName === "dark" ? 5 : 0,
     },
     searchInput: {
       flex: 1,
@@ -143,13 +143,13 @@ export default function HomeScreen() {
       borderRadius: 12,
       marginHorizontal: 6,
       marginBottom: 12,
-      shadowColor: '#000',
+      shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: themeName === 'dark' ? 0.3 : 0.05,
+      shadowOpacity: themeName === "dark" ? 0.3 : 0.05,
       shadowRadius: 4,
-      elevation: themeName === 'dark' ? 8 : 3,
-      borderWidth: themeName === 'dark' ? 1 : 0,
-      borderColor: themeName === 'dark' ? currentTheme.border : 'transparent',
+      elevation: themeName === "dark" ? 8 : 3,
+      borderWidth: themeName === "dark" ? 1 : 0,
+      borderColor: themeName === "dark" ? currentTheme.border : "transparent",
     },
     productName: {
       fontSize: 14,
@@ -239,8 +239,8 @@ export default function HomeScreen() {
     try {
       const authenticated = await isAuthenticated();
       if (!authenticated) {
-        console.log("User not authenticated, redirecting to auth");
-        router.replace("/auth");
+        console.log("User not authenticated, redirecting to onboarding");
+        router.replace("/onboarding");
         return;
       }
 
@@ -248,7 +248,7 @@ export default function HomeScreen() {
       await loadInitialData();
     } catch (error) {
       console.log("Auth check failed:", error);
-      router.replace("/auth");
+      router.replace("/onboarding");
     }
   };
 
@@ -261,7 +261,7 @@ export default function HomeScreen() {
 
       const wasHandled = handleCommonErrors(
         error,
-        () => router.replace("/auth"),
+        () => router.replace("/onboarding"),
         (message) => ToastService.showError("Connection Error", message)
       );
 
@@ -285,7 +285,7 @@ export default function HomeScreen() {
         console.log("getCurrentUser returned null, checking auth status");
         const authenticated = await isAuthenticated();
         if (!authenticated) {
-          router.replace("/auth");
+          router.replace("/onboarding");
         }
       }
     } catch (error) {
@@ -293,7 +293,7 @@ export default function HomeScreen() {
 
       const wasHandled = handleCommonErrors(
         error,
-        () => router.replace("/auth"),
+        () => router.replace("/onboarding"),
         (message) => console.log("User data error:", message)
       );
 
@@ -312,7 +312,7 @@ export default function HomeScreen() {
 
       const wasHandled = handleCommonErrors(
         error,
-        () => router.replace("/auth"),
+        () => router.replace("/onboarding"),
         (message) => ToastService.showError("Connection Error", message)
       );
 
@@ -332,7 +332,7 @@ export default function HomeScreen() {
 
       const wasHandled = handleCommonErrors(
         error,
-        () => router.replace("/auth"),
+        () => router.replace("/onboarding"),
         (message) => ToastService.showError("Connection Error", message)
       );
 
@@ -356,8 +356,10 @@ export default function HomeScreen() {
       filtered = filtered.filter(
         (product) =>
           product.name.toLowerCase().includes(query) ||
-          (product.description && product.description.toLowerCase().includes(query)) ||
-          (product.category_name && product.category_name.toLowerCase().includes(query))
+          (product.description &&
+            product.description.toLowerCase().includes(query)) ||
+          (product.category_name &&
+            product.category_name.toLowerCase().includes(query))
       );
     }
 
@@ -400,7 +402,8 @@ export default function HomeScreen() {
         style={[
           styles.categoryItem,
           isSelected && {
-            backgroundColor: themeName === 'dark' ? currentTheme.primary + '20' : '#F0FDF4',
+            backgroundColor:
+              themeName === "dark" ? currentTheme.primary + "20" : "#F0FDF4",
             borderWidth: 1,
             borderColor: currentTheme.primary,
           },
@@ -427,7 +430,9 @@ export default function HomeScreen() {
         >
           {item.name}
         </Text>
-        <Text style={dynamicStyles.categoryCount}>{item.products_count} items</Text>
+        <Text style={dynamicStyles.categoryCount}>
+          {item.products_count} items
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -452,16 +457,26 @@ export default function HomeScreen() {
             }}
             style={styles.productImage}
           />
-          <TouchableOpacity style={[styles.favoriteButton, {
-            backgroundColor: currentTheme.surface,
-            shadowColor: '#000',
-            shadowOpacity: themeName === 'dark' ? 0.3 : 0.1,
-            elevation: themeName === 'dark' ? 4 : 2,
-          }]}>
+          <TouchableOpacity
+            style={[
+              styles.favoriteButton,
+              {
+                backgroundColor: currentTheme.surface,
+                shadowColor: "#000",
+                shadowOpacity: themeName === "dark" ? 0.3 : 0.1,
+                elevation: themeName === "dark" ? 4 : 2,
+              },
+            ]}
+          >
             <Heart size={16} color={currentTheme.textSecondary} />
           </TouchableOpacity>
           {item.is_low_stock && (
-            <View style={[styles.lowStockBadge, { backgroundColor: currentTheme.warning }]}>
+            <View
+              style={[
+                styles.lowStockBadge,
+                { backgroundColor: currentTheme.warning },
+              ]}
+            >
               <Text style={styles.lowStockText}>Low Stock</Text>
             </View>
           )}
@@ -471,16 +486,24 @@ export default function HomeScreen() {
           <Text style={dynamicStyles.productName} numberOfLines={2}>
             {item.name}
           </Text>
-          <Text style={dynamicStyles.productCategory}>{item.category_name}</Text>
+          <Text style={dynamicStyles.productCategory}>
+            {item.category_name}
+          </Text>
 
           {item.kilograms_in_stock && (
-            <Text style={dynamicStyles.productWeight}>{item.kilograms_in_stock}kg in stock</Text>
+            <Text style={dynamicStyles.productWeight}>
+              {item.kilograms_in_stock}kg in stock
+            </Text>
           )}
 
           <View style={styles.priceRow}>
-            <Text style={dynamicStyles.currentPrice}>Ksh {item.sale_price}</Text>
+            <Text style={dynamicStyles.currentPrice}>
+              Ksh {item.sale_price}
+            </Text>
             {hasDiscount && (
-              <Text style={dynamicStyles.originalPrice}>Ksh {item.cost_price}</Text>
+              <Text style={dynamicStyles.originalPrice}>
+                Ksh {item.cost_price}
+              </Text>
             )}
           </View>
 
@@ -489,7 +512,10 @@ export default function HomeScreen() {
               <Text
                 style={[
                   dynamicStyles.stockText,
-                  item.minimum_stock && item.in_stock <= item.minimum_stock && { color: currentTheme.error },
+                  item.minimum_stock &&
+                    item.in_stock <= item.minimum_stock && {
+                      color: currentTheme.error,
+                    },
                 ]}
               >
                 {item.in_stock > 0
@@ -510,7 +536,7 @@ export default function HomeScreen() {
                   const quantityToUse = item.kilograms_in_stock ? 1 : 1;
                   addItem(item, quantityToUse, weightToUse);
                   ToastService.showSuccess(
-                    'Added to Cart',
+                    "Added to Cart",
                     `${item.name} added to cart`
                   );
                 }
@@ -526,7 +552,12 @@ export default function HomeScreen() {
 
   if (loading || !authChecked) {
     return (
-      <View style={[styles.centerContainer, { backgroundColor: currentTheme.background }]}>
+      <View
+        style={[
+          styles.centerContainer,
+          { backgroundColor: currentTheme.background },
+        ]}
+      >
         <ActivityIndicator size="large" color={currentTheme.primary} />
         <Text style={dynamicStyles.loadingText}>Loading...</Text>
       </View>
@@ -555,7 +586,11 @@ export default function HomeScreen() {
 
       <View style={styles.searchContainer}>
         <View style={dynamicStyles.searchBar}>
-          <Search size={20} color={currentTheme.textSecondary} style={styles.searchIconStyle} />
+          <Search
+            size={20}
+            color={currentTheme.textSecondary}
+            style={styles.searchIconStyle}
+          />
           <TextInput
             style={dynamicStyles.searchInput}
             placeholder="Search products..."
@@ -594,7 +629,9 @@ export default function HomeScreen() {
                 return `Search Results (${filteredProducts.length})`;
               }
               if (selectedCategory) {
-                const categoryName = categories.find((c) => c.id === selectedCategory)?.name;
+                const categoryName = categories.find(
+                  (c) => c.id === selectedCategory
+                )?.name;
                 return `${categoryName} (${filteredProducts.length})`;
               }
               return `All Products (${filteredProducts.length})`;
