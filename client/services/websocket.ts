@@ -1,6 +1,8 @@
 // services/websocket.ts
-import io, { Socket } from 'socket.io-client';
+import io from 'socket.io-client';
 import { tokenManager } from './api';
+
+type Socket = ReturnType<typeof io>;
 
 // Get the base URL for WebSocket connection
 // Laravel Echo Server runs on port 6001 by default
@@ -69,7 +71,6 @@ class WebSocketService {
           bearer_token: token, // Also send as bearer_token for Echo Server
         },
         forceNew: false,
-        debug: false,
       });
 
       this.setupEventHandlers(userId, userRole);
@@ -92,7 +93,7 @@ class WebSocketService {
       this.subscribeToChannels(userId, userRole);
     });
 
-    this.socket.on('disconnect', (reason) => {
+    this.socket.on('disconnect', (reason: any) => {
       console.log('WebSocket disconnected:', reason);
       this.isConnecting = false;
       
@@ -103,7 +104,7 @@ class WebSocketService {
       }
     });
 
-    this.socket.on('connect_error', (error) => {
+    this.socket.on('connect_error', (error: any) => {
       console.error('WebSocket connection error:', error);
       this.isConnecting = false;
       this.reconnectAttempts++;
@@ -113,7 +114,7 @@ class WebSocketService {
       }
     });
 
-    this.socket.on('reconnect', (attemptNumber) => {
+    this.socket.on('reconnect', (attemptNumber: any) => {
       console.log('WebSocket reconnected after', attemptNumber, 'attempts');
       this.reconnectAttempts = 0;
       this.subscribeToChannels(userId, userRole);
