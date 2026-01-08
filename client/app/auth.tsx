@@ -697,32 +697,34 @@ const RegisterScreen = ({
       />
     </View>
 
-    <View style={styles.inputWithIcon}>
-      <User size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="First Name"
-        placeholderTextColor={styles.placeholderColor}
-        value={registerData.first_name}
-        onChangeText={(text) =>
-          setRegisterData({ ...registerData, first_name: text })
-        }
-        autoCapitalize="words"
-      />
-    </View>
+    <View style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}>
+      <View style={[styles.inputWithIcon, { flex: 1, marginBottom: 0 }]}>
+        <User size={20} color={styles.inputIcon.color} />
+        <TextInput
+          style={styles.input}
+          placeholder="First Name"
+          placeholderTextColor={styles.placeholderColor}
+          value={registerData.first_name}
+          onChangeText={(text) =>
+            setRegisterData({ ...registerData, first_name: text })
+          }
+          autoCapitalize="words"
+        />
+      </View>
 
-    <View style={styles.inputWithIcon}>
-      <User size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Last Name"
-        placeholderTextColor={styles.placeholderColor}
-        value={registerData.last_name}
-        onChangeText={(text) =>
-          setRegisterData({ ...registerData, last_name: text })
-        }
-        autoCapitalize="words"
-      />
+      <View style={[styles.inputWithIcon, { flex: 1, marginBottom: 0 }]}>
+        <User size={20} color={styles.inputIcon.color} />
+        <TextInput
+          style={styles.input}
+          placeholder="Last Name"
+          placeholderTextColor={styles.placeholderColor}
+          value={registerData.last_name}
+          onChangeText={(text) =>
+            setRegisterData({ ...registerData, last_name: text })
+          }
+          autoCapitalize="words"
+        />
+      </View>
     </View>
 
     <View style={styles.inputWithIcon}>
@@ -945,7 +947,7 @@ const LoginScreen = ({
       <TouchableOpacity
         onPress={onForgotPassword}
         activeOpacity={0.7}
-        style={{ marginLeft: "auto", marginRight: - 14, alignItems: "center" }}
+        style={{ marginLeft: "auto", marginRight: -14, alignItems: "center" }}
       >
         <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
       </TouchableOpacity>
@@ -1077,7 +1079,6 @@ const EmailVerificationScreen = ({
           loop={true}
           fallbackIcon={Mail}
           fallbackColor={styles.iconColor}
-          
         />
       </View>
     </View>
@@ -1321,7 +1322,7 @@ const createStyles = (theme: any, isDark: boolean) =>
     container: {
       flex: 1,
       backgroundColor: theme.background,
-      marginTop: -24,
+      marginTop: -15,
     },
     keyboardAvoid: {
       flex: 1,
@@ -1410,7 +1411,7 @@ const createStyles = (theme: any, isDark: boolean) =>
     },
     linkContainer: {
       alignItems: "center",
-      paddingVertical: 8,
+      paddingVertical: 2,
     },
     linkText: {
       fontSize: 16,
