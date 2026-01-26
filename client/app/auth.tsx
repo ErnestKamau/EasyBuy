@@ -1322,7 +1322,7 @@ const createStyles = (theme: any, isDark: boolean) =>
     container: {
       flex: 1,
       backgroundColor: theme.background,
-      marginTop: -15,
+      marginTop: 0,
     },
     keyboardAvoid: {
       flex: 1,
@@ -1338,10 +1338,12 @@ const createStyles = (theme: any, isDark: boolean) =>
       borderRadius: 16,
       padding: 32,
       minHeight: 400,
+      marginTop: -4,
     },
     headerContainer: {
       alignItems: "center",
       marginBottom: 28,
+      marginTop: -20,
     },
     title: {
       fontSize: 32,
@@ -1350,12 +1352,15 @@ const createStyles = (theme: any, isDark: boolean) =>
       marginBottom: 8,
       letterSpacing: -0.5,
       fontFamily: headingFontFamily,
+      marginTop: -4,
     },
     subtitle: {
       fontSize: 16,
       color: theme.textSecondary,
       textAlign: "center",
       fontFamily: defaultFontFamily,
+      marginTop: -6,
+      marginBottom: -6,
     },
     inputWithIcon: {
       flexDirection: "row",
@@ -1367,11 +1372,12 @@ const createStyles = (theme: any, isDark: boolean) =>
       paddingHorizontal: 16,
       marginBottom: 20,
       minHeight: 56,
+      marginTop: -2,
     },
     input: {
       flex: 1,
       paddingVertical: 16,
-      fontSize: 16,
+      fontSize: 14,
       color: theme.text,
       fontFamily: defaultFontFamily,
     },
@@ -1389,7 +1395,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       paddingVertical: 18,
       alignItems: "center",
       justifyContent: "center",
-      marginBottom: 20,
+      marginBottom: 14,
       minHeight: 56,
       flexDirection: "row",
       gap: 8,
@@ -1398,6 +1404,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       shadowOpacity: 0.2,
       shadowRadius: 8,
       elevation: 4,
+      marginTop: -6,
     },
     primaryButtonText: {
       color: theme.surface,
@@ -1412,6 +1419,7 @@ const createStyles = (theme: any, isDark: boolean) =>
     linkContainer: {
       alignItems: "center",
       paddingVertical: 2,
+      marginBottom: 0,
     },
     linkText: {
       fontSize: 16,

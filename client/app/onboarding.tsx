@@ -81,39 +81,22 @@ const LottieAnimation = ({
   }
 };
 
+const goToLogin = () => {
+  AsyncStorage.setItem(ONBOARDING_KEY, "true");
+  router.replace("/auth?mode=login");
+};
+
+const goToRegister = () => {
+  AsyncStorage.setItem(ONBOARDING_KEY, "true");
+  router.replace("/auth?mode=register");
+};
+
 export default function OnboardingScreen() {
   const { currentTheme, themeName } = useTheme();
   const isDark = themeName === "dark";
   const insets = useSafeAreaInsets();
-  const [currentScreen, setCurrentScreen] = useState(0);
-  const [screenKey, setScreenKey] = useState(0);
 
   const styles = createStyles(currentTheme, isDark);
-
-  useEffect(() => {
-    setScreenKey((prev) => prev + 1);
-  }, [currentScreen]);
-
-  const handleNext = () => {
-    if (currentScreen === 0) {
-      setCurrentScreen(1);
-    } else {
-      // Mark onboarding as seen and go to auth
-      AsyncStorage.setItem(ONBOARDING_KEY, "true");
-      router.replace("/auth?mode=login");
-    }
-  };
-
-  const handleSkip = () => {
-    AsyncStorage.setItem(ONBOARDING_KEY, "true");
-    router.replace("/auth?mode=login");
-  };
-
-  const handleBack = () => {
-    if (currentScreen === 1) {
-      setCurrentScreen(0);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -127,113 +110,41 @@ export default function OnboardingScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Skip Button */}
-        {currentScreen === 0 && (
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={handleSkip}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.skipButtonText}>Skip</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Back Button (Screen 2 only) */}
-        {currentScreen === 1 && (
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <ArrowLeft size={24} color={currentTheme.text} />
-          </TouchableOpacity>
-        )}
-
         {/* Screen 1: Quality Khat, Delivered Fresh */}
-        {currentScreen === 0 && (
-          <Animated.View
-            entering={FadeIn.duration(400)}
-            exiting={FadeOut.duration(200)}
-            key={`screen-0-${screenKey}`}
-            style={styles.screenContainer}
-          >
-            <View style={styles.iconContainer}>
-              <LottieAnimation
-                source={require("@/assets/lottie/delivery-boy.json")}
-                size={300}
-                autoPlay={true}
-                loop={true}
-              />
-            </View>
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          exiting={FadeOut.duration(200)}
+          style={styles.screenContainer}
+        >
+          <View style={styles.iconContainer}>
+            <LottieAnimation
+              source={require("@/assets/lottie/delivery-boy.json")}
+              size={300}
+              autoPlay={true}
+              loop={true}
+            />
+          </View>
 
-            <View style={styles.textContainer}>
-              <Text style={styles.title}>Quality Khat,</Text>
-              <Text style={styles.titleHighlight}>Delivered Fresh</Text>
-              <Text style={styles.description}>
-                Get premium quality khat and refreshments delivered right to
-                your door. Fast, fresh, and convenient - perfect for when you
-                need it most.
-              </Text>
-            </View>
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>Welcome to EasyBuy</Text>
+            <Text style={styles.titleHighlight}>
+              Your one-stop shop for quality Mirraa and more
+            </Text>
+          </View>
 
-            <View style={styles.indicatorContainer}>
-              <View style={[styles.indicator, styles.indicatorActive]} />
-              <View style={styles.indicator} />
-            </View>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.primaryButton} onPress={goToLogin}>
+              <Text style={styles.primaryButtonText}>Login</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.nextButton}
-              onPress={handleNext}
-              activeOpacity={0.8}
+              style={styles.secondaryButton}
+              onPress={goToRegister}
             >
-              <Text style={styles.nextButtonText}>Next</Text>
-              <ArrowRight size={20} color={currentTheme.surface} />
+              <Text style={styles.secondaryButtonText}>Create Account</Text>
             </TouchableOpacity>
-          </Animated.View>
-        )}
-
-        {/* Screen 2: Chill, Connect, Enjoy */}
-        {currentScreen === 1 && (
-          <Animated.View
-            entering={SlideInRight.duration(400)}
-            exiting={SlideOutLeft.duration(200)}
-            key={`screen-1-${screenKey}`}
-            style={styles.screenContainer}
-          >
-            <View style={[styles.iconContainer, styles.iconContainerLarge]}>
-              <LottieAnimation
-                source={require("@/assets/lottie/skeleton-playing-guitar.json")}
-                size={300}
-                autoPlay={true}
-                loop={true}
-              />
-            </View>
-
-            <View style={styles.textContainer}>
-              <Text style={styles.title}>Chill, Connect,</Text>
-              <Text style={styles.titleHighlight}>Enjoy</Text>
-              <Text style={styles.description}>
-                Join our community and enjoy quality time with friends. Visit
-                our chill zone or have everything delivered - your choice, your
-                convenience.
-              </Text>
-            </View>
-
-            <View style={styles.indicatorContainer}>
-              <View style={styles.indicator} />
-              <View style={[styles.indicator, styles.indicatorActive]} />
-            </View>
-
-            <TouchableOpacity
-              style={styles.nextButton}
-              onPress={handleNext}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.nextButtonText}>Get Started</Text>
-              <ArrowRight size={20} color={currentTheme.surface} />
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+          </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -291,16 +202,16 @@ const createStyles = (theme: any, isDark: boolean) =>
       marginBottom: 30,
     },
     title: {
-      fontSize: 36,
+      fontSize: 24,
       fontWeight: "700",
       color: theme.primary,
       textAlign: "center",
       letterSpacing: -0.5,
-      marginBottom: 4,
+      marginBottom: 12,
       fontFamily: headingFontFamily,
     },
     titleHighlight: {
-      fontSize: 36,
+      fontSize: 24,
       fontWeight: "700",
       color: theme.primary,
       textAlign: "center",
@@ -353,6 +264,53 @@ const createStyles = (theme: any, isDark: boolean) =>
     nextButtonText: {
       color: theme.surface,
       fontSize: 18,
+      fontWeight: "600",
+      letterSpacing: 0.3,
+      fontFamily: defaultFontFamily,
+    },
+    buttonContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 16,
+    },
+    primaryButton: {
+      backgroundColor: theme.primary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      flexDirection: "row",
+      minHeight: 56,
+      shadowColor: theme.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    secondaryButton: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      minHeight: 56,
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+      gap: 8,
+    },
+    primaryButtonText: {
+      color: theme.surface,
+      fontSize: 16,
+      fontWeight: "600",
+      letterSpacing: 0.3,
+      fontFamily: defaultFontFamily,
+    },
+    secondaryButtonText: {
+      color: theme.primary,
+      fontSize: 16,
       fontWeight: "600",
       letterSpacing: 0.3,
       fontFamily: defaultFontFamily,
