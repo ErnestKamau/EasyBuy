@@ -16,6 +16,8 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "@/app/_layout";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Theme } from "@/constants/Themes";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "react-native";
 import {
@@ -30,6 +32,8 @@ import {
   Payment,
   paymentsApi,
   api,
+  Notification,
+  notificationsApi,
 } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
 import {
@@ -56,10 +60,13 @@ import {
   ChevronRight,
   Search,
   Filter,
+  Bell,
 } from "lucide-react-native";
 
 export default function AdminScreen() {
   const { user } = useAuth();
+  const { currentTheme, themeName } = useTheme();
+  const isDark = themeName === "dark";
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -67,7 +74,7 @@ export default function AdminScreen() {
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [salesAnalytics, setSalesAnalytics] = useState<SalesAnalytics | null>(
-    null
+    null,
   );
   const [unpaidSales, setUnpaidSales] = useState<Sale[]>([]);
   const [debts, setDebts] = useState<Sale[]>([]);
@@ -78,8 +85,19 @@ export default function AdminScreen() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "categories" | "products" | "orders" | "debts" | "alerts" | "sales"
+    | "categories"
+    | "products"
+    | "orders"
+    | "debts"
+    | "alerts"
+    | "sales"
+    | "notifications"
   >("orders");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationTab, setNotificationTab] = useState<"unread" | "read">(
+    "unread",
+  );
+  const [unreadCount, setUnreadCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const sidebarAnimation = useRef(new Animated.Value(0)).current;
 
@@ -146,6 +164,7 @@ export default function AdminScreen() {
     reference: "",
     notes: "",
   });
+  const styles = createStyles(currentTheme, isDark);
 
   useEffect(() => {
     if (user?.role !== "admin") {
@@ -252,7 +271,7 @@ export default function AdminScreen() {
 
       // Check if the product's category still exists
       const categoryExists = categories.some(
-        (cat) => cat.id === product.category
+        (cat) => cat.id === product.category,
       );
       const categoryValue = categoryExists ? product.category.toString() : "";
 
@@ -301,7 +320,7 @@ export default function AdminScreen() {
     if (status !== "granted") {
       ToastService.showError(
         "Permission Denied",
-        "We need camera roll permissions to add images"
+        "We need camera roll permissions to add images",
       );
       return;
     }
@@ -425,7 +444,7 @@ export default function AdminScreen() {
       // Handle mutual exclusivity
       if (productForm.measurementType === "kilogram") {
         productData.kilograms_in_stock = parseFloat(
-          productForm.kilograms_in_stock
+          productForm.kilograms_in_stock,
         );
         productData.minimum_stock = parseFloat(productForm.minimum_stock); // Minimum kg threshold
       } else {
@@ -475,7 +494,7 @@ export default function AdminScreen() {
                 await productsApi.deleteCategory(category.id);
                 ToastService.showSuccess(
                   "Success",
-                  "Category deleted successfully"
+                  "Category deleted successfully",
                 );
                 loadAdminData();
               } catch (error) {
@@ -484,7 +503,7 @@ export default function AdminScreen() {
             })();
           },
         },
-      ]
+      ],
     );
   };
 
@@ -503,7 +522,7 @@ export default function AdminScreen() {
                 await productsApi.deleteProduct(product.id);
                 ToastService.showSuccess(
                   "Success",
-                  "Product deleted successfully"
+                  "Product deleted successfully",
                 );
                 loadAdminData();
               } catch (error) {
@@ -512,7 +531,7 @@ export default function AdminScreen() {
             })();
           },
         },
-      ]
+      ],
     );
   };
 
@@ -529,10 +548,10 @@ export default function AdminScreen() {
         paymentStatus === "fully-paid" || paymentStatus === "partially-paid"
           ? "Paid"
           : paymentStatus === "debt"
-          ? "Debt"
-          : paymentStatus === "failed"
-          ? "Failed"
-          : "Pending"
+            ? "Debt"
+            : paymentStatus === "failed"
+              ? "Failed"
+              : "Pending"
       }\nAmount: KES ${order.total_amount?.toLocaleString() || 0}\n\n${
         isDebt
           ? "This will mark the order as debt with 7 days payment deadline."
@@ -555,7 +574,7 @@ export default function AdminScreen() {
                   "Success",
                   isDebt
                     ? "Order confirmed and marked as debt (7 days)"
-                    : "Order confirmed and sale created"
+                    : "Order confirmed and sale created",
                 );
                 loadAdminData();
               } catch (error) {
@@ -564,7 +583,7 @@ export default function AdminScreen() {
             })();
           },
         },
-      ]
+      ],
     );
   };
 
@@ -595,7 +614,7 @@ export default function AdminScreen() {
             })();
           },
         },
-      ]
+      ],
     );
   };
 
@@ -621,7 +640,7 @@ export default function AdminScreen() {
     if (paymentForm.method === "mpesa" && !paymentForm.phone_number) {
       ToastService.showError(
         "Validation Error",
-        "Phone number is required for M-Pesa payments"
+        "Phone number is required for M-Pesa payments",
       );
       return;
     }
@@ -646,7 +665,7 @@ export default function AdminScreen() {
 
       const response = await paymentsApi.addPayment(
         selectedSale.id,
-        paymentData
+        paymentData,
       );
 
       // If M-Pesa payment, initiate STK push
@@ -656,23 +675,23 @@ export default function AdminScreen() {
           const stkResponse = await mpesaApi.initiateStkPush(
             selectedSale.id,
             paymentForm.phone_number,
-            parseFloat(paymentForm.amount)
+            parseFloat(paymentForm.amount),
           );
           if (stkResponse.success) {
             ToastService.showSuccess(
               "Success",
-              "M-Pesa payment request sent to customer's phone"
+              "M-Pesa payment request sent to customer's phone",
             );
           } else {
             ToastService.showError(
               "M-Pesa Error",
-              stkResponse.message || "Failed to initiate M-Pesa payment"
+              stkResponse.message || "Failed to initiate M-Pesa payment",
             );
           }
         } catch (mpesaError) {
           ToastService.showApiError(
             mpesaError,
-            "Payment created but M-Pesa request failed"
+            "Payment created but M-Pesa request failed",
           );
         }
       } else {
@@ -688,7 +707,7 @@ export default function AdminScreen() {
       if (selectedSale) {
         const updatedDebts = await salesApi.getDebts();
         const updatedSale = updatedDebts.data.find(
-          (s) => s.id === selectedSale.id
+          (s) => s.id === selectedSale.id,
         );
         if (updatedSale) {
           setSelectedSale(updatedSale);
@@ -1019,14 +1038,14 @@ export default function AdminScreen() {
       item.payment_status === "fully-paid"
         ? "Fully Paid"
         : item.payment_status === "partially-paid"
-        ? "Partially Paid"
-        : item.payment_status === "debt"
-        ? "Debt"
-        : item.payment_status === "failed"
-        ? "Failed"
-        : item.payment_status === "pending"
-        ? "Pending"
-        : "Pending";
+          ? "Partially Paid"
+          : item.payment_status === "debt"
+            ? "Debt"
+            : item.payment_status === "failed"
+              ? "Failed"
+              : item.payment_status === "pending"
+                ? "Pending"
+                : "Pending";
 
     return (
       <View style={styles.orderCard}>
@@ -1037,14 +1056,31 @@ export default function AdminScreen() {
             </Text>
             <Text style={styles.orderCustomer}>{customerName}</Text>
             <Text style={styles.orderDate}>
-              {new Date(
-                `${item.order_date}T${item.order_time || "00:00:00"}`
-              ).toLocaleString()}
+              {(() => {
+                if (item.order_date) {
+                  const dateStr = String(item.order_date);
+                  const parsedDate = new Date(dateStr);
+                  console.log("Order date debug:", {
+                    raw: item.order_date,
+                    string: dateStr,
+                    parsed: parsedDate.toString(),
+                    isValid: !isNaN(parsedDate.getTime()),
+                  });
+                  return parsedDate.toLocaleString();
+                } else if (item.updated_at) {
+                  return new Date(item.updated_at).toLocaleString();
+                } else {
+                  return "Date unavailable";
+                }
+              })()}
             </Text>
           </View>
           <View style={styles.orderAmount}>
             <Text style={styles.orderTotal}>
-              Ksh {item.total_amount?.toLocaleString() || 0}
+              Ksh{" "}
+              {item.total_amount && item.total_amount > 0
+                ? item.total_amount.toLocaleString()
+                : "0"}
             </Text>
             <View
               style={[
@@ -1275,7 +1311,7 @@ export default function AdminScreen() {
     if (filters.dateFrom || filters.timeFrom) {
       filtered = filtered.filter((order) => {
         const orderDateTime = new Date(
-          `${order.order_date}T${order.order_time || "00:00:00"}`
+          `${order.order_date}T${order.order_time || "00:00:00"}`,
         );
         let fromDateTime = new Date();
 
@@ -1287,7 +1323,7 @@ export default function AdminScreen() {
               parseInt(hours) || 0,
               parseInt(minutes) || 0,
               0,
-              0
+              0,
             );
           } else {
             fromDateTime.setHours(0, 0, 0, 0);
@@ -1300,7 +1336,7 @@ export default function AdminScreen() {
             parseInt(hours) || 0,
             parseInt(minutes) || 0,
             0,
-            0
+            0,
           );
         }
 
@@ -1310,7 +1346,7 @@ export default function AdminScreen() {
     if (filters.dateTo || filters.timeTo) {
       filtered = filtered.filter((order) => {
         const orderDateTime = new Date(
-          `${order.order_date}T${order.order_time || "00:00:00"}`
+          `${order.order_date}T${order.order_time || "00:00:00"}`,
         );
         let toDateTime = new Date();
 
@@ -1322,7 +1358,7 @@ export default function AdminScreen() {
               parseInt(hours) || 0,
               parseInt(minutes) || 0,
               0,
-              0
+              0,
             );
           } else {
             toDateTime.setHours(23, 59, 59, 999);
@@ -1335,7 +1371,7 @@ export default function AdminScreen() {
             parseInt(hours) || 0,
             parseInt(minutes) || 0,
             0,
-            0
+            0,
           );
         }
 
@@ -1346,7 +1382,7 @@ export default function AdminScreen() {
     // Filter by order status
     if (filters.orderStatus) {
       filtered = filtered.filter(
-        (order) => order.order_status === filters.orderStatus
+        (order) => order.order_status === filters.orderStatus,
       );
     }
 
@@ -1354,8 +1390,8 @@ export default function AdminScreen() {
     if (filters.productId) {
       filtered = filtered.filter((order) =>
         order.items?.some(
-          (item) => item.product_id === parseInt(filters.productId)
-        )
+          (item) => item.product_id === parseInt(filters.productId),
+        ),
       );
     }
 
@@ -1397,7 +1433,7 @@ export default function AdminScreen() {
               parseInt(hours) || 0,
               parseInt(minutes) || 0,
               0,
-              0
+              0,
             );
           } else {
             fromDateTime.setHours(0, 0, 0, 0);
@@ -1410,7 +1446,7 @@ export default function AdminScreen() {
             parseInt(hours) || 0,
             parseInt(minutes) || 0,
             0,
-            0
+            0,
           );
         }
 
@@ -1430,7 +1466,7 @@ export default function AdminScreen() {
               parseInt(hours) || 0,
               parseInt(minutes) || 0,
               0,
-              0
+              0,
             );
           } else {
             toDateTime.setHours(23, 59, 59, 999);
@@ -1443,7 +1479,7 @@ export default function AdminScreen() {
             parseInt(hours) || 0,
             parseInt(minutes) || 0,
             0,
-            0
+            0,
           );
         }
 
@@ -1454,7 +1490,7 @@ export default function AdminScreen() {
     // Filter by payment status
     if (filters.paymentStatus) {
       filtered = filtered.filter(
-        (sale) => sale.payment_status === filters.paymentStatus
+        (sale) => sale.payment_status === filters.paymentStatus,
       );
     }
 
@@ -1462,8 +1498,8 @@ export default function AdminScreen() {
     if (filters.productId) {
       filtered = filtered.filter((sale) =>
         sale.items?.some(
-          (item) => item.product_id === parseInt(filters.productId)
-        )
+          (item) => item.product_id === parseInt(filters.productId),
+        ),
       );
     }
 
@@ -1497,7 +1533,7 @@ export default function AdminScreen() {
               parseInt(hours) || 0,
               parseInt(minutes) || 0,
               0,
-              0
+              0,
             );
           } else {
             fromDateTime.setHours(0, 0, 0, 0);
@@ -1510,7 +1546,7 @@ export default function AdminScreen() {
             parseInt(hours) || 0,
             parseInt(minutes) || 0,
             0,
-            0
+            0,
           );
         }
 
@@ -1530,7 +1566,7 @@ export default function AdminScreen() {
               parseInt(hours) || 0,
               parseInt(minutes) || 0,
               0,
-              0
+              0,
             );
           } else {
             toDateTime.setHours(23, 59, 59, 999);
@@ -1543,7 +1579,7 @@ export default function AdminScreen() {
             parseInt(hours) || 0,
             parseInt(minutes) || 0,
             0,
-            0
+            0,
           );
         }
 
@@ -1554,7 +1590,7 @@ export default function AdminScreen() {
     // Filter by payment status
     if (filters.paymentStatus) {
       filtered = filtered.filter(
-        (debt) => debt.payment_status === filters.paymentStatus
+        (debt) => debt.payment_status === filters.paymentStatus,
       );
     }
 
@@ -1568,14 +1604,14 @@ export default function AdminScreen() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((product) =>
-        product.name.toLowerCase().includes(query)
+        product.name.toLowerCase().includes(query),
       );
     }
 
     // Filter by category
     if (filters.categoryId) {
       filtered = filtered.filter(
-        (product) => product.category === parseInt(filters.categoryId)
+        (product) => product.category === parseInt(filters.categoryId),
       );
     }
 
@@ -1589,7 +1625,7 @@ export default function AdminScreen() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((category) =>
-        category.name.toLowerCase().includes(query)
+        category.name.toLowerCase().includes(query),
       );
     }
 
@@ -1775,7 +1811,7 @@ export default function AdminScreen() {
             style={styles.menuButton}
             onPress={() => setSidebarOpen(!sidebarOpen)}
           >
-            <Menu size={24} color="#1E293B" />
+            <Menu size={24} color={currentTheme.text} />
           </TouchableOpacity>
           <View style={styles.topBarContent}>
             <Text style={styles.topBarTitle}>
@@ -1805,7 +1841,7 @@ export default function AdminScreen() {
             style={styles.backButtonTop}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={24} color="#1E293B" />
+            <ArrowLeft size={24} color={currentTheme.text} />
           </TouchableOpacity>
         </View>
 
@@ -1824,12 +1860,12 @@ export default function AdminScreen() {
                   activeTab === "orders"
                     ? "Search by order number or customer name..."
                     : activeTab === "sales"
-                    ? "Search by sale number, customer name, or payment number..."
-                    : activeTab === "debts"
-                    ? "Search by customer name or sale number..."
-                    : activeTab === "products"
-                    ? "Search by product name..."
-                    : "Search by category name..."
+                      ? "Search by sale number, customer name, or payment number..."
+                      : activeTab === "debts"
+                        ? "Search by customer name or sale number..."
+                        : activeTab === "products"
+                          ? "Search by product name..."
+                          : "Search by category name..."
                 }
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -2190,7 +2226,7 @@ export default function AdminScreen() {
                   {getPaginatedData(
                     filteredOrders,
                     ordersPage,
-                    itemsPerPage
+                    itemsPerPage,
                   ).map((item) => (
                     <View key={item.id}>{renderOrderItem({ item })}</View>
                   ))}
@@ -2221,7 +2257,7 @@ export default function AdminScreen() {
                           ordersPage >=
                             getTotalPages(
                               filteredOrders.length,
-                              itemsPerPage
+                              itemsPerPage,
                             ) && styles.paginationButtonDisabled,
                         ]}
                         onPress={() =>
@@ -2229,10 +2265,10 @@ export default function AdminScreen() {
                             Math.min(
                               getTotalPages(
                                 filteredOrders.length,
-                                itemsPerPage
+                                itemsPerPage,
                               ),
-                              ordersPage + 1
-                            )
+                              ordersPage + 1,
+                            ),
                           )
                         }
                         disabled={
@@ -2277,7 +2313,7 @@ export default function AdminScreen() {
                   {getPaginatedData(filteredSales, salesPage, itemsPerPage).map(
                     (item) => (
                       <View key={item.id}>{renderSaleItem({ item })}</View>
-                    )
+                    ),
                   )}
                   {getTotalPages(filteredSales.length, itemsPerPage) > 1 && (
                     <View style={styles.paginationContainer}>
@@ -2309,8 +2345,8 @@ export default function AdminScreen() {
                           setSalesPage(
                             Math.min(
                               getTotalPages(filteredSales.length, itemsPerPage),
-                              salesPage + 1
-                            )
+                              salesPage + 1,
+                            ),
                           )
                         }
                         disabled={
@@ -2355,7 +2391,7 @@ export default function AdminScreen() {
                   {getPaginatedData(filteredDebts, debtsPage, itemsPerPage).map(
                     (item) => (
                       <View key={item.id}>{renderDebtItem({ item })}</View>
-                    )
+                    ),
                   )}
                   {getTotalPages(filteredDebts.length, itemsPerPage) > 1 && (
                     <View style={styles.paginationContainer}>
@@ -2387,8 +2423,8 @@ export default function AdminScreen() {
                           setDebtsPage(
                             Math.min(
                               getTotalPages(filteredDebts.length, itemsPerPage),
-                              debtsPage + 1
-                            )
+                              debtsPage + 1,
+                            ),
                           )
                         }
                         disabled={
@@ -3151,1202 +3187,1203 @@ export default function AdminScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-    marginBottom: 20,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: "#64748B",
-  },
+const createStyles = (theme: Theme, isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+      marginBottom: 20,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: theme.background,
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      color: theme.text,
+    },
 
-  // Sidebar
-  sidebar: {
-    width: 280,
-    backgroundColor: "#FFFFFF",
-    borderRightWidth: 1,
-    borderRightColor: "#E2E8F0",
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    zIndex: 1000,
-    shadowColor: "#000",
-    shadowOffset: { width: 2, height: 0 },
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  sidebarHeader: {
-    padding: 24,
-    paddingTop: 60,
-    backgroundColor: "#6366F1",
-    borderBottomWidth: 1,
-    borderBottomColor: "#4F46E5",
-  },
-  sidebarLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  sidebarTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    marginBottom: 4,
-  },
-  sidebarSubtitle: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
-  },
-  sidebarMenu: {
-    flex: 1,
-    paddingTop: 16,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginHorizontal: 12,
-    marginVertical: 4,
-    borderRadius: 12,
-  },
-  menuItemActive: {
-    backgroundColor: "#F3F4F6",
-  },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-    backgroundColor: "#F1F5F9",
-  },
-  menuLabel: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 24,
-    alignItems: "center",
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  sidebarFooter: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-  },
-  sidebarBackButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#F8FAFC",
-    gap: 8,
-  },
-  sidebarBackText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    zIndex: 999,
-  },
+    // Sidebar
+    sidebar: {
+      width: 280,
+      backgroundColor: theme.background,
+      borderRightWidth: 1,
+      borderRightColor: theme.border,
+      position: "absolute",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      zIndex: 1000,
+      shadowColor: "#000",
+      shadowOffset: { width: 2, height: 0 },
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    sidebarHeader: {
+      padding: 24,
+      paddingTop: 60,
+      backgroundColor: theme.primary,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? theme.border : theme.primary,
+    },
+    sidebarLogo: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+      backgroundColor: theme.primary,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    sidebarTitle: {
+      fontSize: 24,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 4,
+    },
+    sidebarSubtitle: {
+      fontSize: 14,
+      color: theme.text,
+    },
+    sidebarMenu: {
+      flex: 1,
+      paddingTop: 16,
+    },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      marginHorizontal: 12,
+      marginVertical: 4,
+      borderRadius: 12,
+    },
+    menuItemActive: {
+      backgroundColor: theme.surface,
+    },
+    menuIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+      backgroundColor: theme.surface,
+    },
+    menuLabel: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.textSecondary,
+    },
+    badge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      minWidth: 24,
+      alignItems: "center",
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    sidebarFooter: {
+      padding: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.surface,
+    },
+    sidebarBackButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 12,
+      borderRadius: 8,
+      backgroundColor: theme.surface,
+      gap: 8,
+    },
+    sidebarBackText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.textSecondary,
+    },
+    overlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      zIndex: 999,
+    },
 
-  // Main Content
-  mainContent: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 60,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  menuButton: {
-    padding: 8,
-    marginRight: 12,
-  },
-  topBarContent: {
-    flex: 1,
-  },
-  topBarTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 2,
-  },
-  topBarSubtitle: {
-    fontSize: 14,
-    color: "#64748B",
-  },
-  backButtonTop: {
-    padding: 8,
-    marginLeft: 12,
-  },
+    // Main Content
+    mainContent: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    topBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      paddingTop: 60,
+      backgroundColor: theme.background,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.surface,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    menuButton: {
+      padding: 8,
+      marginRight: 12,
+    },
+    topBarContent: {
+      flex: 1,
+    },
+    topBarTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 2,
+    },
+    topBarSubtitle: {
+      fontSize: 14,
+      color: theme.textSecondary,
+    },
+    backButtonTop: {
+      padding: 8,
+      marginLeft: 12,
+    },
 
-  // Search and Filter
-  searchFilterContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    gap: 12,
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: "#1E293B",
-  },
-  clearSearchButton: {
-    padding: 4,
-  },
-  filterButton: {
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  filterPanel: {
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  filterHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  filterTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  clearFiltersText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#8B5CF6",
-  },
-  filterRow: {
-    marginBottom: 16,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#64748B",
-    marginBottom: 8,
-  },
-  dateInputRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  dateInputContainer: {
-    flex: 1,
-  },
-  dateInputLabel: {
-    fontSize: 12,
-    color: "#64748B",
-    marginBottom: 4,
-  },
-  dateInput: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    fontSize: 14,
-    color: "#1E293B",
-  },
-  productFilterScroll: {
-    flexDirection: "row",
-  },
-  statusFilterRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  filterChipActive: {
-    backgroundColor: "#8B5CF6",
-    borderColor: "#8B5CF6",
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  filterChipTextActive: {
-    color: "#FFFFFF",
-  },
+    // Search and Filter
+    searchFilterContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.background,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.surface,
+      gap: 12,
+    },
+    searchContainer: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.surface,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.text,
+    },
+    clearSearchButton: {
+      padding: 4,
+    },
+    filterButton: {
+      padding: 10,
+      borderRadius: 8,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    filterPanel: {
+      backgroundColor: theme.background,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+    },
+    filterHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    filterTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    clearFiltersText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.textSecondary,
+    },
+    filterRow: {
+      marginBottom: 16,
+    },
+    filterLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.textSecondary,
+      marginBottom: 8,
+    },
+    dateInputRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    dateInputContainer: {
+      flex: 1,
+    },
+    dateInputLabel: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    dateInput: {
+      backgroundColor: theme.surface,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      fontSize: 14,
+      color: theme.text,
+    },
+    productFilterScroll: {
+      flexDirection: "row",
+    },
+    statusFilterRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    filterChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    filterChipActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    filterChipText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: theme.textSecondary,
+    },
+    filterChipTextActive: {
+      color: "#FFFFFF",
+    },
 
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: 60,
-    backgroundColor: "#8B5CF6",
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  placeholder: {
-    width: 40,
-  },
+    // Header
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      paddingTop: 60,
+      backgroundColor: theme.primary,
+    },
+    backButton: {
+      padding: 8,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: theme.text,
+    },
+    placeholder: {
+      width: 40,
+    },
 
-  // Tabs
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-  },
-  tab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    gap: 8,
-  },
-  activeTab: {
-    backgroundColor: "#8B5CF6",
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  activeTabText: {
-    color: "#FFFFFF",
-  },
+    // Tabs
+    tabContainer: {
+      flexDirection: "row",
+      backgroundColor: theme.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    tab: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 16,
+      gap: 8,
+    },
+    activeTab: {
+      backgroundColor: theme.primary,
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.textSecondary,
+    },
+    activeTabText: {
+      color: theme.text,
+    },
 
-  // Content
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  tabContent: {
-    paddingBottom: 20,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  addButton: {
-    backgroundColor: "#22C55E",
-    borderRadius: 8,
-    padding: 12,
-  },
+    // Content
+    content: {
+      flex: 1,
+      padding: 20,
+    },
+    tabContent: {
+      paddingBottom: 20,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    addButton: {
+      backgroundColor: theme.success,
+      borderRadius: 8,
+      padding: 12,
+    },
 
-  // Item Cards
-  itemCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  productListImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-    backgroundColor: "#F1F5F9",
-  },
-  productListImagePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-    backgroundColor: "#F1F5F9",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1E293B",
-    marginBottom: 4,
-  },
-  itemSubtitle: {
-    fontSize: 14,
-    color: "#64748B",
-  },
-  lowStockIndicator: {
-    fontSize: 12,
-    color: "#EF4444",
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  itemActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  editButton: {
-    backgroundColor: "#DBEAFE",
-    borderRadius: 8,
-    padding: 8,
-  },
-  deleteButton: {
-    backgroundColor: "#FEE2E2",
-    borderRadius: 8,
-    padding: 8,
-  },
+    // Item Cards
+    itemCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    productListImage: {
+      width: 60,
+      height: 60,
+      borderRadius: 8,
+      marginRight: 12,
+      backgroundColor: theme.surface,
+    },
+    productListImagePlaceholder: {
+      width: 60,
+      height: 60,
+      borderRadius: 8,
+      marginRight: 12,
+      backgroundColor: theme.surface,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    itemInfo: {
+      flex: 1,
+    },
+    itemName: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.text,
+      marginBottom: 4,
+    },
+    itemSubtitle: {
+      fontSize: 14,
+      color: theme.textSecondary,
+    },
+    lowStockIndicator: {
+      fontSize: 12,
+      color: theme.error,
+      fontWeight: "600",
+      marginTop: 4,
+    },
+    itemActions: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    editButton: {
+      backgroundColor: "#DBEAFE",
+      borderRadius: 8,
+      padding: 8,
+    },
+    deleteButton: {
+      backgroundColor: "#FEE2E2",
+      borderRadius: 8,
+      padding: 8,
+    },
 
-  // No Alerts
-  noAlerts: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 60,
-  },
-  noAlertsText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#22C55E",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  noAlertsSubtext: {
-    fontSize: 14,
-    color: "#64748B",
-  },
+    // No Alerts
+    noAlerts: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingVertical: 60,
+    },
+    noAlertsText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.success,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    noAlertsSubtext: {
+      fontSize: 14,
+      color: theme.textSecondary,
+    },
 
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalScrollView: {
-    flex: 1,
-    width: "100%",
-  },
-  modalContent: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    margin: 16,
-    maxWidth: 400,
-    width: "100%",
-    alignSelf: "center",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
-  closeButton: {
-    padding: 4,
-  },
+    // Modal
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalScrollView: {
+      flex: 1,
+      width: "100%",
+    },
+    modalContent: {
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      margin: 16,
+      maxWidth: 400,
+      width: "100%",
+      alignSelf: "center",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.surface,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.text,
+    },
+    closeButton: {
+      padding: 4,
+    },
 
-  // Form
-  formContainer: {
-    padding: 20,
-  },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1E293B",
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#1E293B",
-    backgroundColor: "#FFFFFF",
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: "top",
-  },
-  formRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  formColumn: {
-    flex: 1,
-  },
-  pickerContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  categoryOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F1F5F9",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  selectedCategoryOption: {
-    backgroundColor: "#22C55E",
-    borderColor: "#22C55E",
-  },
-  categoryOptionText: {
-    fontSize: 14,
-    color: "#64748B",
-  },
-  selectedCategoryOptionText: {
-    color: "#FFFFFF",
-  },
-  noCategoriesText: {
-    fontSize: 14,
-    color: "#EF4444",
-    fontStyle: "italic",
-    textAlign: "center",
-    padding: 16,
-  },
-  segmentedControl: {
-    flexDirection: "row",
-    backgroundColor: "#F1F5F9",
-    borderRadius: 8,
-    padding: 4,
-    marginBottom: 12,
-  },
-  segmentedButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  segmentedButtonActive: {
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  segmentedButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  segmentedButtonTextActive: {
-    color: "#22C55E",
-  },
-  errorContainer: {
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FEE2E2",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    fontSize: 14,
-    color: "#EF4444",
-    fontWeight: "500",
-  },
-  textInputError: {
-    borderColor: "#EF4444",
-    backgroundColor: "#FEF2F2",
-  },
-  fieldErrorText: {
-    fontSize: 12,
-    color: "#EF4444",
-    marginTop: 4,
-    marginBottom: 4,
-  },
+    // Form
+    formContainer: {
+      padding: 20,
+    },
+    fieldLabel: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.text,
+      marginBottom: 8,
+      marginTop: 12,
+    },
+    textInput: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: theme.text,
+      backgroundColor: theme.surface,
+    },
+    textArea: {
+      height: 80,
+      textAlignVertical: "top",
+    },
+    formRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    formColumn: {
+      flex: 1,
+    },
+    pickerContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    categoryOption: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    selectedCategoryOption: {
+      backgroundColor: theme.success,
+      borderColor: theme.success,
+    },
+    categoryOptionText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+    },
+    selectedCategoryOptionText: {
+      color: theme.text,
+    },
+    noCategoriesText: {
+      fontSize: 14,
+      color: theme.error,
+      fontStyle: "italic",
+      textAlign: "center",
+      padding: 16,
+    },
+    segmentedControl: {
+      flexDirection: "row",
+      backgroundColor: theme.surface,
+      borderRadius: 8,
+      padding: 4,
+      marginBottom: 12,
+    },
+    segmentedButton: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 6,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    segmentedButtonActive: {
+      backgroundColor: theme.surface,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    segmentedButtonText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.textSecondary,
+    },
+    segmentedButtonTextActive: {
+      color: theme.success,
+    },
+    errorContainer: {
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+    },
+    errorText: {
+      fontSize: 14,
+      color: theme.error,
+      fontWeight: "500",
+    },
+    textInputError: {
+      borderColor: theme.error,
+      backgroundColor: theme.surface,
+    },
+    fieldErrorText: {
+      fontSize: 12,
+      color: theme.error,
+      marginTop: 4,
+      marginBottom: 4,
+    },
 
-  // Modal Actions
-  modalActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    gap: 12,
-  },
-  cancelButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  saveButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#22C55E",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
+    // Modal Actions
+    modalActions: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      alignItems: "center",
+      padding: 20,
+      borderTopWidth: 1,
+      borderTopColor: theme.surface,
+      gap: 12,
+    },
+    cancelButton: {
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    cancelButtonText: {
+      fontSize: 16,
+      color: theme.textSecondary,
+      fontWeight: "600",
+    },
+    saveButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.success,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 8,
+      gap: 8,
+    },
+    saveButtonText: {
+      fontSize: 16,
+      color: theme.text,
+      fontWeight: "600",
+    },
 
-  // Order Styles
-  orderCard: {
-    backgroundColor: "#FFFFFF",
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-  },
-  orderHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-  orderInfo: {
-    flex: 1,
-  },
-  orderNumber: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 4,
-  },
-  orderCustomer: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 4,
-  },
-  orderDate: {
-    fontSize: 12,
-    color: "#94A3B8",
-  },
-  orderAmount: {
-    alignItems: "flex-end",
-  },
-  orderTotal: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#22C55E",
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  orderActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  confirmButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F0FDF4",
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  confirmButtonText: {
-    fontSize: 14,
-    color: "#22C55E",
-    fontWeight: "600",
-  },
-  orderCancelButtonText: {
-    fontSize: 14,
-    color: "#EF4444",
-    fontWeight: "600",
-  },
+    // Order Styles
+    orderCard: {
+      backgroundColor: theme.surface,
+      marginBottom: 16,
+      borderRadius: 16,
+      padding: 20,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    orderHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 16,
+    },
+    orderInfo: {
+      flex: 1,
+    },
+    orderNumber: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 4,
+    },
+    orderCustomer: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    orderDate: {
+      fontSize: 12,
+      color: theme.textSecondary,
+    },
+    orderAmount: {
+      alignItems: "flex-end",
+    },
+    orderTotal: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: "#22C55E",
+      marginBottom: 8,
+    },
+    statusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    orderActions: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    confirmButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#F0FDF4",
+      paddingVertical: 12,
+      borderRadius: 8,
+      gap: 6,
+    },
+    confirmButtonText: {
+      fontSize: 14,
+      color: "#22C55E",
+      fontWeight: "600",
+    },
+    orderCancelButtonText: {
+      fontSize: 14,
+      color: "#EF4444",
+      fontWeight: "600",
+    },
 
-  // No Orders
-  noOrders: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 60,
-  },
-  noOrdersText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#94A3B8",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  noOrdersSubtext: {
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-  },
+    // No Orders
+    noOrders: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingVertical: 60,
+    },
+    noOrdersText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: "#94A3B8",
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    noOrdersSubtext: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      textAlign: "center",
+    },
 
-  // Sales Styles
-  analyticsContainer: {
-    marginBottom: 16,
-  },
-  analyticsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 12,
-  },
-  analyticsCard: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  analyticsValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  analyticsLabel: {
-    fontSize: 12,
-    color: "#64748B",
-    textAlign: "center",
-  },
-  unpaidAlert: {
-    backgroundColor: "#FFFBEB",
-    borderRadius: 8,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-  unpaidAlertText: {
-    fontSize: 14,
-    color: "#92400E",
-    fontWeight: "500",
-  },
-  salesCard: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  salesHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  salesInfo: {
-    flex: 1,
-  },
-  saleNumber: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 4,
-  },
-  saleCustomer: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 4,
-  },
-  saleDate: {
-    fontSize: 12,
-    color: "#94A3B8",
-  },
-  salesAmount: {
-    alignItems: "flex-end",
-  },
-  saleTotal: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#22C55E",
-    marginBottom: 4,
-  },
-  saleProfit: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#3B82F6",
-    marginBottom: 8,
-  },
-  paymentStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  paymentStatusText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  paymentInfo: {
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-    paddingTop: 12,
-    marginBottom: 12,
-  },
-  paymentInfoText: {
-    fontSize: 14,
-    color: "#64748B",
-  },
-  salesActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  addPaymentButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#DBEAFE",
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-  },
-  addPaymentButtonText: {
-    fontSize: 14,
-    color: "#3B82F6",
-    fontWeight: "600",
-  },
-  noSales: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 60,
-  },
-  noSalesText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#94A3B8",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  noSalesSubtext: {
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-  },
+    // Sales Styles
+    analyticsContainer: {
+      marginBottom: 16,
+    },
+    analyticsRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginBottom: 12,
+    },
+    analyticsCard: {
+      flex: 1,
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    analyticsValue: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.text,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    analyticsLabel: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      textAlign: "center",
+    },
+    unpaidAlert: {
+      backgroundColor: isDark ? "#3B2D0F" : "#FFFBEB",
+      borderRadius: 8,
+      padding: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 16,
+    },
+    unpaidAlertText: {
+      fontSize: 14,
+      color: isDark ? "#FCD34D" : "#92400E",
+      fontWeight: "500",
+    },
+    salesCard: {
+      backgroundColor: theme.surface,
+      marginHorizontal: 16,
+      marginVertical: 8,
+      borderRadius: 12,
+      padding: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    salesHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 12,
+    },
+    salesInfo: {
+      flex: 1,
+    },
+    saleNumber: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: "#1E293B",
+      marginBottom: 4,
+    },
+    saleCustomer: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    saleDate: {
+      fontSize: 12,
+      color: theme.textSecondary,
+    },
+    salesAmount: {
+      alignItems: "flex-end",
+    },
+    saleTotal: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.success,
+      marginBottom: 4,
+    },
+    saleProfit: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.info,
+      marginBottom: 8,
+    },
+    paymentStatusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    paymentStatusText: {
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    paymentInfo: {
+      borderTopWidth: 1,
+      borderTopColor: isDark ? theme.border : "#F1F5F9",
+      paddingTop: 12,
+      marginBottom: 12,
+    },
+    paymentInfoText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+    },
+    salesActions: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    addPaymentButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: isDark ? "#1E3A5A" : "#DBEAFE",
+      paddingVertical: 10,
+      borderRadius: 8,
+      gap: 6,
+    },
+    addPaymentButtonText: {
+      fontSize: 14,
+      color: theme.info,
+      fontWeight: "600",
+    },
+    noSales: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingVertical: 60,
+    },
+    noSalesText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.textSecondary,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    noSalesSubtext: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      textAlign: "center",
+    },
 
-  // Payment Modal Styles
-  paymentSummary: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 20,
-  },
-  paymentSummaryTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 8,
-  },
-  paymentSummaryText: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 4,
-  },
-  paymentSummaryBalance: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#22C55E",
-    marginTop: 4,
-  },
-  paymentMethodContainer: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
-  },
-  paymentMethodOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F1F5F9",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  selectedPaymentMethodOption: {
-    backgroundColor: "#22C55E",
-    borderColor: "#22C55E",
-  },
-  paymentMethodOptionText: {
-    fontSize: 14,
-    color: "#64748B",
-  },
-  selectedPaymentMethodOptionText: {
-    color: "#FFFFFF",
-  },
+    // Payment Modal Styles
+    paymentSummary: {
+      backgroundColor: isDark ? theme.border : "#F8FAFC",
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 20,
+    },
+    paymentSummaryTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 8,
+    },
+    paymentSummaryText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    paymentSummaryBalance: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.success,
+      marginTop: 4,
+    },
+    paymentMethodContainer: {
+      flexDirection: "row",
+      gap: 8,
+      marginBottom: 12,
+    },
+    paymentMethodOption: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: isDark ? theme.border : "#F1F5F9",
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    selectedPaymentMethodOption: {
+      backgroundColor: theme.success,
+      borderColor: theme.success,
+    },
+    paymentMethodOptionText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+    },
+    selectedPaymentMethodOptionText: {
+      color: "#FFFFFF",
+    },
 
-  // Order Details Styles
-  orderDetailsSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-  },
-  orderDetailsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  orderDetailLabel: {
-    fontSize: 12,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-  orderDetailValue: {
-    fontSize: 12,
-    color: "#1E293B",
-    fontWeight: "600",
-  },
-  orderItemsSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-  },
-  orderItemsTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-    marginBottom: 8,
-  },
-  orderItemText: {
-    fontSize: 12,
-    color: "#64748B",
-    marginLeft: 8,
-    marginBottom: 4,
-  },
+    // Order Details Styles
+    orderDetailsSection: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    orderDetailsRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 4,
+    },
+    orderDetailLabel: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      fontWeight: "500",
+    },
+    orderDetailValue: {
+      fontSize: 12,
+      color: theme.text,
+      fontWeight: "600",
+    },
+    orderItemsSection: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? theme.border : "#F1F5F9",
+    },
+    orderItemsTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.text,
+      marginBottom: 8,
+    },
+    orderItemText: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginLeft: 8,
+      marginBottom: 4,
+    },
 
-  // Debt Card Styles
-  debtCard: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  debtHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-  debtInfo: {
-    flex: 1,
-  },
-  debtCustomer: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 4,
-  },
-  debtPhone: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 4,
-  },
-  debtSaleNumber: {
-    fontSize: 12,
-    color: "#94A3B8",
-  },
-  debtAmount: {
-    alignItems: "flex-end",
-  },
-  debtTotal: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#EF4444",
-    marginBottom: 8,
-  },
-  debtStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  debtStatusText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  debtDetails: {
-    marginBottom: 12,
-  },
-  debtDetailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F8FAFC",
-  },
-  debtDetailLabel: {
-    fontSize: 14,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-  debtDetailValue: {
-    fontSize: 14,
-    color: "#1E293B",
-    fontWeight: "600",
-  },
-  debtActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-  },
+    // Debt Card Styles
+    debtCard: {
+      backgroundColor: theme.surface,
+      marginHorizontal: 16,
+      marginVertical: 8,
+      borderRadius: 12,
+      padding: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    debtHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 16,
+    },
+    debtInfo: {
+      flex: 1,
+    },
+    debtCustomer: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 4,
+    },
+    debtPhone: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    debtSaleNumber: {
+      fontSize: 12,
+      color: theme.textSecondary,
+    },
+    debtAmount: {
+      alignItems: "flex-end",
+    },
+    debtTotal: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.error,
+      marginBottom: 8,
+    },
+    debtStatusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    debtStatusText: {
+      fontSize: 10,
+      fontWeight: "700",
+    },
+    debtDetails: {
+      marginBottom: 12,
+    },
+    debtDetailRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? theme.border : "#F8FAFC",
+    },
+    debtDetailLabel: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      fontWeight: "500",
+    },
+    debtDetailValue: {
+      fontSize: 14,
+      color: theme.text,
+      fontWeight: "600",
+    },
+    debtActions: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 8,
+    },
 
-  // Image Picker Styles
-  imagePickerContainer: {
-    marginBottom: 12,
-  },
-  imagePreviewContainer: {
-    position: "relative",
-    marginBottom: 12,
-    alignItems: "center",
-  },
-  imagePreview: {
-    width: 200,
-    height: 200,
-    borderRadius: 12,
-    backgroundColor: "#F1F5F9",
-  },
-  removeImageButton: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: "#EF4444",
-    borderRadius: 20,
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  imagePickerButton: {
-    backgroundColor: "#22C55E",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    alignItems: "center",
-  },
-  imagePickerButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  imagePickerHint: {
-    fontSize: 12,
-    color: "#64748B",
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  // Sales Details Styles
-  salesDetailsSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-  },
-  salesDetailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  salesDetailLabel: {
-    fontSize: 12,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-  salesDetailValue: {
-    fontSize: 12,
-    color: "#1E293B",
-    fontWeight: "600",
-  },
-  // Payment History Styles
-  paymentHistorySection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-  },
-  paymentHistoryTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-    marginBottom: 8,
-  },
-  paymentHistoryItem: {
-    marginBottom: 4,
-  },
-  paymentHistoryText: {
-    fontSize: 12,
-    color: "#64748B",
-    marginLeft: 8,
-  },
-  // Pagination Styles
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
-    marginBottom: 20,
-    gap: 16,
-    paddingHorizontal: 16,
-  },
-  paginationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  paginationButtonDisabled: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    opacity: 0.5,
-  },
-  paginationText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-    minWidth: 100,
-    textAlign: "center",
-  },
-});
+    // Image Picker Styles
+    imagePickerContainer: {
+      marginBottom: 12,
+    },
+    imagePreviewContainer: {
+      position: "relative",
+      marginBottom: 12,
+      alignItems: "center",
+    },
+    imagePreview: {
+      width: 200,
+      height: 200,
+      borderRadius: 12,
+      backgroundColor: isDark ? theme.border : "#F1F5F9",
+    },
+    removeImageButton: {
+      position: "absolute",
+      top: 8,
+      right: 8,
+      backgroundColor: theme.error,
+      borderRadius: 20,
+      width: 32,
+      height: 32,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    imagePickerButton: {
+      backgroundColor: theme.success,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      alignItems: "center",
+    },
+    imagePickerButtonText: {
+      color: "#FFFFFF",
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    imagePickerHint: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginBottom: 8,
+      marginTop: 4,
+    },
+    // Sales Details Styles
+    salesDetailsSection: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    salesDetailRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 8,
+    },
+    salesDetailLabel: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      fontWeight: "500",
+    },
+    salesDetailValue: {
+      fontSize: 12,
+      color: theme.text,
+      fontWeight: "600",
+    },
+    // Payment History Styles
+    paymentHistorySection: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    paymentHistoryTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.text,
+      marginBottom: 8,
+    },
+    paymentHistoryItem: {
+      marginBottom: 4,
+    },
+    paymentHistoryText: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginLeft: 8,
+    },
+    // Pagination Styles
+    paginationContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 20,
+      marginBottom: 20,
+      gap: 16,
+      paddingHorizontal: 16,
+    },
+    paginationButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 8,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    paginationButtonDisabled: {
+      backgroundColor: isDark ? theme.border : "#F8FAFC",
+      borderColor: theme.border,
+      opacity: 0.5,
+    },
+    paginationText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.text,
+      minWidth: 100,
+      textAlign: "center",
+    },
+  });

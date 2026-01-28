@@ -24,7 +24,6 @@ import {
   AlertTriangle,
   Package,
   Trash2,
-  ChevronRight,
 } from "lucide-react-native";
 
 // Helper function to create dynamic styles
@@ -72,34 +71,6 @@ const createDynamicStyles = (currentTheme: any, themeName: string) =>
       fontSize: 14,
       color: currentTheme.textSecondary,
       textAlign: "center",
-    },
-    notificationGroup: {
-      marginBottom: 16,
-    },
-    groupHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 20,
-      paddingVertical: 12,
-      backgroundColor: currentTheme.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: currentTheme.border,
-    },
-    groupTitle: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: currentTheme.textSecondary,
-      textTransform: "uppercase",
-    },
-    groupCount: {
-      fontSize: 12,
-      fontWeight: "600",
-      color: currentTheme.primary,
-      backgroundColor: currentTheme.primary + "20",
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
     },
     notificationItem: {
       backgroundColor: currentTheme.surface,
@@ -166,118 +137,36 @@ const createDynamicStyles = (currentTheme: any, themeName: string) =>
       fontWeight: "600",
       textTransform: "uppercase",
     },
+    // Tab styles
+    tabContainer: {
+      flexDirection: "row",
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      backgroundColor: currentTheme.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: currentTheme.border,
+      gap: 12,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      alignItems: "center",
+      backgroundColor: currentTheme.background,
+    },
+    activeTab: {
+      backgroundColor: currentTheme.primary,
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: currentTheme.textSecondary,
+    },
+    activeTabText: {
+      color: "#FFFFFF",
+    },
   });
-
-// Group notifications by type and time window
-const groupNotifications = (
-  notifications: Notification[]
-): Array<{
-  type: string;
-  title: string;
-  notifications: Notification[];
-  timeWindow: string;
-}> => {
-  const groups: Record<string, Notification[]> = {};
-  const now = new Date();
-  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-
-  notifications.forEach((notification) => {
-    const createdAt = new Date(notification.created_at);
-    const isRecent = createdAt >= oneHourAgo;
-    const groupKey = isRecent
-      ? `${notification.type}_recent`
-      : `${notification.type}_older`;
-
-    if (!groups[groupKey]) {
-      groups[groupKey] = [];
-    }
-    groups[groupKey].push(notification);
-  });
-
-  // Convert to array and sort
-  return Object.entries(groups)
-    .map(([key, notifs]) => {
-      const type = notifs[0].type;
-      const isRecent = key.includes("_recent");
-      const count = notifs.length;
-
-      let title = "";
-      switch (type) {
-        case "order_placed":
-          title = count === 1 ? "New Order" : `${count} New Orders`;
-          break;
-        case "order_confirmed":
-          title = count === 1 ? "Order Confirmed" : `${count} Orders Confirmed`;
-          break;
-        case "order_cancelled":
-          title = count === 1 ? "Order Cancelled" : `${count} Orders Cancelled`;
-          break;
-        case "debt_warning_2days":
-          title =
-            count === 1 ? "Payment Due Soon" : `${count} Payments Due Soon`;
-          break;
-        case "debt_warning_admin_2days":
-          title =
-            count === 1
-              ? "Customer Payment Due"
-              : `${count} Customer Payments Due`;
-          break;
-        case "debt_overdue":
-          title = count === 1 ? "Payment Overdue" : `${count} Payments Overdue`;
-          break;
-        case "debt_overdue_admin":
-          title =
-            count === 1
-              ? "Customer Payment Overdue"
-              : `${count} Customer Payments Overdue`;
-          break;
-        case "payment_received":
-          title =
-            count === 1 ? "Payment Received" : `${count} Payments Received`;
-          break;
-        case "payment_received_admin":
-          title =
-            count === 1 ? "Payment Received" : `${count} Payments Received`;
-          break;
-        case "sale_fully_paid":
-          title =
-            count === 1 ? "Payment Complete" : `${count} Payments Complete`;
-          break;
-        case "low_stock_alert":
-          title = count === 1 ? "Low Stock Alert" : `${count} Low Stock Alerts`;
-          break;
-        case "refund_processed":
-          title =
-            count === 1 ? "Refund Processed" : `${count} Refunds Processed`;
-          break;
-        case "new_product_available":
-          title = count === 1 ? "New Product" : `${count} New Products`;
-          break;
-        default:
-          title = `${count} Notifications`;
-      }
-
-      return {
-        type,
-        title,
-        notifications: notifs.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        ),
-        timeWindow: isRecent ? "recent" : "older",
-      };
-    })
-    .sort((a, b) => {
-      // Sort by time window (recent first), then by type
-      if (a.timeWindow !== b.timeWindow) {
-        return a.timeWindow === "recent" ? -1 : 1;
-      }
-      return (
-        new Date(b.notifications[0].created_at).getTime() -
-        new Date(a.notifications[0].created_at).getTime()
-      );
-    });
-};
 
 // Get icon for notification type
 const getNotificationIcon = (type: string) => {
@@ -376,7 +265,7 @@ export default function NotificationModal() {
     deleteNotification,
   } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<"unread" | "read">("unread");
 
   const dynamicStyles = createDynamicStyles(currentTheme, themeName);
 
@@ -404,27 +293,19 @@ export default function NotificationModal() {
     });
   }, [navigation, unreadCount, markAllAsRead, currentTheme.primary]);
 
-  // Group notifications
-  const groupedNotifications = useMemo(() => {
-    return groupNotifications(notifications);
-  }, [notifications]);
+  // Filter notifications based on active tab
+  const filteredNotifications = useMemo(() => {
+    if (activeTab === "unread") {
+      return notifications.filter((n) => !n.read_at);
+    } else {
+      return notifications.filter((n) => n.read_at);
+    }
+  }, [notifications, activeTab]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await refreshNotifications();
     setRefreshing(false);
-  };
-
-  const toggleGroup = (groupKey: string) => {
-    setExpandedGroups((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(groupKey)) {
-        newSet.delete(groupKey);
-      } else {
-        newSet.add(groupKey);
-      }
-      return newSet;
-    });
   };
 
   const handleNotificationPress = async (notification: Notification) => {
@@ -497,71 +378,25 @@ export default function NotificationModal() {
           {isUnread && (
             <TouchableOpacity
               style={dynamicStyles.actionIcon}
-              onPress={() => markAsRead(notification.id)}
+              onPress={(e) => {
+                e.stopPropagation();
+                markAsRead(notification.id);
+              }}
             >
               <CheckCircle2 size={18} color={currentTheme.primary} />
             </TouchableOpacity>
           )}
           <TouchableOpacity
             style={dynamicStyles.actionIcon}
-            onPress={() => deleteNotification(notification.id)}
+            onPress={(e) => {
+              e.stopPropagation();
+              deleteNotification(notification.id);
+            }}
           >
             <Trash2 size={18} color={currentTheme.error} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
-    );
-  };
-
-  const renderGroup = (group: {
-    type: string;
-    title: string;
-    notifications: Notification[];
-    timeWindow: string;
-  }) => {
-    const groupKey = `${group.type}_${group.timeWindow}`;
-    const isExpanded = expandedGroups.has(groupKey);
-    const unreadInGroup = group.notifications.filter((n) => !n.read_at).length;
-
-    return (
-      <View key={groupKey} style={dynamicStyles.notificationGroup}>
-        <TouchableOpacity
-          style={dynamicStyles.groupHeader}
-          onPress={() => toggleGroup(groupKey)}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Text style={dynamicStyles.groupTitle}>{group.title}</Text>
-            {unreadInGroup > 0 && (
-              <View style={dynamicStyles.groupCount}>
-                <Text
-                  style={{
-                    color: currentTheme.primary,
-                    fontSize: 11,
-                    fontWeight: "700",
-                  }}
-                >
-                  {unreadInGroup}
-                </Text>
-              </View>
-            )}
-          </View>
-          <ChevronRight
-            size={16}
-            color={currentTheme.textSecondary}
-            style={{ transform: [{ rotate: isExpanded ? "90deg" : "0deg" }] }}
-          />
-        </TouchableOpacity>
-
-        {isExpanded && (
-          <View>
-            {group.notifications.map((notification) => (
-              <View key={notification.id}>
-                {renderNotificationItem(notification)}
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
     );
   };
 
@@ -585,10 +420,45 @@ export default function NotificationModal() {
         backgroundColor={currentTheme.surface}
       />
 
-      {/* Header actions will be handled by Expo Router modal header */}
+      {/* Tab Buttons */}
+      <View style={dynamicStyles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            dynamicStyles.tab,
+            activeTab === "unread" && dynamicStyles.activeTab,
+          ]}
+          onPress={() => setActiveTab("unread")}
+        >
+          <Text
+            style={[
+              dynamicStyles.tabText,
+              activeTab === "unread" && dynamicStyles.activeTabText,
+            ]}
+          >
+            Unread ({notifications.filter((n) => !n.read_at).length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            dynamicStyles.tab,
+            activeTab === "read" && dynamicStyles.activeTab,
+          ]}
+          onPress={() => setActiveTab("read")}
+        >
+          <Text
+            style={[
+              dynamicStyles.tabText,
+              activeTab === "read" && dynamicStyles.activeTabText,
+            ]}
+          >
+            Read
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Notifications List */}
-      {notifications.length === 0 ? (
+      {filteredNotifications.length === 0 ? (
         <ScrollView
           contentContainerStyle={{ flex: 1 }}
           refreshControl={
@@ -603,17 +473,21 @@ export default function NotificationModal() {
             <View style={dynamicStyles.emptyIcon}>
               <Bell size={48} color={currentTheme.textSecondary} />
             </View>
-            <Text style={dynamicStyles.emptyTitle}>No Notifications</Text>
+            <Text style={dynamicStyles.emptyTitle}>
+              No {activeTab} Notifications
+            </Text>
             <Text style={dynamicStyles.emptySubtitle}>
-              You're all caught up! New notifications will appear here.
+              {activeTab === "unread"
+                ? "You're all caught up! New notifications will appear here."
+                : "No read notifications yet."}
             </Text>
           </View>
         </ScrollView>
       ) : (
         <FlatList
-          data={groupedNotifications}
-          renderItem={({ item }) => renderGroup(item)}
-          keyExtractor={(item) => `${item.type}_${item.timeWindow}`}
+          data={filteredNotifications}
+          renderItem={({ item }) => renderNotificationItem(item)}
+          keyExtractor={(item) => item.id.toString()}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

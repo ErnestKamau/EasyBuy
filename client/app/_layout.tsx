@@ -95,7 +95,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(
-    null
+    null,
   );
   const [initialNavigationComplete, setInitialNavigationComplete] =
     useState(false);
@@ -120,7 +120,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
         setIsAuthenticated(true);
         ToastService.showSuccess(
           "Welcome back!",
-          `Hello, ${currentUser.username}`
+          `Hello, ${currentUser.username}`,
         );
       } else {
         await tokenManager.clearTokens();
@@ -144,7 +144,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       setIsAuthenticated(true);
       ToastService.showSuccess(
         "Login Successful!",
-        `Welcome back, ${response.user.username}`
+        `Welcome back, ${response.user.username}`,
       );
     } catch (error) {
       console.log("Login failed", error);
@@ -162,8 +162,10 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       setUser(null);
       setIsAuthenticated(false);
       setInitialNavigationComplete(false);
-      // Redirect to onboarding after logout
-      router.replace("/onboarding");
+      // Clear onboarding flag so user is redirected to onboarding
+      await AsyncStorage.removeItem(ONBOARDING_KEY);
+      // Navigate to root and let navigation logic redirect to onboarding
+      router.replace("/");
     }
   }, [router]);
 
@@ -290,7 +292,7 @@ function AuthProvider({ children }: { readonly children: React.ReactNode }) {
       logout,
       refreshAuth,
       checkVerificationStatus,
-    ]
+    ],
   );
 
   // Show loading screen until auth check completes AND initial navigation is set
@@ -423,12 +425,12 @@ function RootLayoutNav() {
                   router.replace("/(tabs)");
                 },
               },
-            ]
+            ],
           );
         } else {
           Alert.alert(
             "Verification Pending",
-            "Please wait a moment and try again, or check your email for the verification link."
+            "Please wait a moment and try again, or check your email for the verification link.",
           );
         }
       }

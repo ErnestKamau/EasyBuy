@@ -211,7 +211,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       fontFamily: headingFontFamily,
     },
     titleHighlight: {
-      fontSize: 24,
+      fontSize: 22,
       fontWeight: "700",
       color: theme.primary,
       textAlign: "center",
@@ -272,7 +272,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       flexDirection: "row",
       justifyContent: "center",
       alignItems: "center",
-      gap: 16,
+      gap: 32,
     },
     primaryButton: {
       backgroundColor: theme.primary,

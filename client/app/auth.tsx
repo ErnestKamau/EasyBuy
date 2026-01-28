@@ -11,6 +11,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Dimensions,
+  Image,
 } from "react-native";
 import {
   SafeAreaView,
@@ -137,7 +138,7 @@ export default function AuthScreens() {
   const isDark = themeName === "dark";
 
   const [currentScreen, setCurrentScreen] = useState<AuthScreen>(
-    (params.mode as AuthScreen) || "login"
+    (params.mode as AuthScreen) || "login",
   );
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -182,15 +183,9 @@ export default function AuthScreens() {
 
   const styles = createStyles(currentTheme, isDark);
   const insets = useSafeAreaInsets();
-  const [screenKey, setScreenKey] = useState(0);
 
   // Refs for OTP inputs
   const codeInputRefs = useRef<(TextInput | null)[]>([]);
-
-  // Update screen key when screen changes for animation
-  useEffect(() => {
-    setScreenKey((prev) => prev + 1);
-  }, [currentScreen]);
 
   // Handle login
   const handleLogin = useCallback(async () => {
@@ -224,7 +219,7 @@ export default function AuthScreens() {
     ) {
       ToastService.showError(
         "Validation Error",
-        "Please fill in all required fields"
+        "Please fill in all required fields",
       );
       return;
     }
@@ -232,7 +227,7 @@ export default function AuthScreens() {
     if (!privacyAccepted) {
       ToastService.showError(
         "Privacy Policy",
-        "Please accept the privacy policy to continue"
+        "Please accept the privacy policy to continue",
       );
       return;
     }
@@ -245,7 +240,7 @@ export default function AuthScreens() {
     if (registerData.password.length < 8) {
       ToastService.showError(
         "Weak Password",
-        "Password must be at least 8 characters long"
+        "Password must be at least 8 characters long",
       );
       return;
     }
@@ -261,7 +256,7 @@ export default function AuthScreens() {
     if (!dateRegex.test(registerData.date_of_birth)) {
       ToastService.showError(
         "Invalid Date",
-        "Please enter date of birth in YYYY-MM-DD format"
+        "Please enter date of birth in YYYY-MM-DD format",
       );
       return;
     }
@@ -276,7 +271,7 @@ export default function AuthScreens() {
     if (birthDate > today) {
       ToastService.showError(
         "Invalid Date",
-        "Date of birth cannot be in the future"
+        "Date of birth cannot be in the future",
       );
       return;
     }
@@ -291,7 +286,7 @@ export default function AuthScreens() {
       setVerificationCode(["", "", "", ""]);
       ToastService.showSuccess(
         "Registration Successful!",
-        "Please check your email for the OTP verification code"
+        "Please check your email for the OTP verification code",
       );
     } catch (error) {
       ToastService.showApiError(error, "Registration Failed");
@@ -323,7 +318,7 @@ export default function AuthScreens() {
       setCurrentScreen("email-verification");
       ToastService.showSuccess(
         "Code Sent",
-        "Please check your email for the OTP verification code"
+        "Please check your email for the OTP verification code",
       );
     } catch (error) {
       ToastService.showApiError(error, "Failed to send code");
@@ -380,7 +375,7 @@ export default function AuthScreens() {
         await authApi.verifyEmailCode(userEmail, code);
         ToastService.showSuccess(
           "Email Verified!",
-          "Your email has been verified successfully"
+          "Your email has been verified successfully",
         );
         setCurrentScreen("account-created");
       } else {
@@ -388,7 +383,7 @@ export default function AuthScreens() {
         await authApi.verifyResetCode(userEmail, code);
         ToastService.showSuccess(
           "Code Verified!",
-          "Please set your new password"
+          "Please set your new password",
         );
         setCurrentScreen("reset-password");
       }
@@ -421,7 +416,7 @@ export default function AuthScreens() {
     if (resetPasswordData.password.length < 8) {
       ToastService.showError(
         "Weak Password",
-        "Password must be at least 8 characters"
+        "Password must be at least 8 characters",
       );
       return;
     }
@@ -433,7 +428,7 @@ export default function AuthScreens() {
         userEmail,
         code,
         resetPasswordData.password,
-        resetPasswordData.password_confirmation
+        resetPasswordData.password_confirmation,
       );
       // Clear password fields
       setResetPasswordData({
@@ -443,7 +438,7 @@ export default function AuthScreens() {
       setCurrentScreen("password-changed");
       ToastService.showSuccess(
         "Password Reset",
-        "Your password has been reset successfully"
+        "Your password has been reset successfully",
       );
     } catch (error) {
       ToastService.showApiError(error, "Password Reset Failed");
@@ -472,7 +467,7 @@ export default function AuthScreens() {
       }
       ToastService.showSuccess(
         "Code Sent",
-        "Verification code resent to your email"
+        "Verification code resent to your email",
       );
     } catch (error) {
       ToastService.showApiError(error, "Failed to resend code");
@@ -488,7 +483,6 @@ export default function AuthScreens() {
           <Animated.View
             entering={FadeIn.duration(300)}
             exiting={FadeOut.duration(200)}
-            key={screenKey}
           >
             <RegisterScreen
               registerData={registerData}
@@ -511,7 +505,6 @@ export default function AuthScreens() {
           <Animated.View
             entering={FadeIn.duration(300)}
             exiting={FadeOut.duration(200)}
-            key={screenKey}
           >
             <LoginScreen
               loginData={loginData}
@@ -533,7 +526,6 @@ export default function AuthScreens() {
           <Animated.View
             entering={SlideInRight.duration(300)}
             exiting={SlideOutLeft.duration(200)}
-            key={screenKey}
           >
             <ForgotPasswordScreen
               email={forgotPasswordEmail}
@@ -550,7 +542,6 @@ export default function AuthScreens() {
           <Animated.View
             entering={SlideInRight.duration(300)}
             exiting={SlideOutLeft.duration(200)}
-            key={screenKey}
           >
             <EmailVerificationScreen
               email={userEmail}
@@ -574,7 +565,6 @@ export default function AuthScreens() {
           <Animated.View
             entering={SlideInRight.duration(300)}
             exiting={SlideOutLeft.duration(200)}
-            key={screenKey}
           >
             <ResetPasswordScreen
               passwordData={resetPasswordData}
@@ -594,7 +584,6 @@ export default function AuthScreens() {
           <Animated.View
             entering={FadeIn.duration(400).springify()}
             exiting={FadeOut.duration(200)}
-            key={screenKey}
           >
             <AccountCreatedScreen
               onContinue={() => {
@@ -622,7 +611,6 @@ export default function AuthScreens() {
           <Animated.View
             entering={FadeIn.duration(400).springify()}
             exiting={FadeOut.duration(200)}
-            key={screenKey}
           >
             <PasswordChangedScreen
               onContinue={() => setCurrentScreen("login")}
@@ -888,6 +876,18 @@ const LoginScreen = ({
   styles,
 }: any) => (
   <View style={styles.formContainer}>
+    <View style={{ alignItems: "center", marginBottom: 16 }}>
+      <Image
+        source={require("@/assets/images/online-shopping-from-mobile.png")}
+        style={{
+          width: 180,
+          height: 180,
+          marginBottom: 12,
+        }}
+        resizeMode="contain"
+      />
+    </View>
+
     <View style={styles.headerContainer}>
       <Text style={styles.title}>Login Account</Text>
       <Text style={styles.subtitle}>Welcome Back!</Text>
@@ -1336,9 +1336,10 @@ const createStyles = (theme: any, isDark: boolean) =>
     formContainer: {
       backgroundColor: theme.surface,
       borderRadius: 16,
-      padding: 32,
+      padding: 24,
       minHeight: 400,
       marginTop: -4,
+      borderWidth: 2,
     },
     headerContainer: {
       alignItems: "center",

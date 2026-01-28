@@ -26,6 +26,11 @@ class Order extends Model
     ];
 
     /**
+     * Accessors to append to model's array/JSON form
+     */
+    protected $appends = ['total_amount'];
+
+    /**
      * Boot the model
      */
     protected static function boot()

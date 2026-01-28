@@ -22,6 +22,11 @@ class OrderItem extends Model
     ];
 
     /**
+     * Accessors to append to model's array/JSON form
+     */
+    protected $appends = ['subtotal'];
+
+    /**
      * Get the order that owns this item
      */
     public function order(): BelongsTo

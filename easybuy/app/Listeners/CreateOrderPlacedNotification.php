@@ -4,13 +4,9 @@ namespace App\Listeners;
 
 use App\Events\OrderPlaced;
 use App\Services\NotificationService;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 
-class CreateOrderPlacedNotification implements ShouldQueue
+class CreateOrderPlacedNotification
 {
-    use InteractsWithQueue;
-
     /**
      * Handle the event.
      */
