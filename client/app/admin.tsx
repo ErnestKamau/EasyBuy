@@ -1723,6 +1723,26 @@ export default function AdminScreen() {
           style={styles.sidebarMenu}
           showsVerticalScrollIndicator={false}
         >
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              router.push("/awaiting-pickup" as any);
+              setSidebarOpen(false);
+            }}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: "#F59E0B20" }]}>
+              <Clock size={20} color="#F59E0B" />
+            </View>
+            <Text
+              style={[
+                styles.menuLabel,
+                { color: "#F59E0B", fontWeight: "700" },
+              ]}
+            >
+              Awaiting Pickup
+            </Text>
+          </TouchableOpacity>
+
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;

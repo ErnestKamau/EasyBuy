@@ -25,3 +25,9 @@ Schedule::job(new SendDebtWarningNotifications)->daily();
 Schedule::call(function () {
     NotificationService::cleanupOldNotifications(30);
 })->daily();
+
+// Send pickup reminders (every 30 minutes)
+Schedule::job(new \App\Jobs\SendPickupRemindersJob)->everyThirtyMinutes();
+
+// Auto-cancel overdue orders (every hour)
+Schedule::job(new \App\Jobs\AutoCancelOverdueOrdersJob)->hourly();

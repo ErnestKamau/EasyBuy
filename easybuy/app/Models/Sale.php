@@ -24,6 +24,8 @@ class Sale extends Model
         'due_date',
         'receipt_generated',
         'made_on',
+        'fulfillment_status',
+        'fulfilled_at',
     ];
 
     protected $casts = [
@@ -34,6 +36,7 @@ class Sale extends Model
         'due_date' => 'datetime',
         'receipt_generated' => 'boolean',
         'made_on' => 'datetime',
+        'fulfilled_at' => 'datetime',
     ];
 
     /**
@@ -322,5 +325,56 @@ class Sale extends Model
     public function canAddPayment(float $amount): bool
     {
         return $this->balance >= $amount && $this->payment_status !== 'fully-paid';
+    }
+
+    /**
+     * Process wallet adjustment after all payments are added
+     * Called when admin confirms pickup
+     */
+    public function processWalletAdjustment(): void
+    {
+        if (!$this->order || !$this->order->user) {
+            return;
+        }
+        
+        $user = $this->order->user;
+        $difference = (float) $this->total_paid - (float) $this->total_amount;
+        
+        // Exact payment - no adjustment needed
+        if (abs($difference) < 0.01) {
+            return;
+        }
+        
+        if ($difference > 0) {
+            // Overpayment - credit to wallet
+            WalletTransaction::createTransaction(
+                $user->id,
+                $difference,
+                'overpayment',
+                "Overpayment from order {$this->order->order_number}: KES " . number_format($difference, 2),
+                $this->order_id,
+                $this->id
+            );
+        } else {
+            // Underpayment - create debt
+            WalletTransaction::createTransaction(
+                $user->id,
+                $difference, // Negative amount
+                'underpayment',
+                "Debt from order {$this->order->order_number}: KES " . number_format(abs($difference), 2) . " remaining",
+                $this->order_id,
+                $this->id
+            );
+        }
+    }
+
+    /**
+     * Mark sale as fulfilled (pickup complete)
+     */
+    public function markAsFulfilled(): void
+    {
+        $this->fulfillment_status = 'fulfilled';
+        $this->fulfilled_at = Carbon::now();
+        $this->save();
     }
 }

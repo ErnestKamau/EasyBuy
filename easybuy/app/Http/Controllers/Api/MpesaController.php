@@ -51,17 +51,43 @@ class MpesaController extends Controller
     public function initiateStkPush(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'sale_id' => 'required|exists:sales,id',
+            'sale_id' => 'nullable|exists:sales,id',
+            'order_id' => 'nullable|exists:orders,id',
             'phone_number' => 'required|string|regex:/^(\+?254|0)[17]\d{8}$/',
             'amount' => 'required|numeric|min:1',
         ]);
 
+        if (empty($validated['sale_id']) && empty($validated['order_id'])) {
+            return response()->json(['success' => false, 'message' => 'Either sale_id or order_id is required'], 422);
+        }
+
         DB::beginTransaction();
         try {
-            $sale = Sale::findOrFail($validated['sale_id']);
+            $accountReference = '';
+            $transactionDesc = '';
+            $sale = null;
+            $order = null;
 
-            // Validate amount doesn't exceed balance
-            Payment::validateAmount($sale, (float) $validated['amount']);
+            if (!empty($validated['sale_id'])) {
+                $sale = Sale::findOrFail($validated['sale_id']);
+                Payment::validateAmount($sale, (float) $validated['amount']);
+                $accountReference = $sale->sale_number;
+                $transactionDesc = "Payment for Sale {$sale->sale_number}";
+            } elseif (!empty($validated['order_id'])) {
+                $order = \App\Models\Order::findOrFail($validated['order_id']);
+                // Check if order already has a sale
+                if ($order->sale) {
+                    $sale = $order->sale;
+                    Payment::validateAmount($sale, (float) $validated['amount']);
+                    $accountReference = $sale->sale_number;
+                    $transactionDesc = "Payment for Sale {$sale->sale_number}";
+                } else {
+                    // Pre-sale payment for Order
+                    $accountReference = $order->order_number;
+                    $transactionDesc = "Payment for Order {$order->order_number}";
+                    // TODO: Validate order payment amount if needed (e.g. against order total)
+                }
+            }
 
             // Format phone number (remove + and leading 0)
             $phoneNumber = preg_replace('/^\+/', '', $validated['phone_number']);
@@ -99,9 +125,11 @@ class MpesaController extends Controller
                 'PartyB' => $shortcode,
                 'PhoneNumber' => $phoneNumber,
                 'CallBackURL' => $callbackUrl,
-                'AccountReference' => $sale->sale_number,
-                'TransactionDesc' => "Payment for Sale {$sale->sale_number}",
+                'AccountReference' => $accountReference,
+                'TransactionDesc' => $transactionDesc,
             ];
+
+            Log::info('Initiating STK Push', ['payload' => $payload]);
 
             $response = Http::withToken($accessToken)
                 ->withHeaders(['Content-Type' => 'application/json'])
@@ -112,7 +140,8 @@ class MpesaController extends Controller
 
                 // Create payment record
                 $payment = Payment::create([
-                    'sale_id' => $sale->id,
+                    'sale_id' => $sale ? $sale->id : null,
+                    'order_id' => $order && !$sale ? $order->id : null, // Link to order if no sale yet
                     'payment_method' => 'mpesa',
                     'amount' => $validated['amount'],
                     'status' => 'pending',
@@ -125,10 +154,10 @@ class MpesaController extends Controller
                     'transaction_id' => $data['CheckoutRequestID'] ?? uniqid('MPESA_'),
                     'checkout_request_id' => $data['CheckoutRequestID'] ?? '',
                     'merchant_request_id' => $data['MerchantRequestID'] ?? '',
-                    'account_reference' => $sale->sale_number,
+                    'account_reference' => $accountReference,
                     'amount' => $validated['amount'],
                     'phone_number' => $phoneNumber,
-                    'transaction_desc' => "Payment for Sale {$sale->sale_number}",
+                    'transaction_desc' => $transactionDesc,
                     'status' => 'pending',
                 ]);
 
@@ -146,6 +175,7 @@ class MpesaController extends Controller
                 ]);
             }
 
+            Log::error('STK Push Failed', ['response' => $response->json()]);
             DB::rollBack();
 
             return response()->json([

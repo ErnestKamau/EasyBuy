@@ -16,6 +16,7 @@ class Payment extends Model
     protected $fillable = [
         'payment_number',
         'sale_id',
+        'order_id',
         'payment_method',
         'amount',
         'mpesa_transaction_id',
@@ -92,6 +93,14 @@ class Payment extends Model
     public function sale(): BelongsTo
     {
         return $this->belongsTo(Sale::class);
+    }
+
+    /**
+     * Get the order that owns this payment (for pre-sale payments)
+     */
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 
     /**
@@ -193,10 +202,26 @@ class Payment extends Model
 
         if ($amount > $sale->balance) {
             throw new PaymentAmountExceedsBalanceException(
-                $sale->sale_number,
-                $sale->balance,
-                $amount
+                "Payment amount KES " .number_format($amount, 2) . 
+                " exceeds remaining balance KES " . number_format($sale->balance, 2)
             );
         }
+    }
+
+    /**
+     * Link payment to sale (when sale is created)
+     */
+    public function linkToSale(int $saleId): void
+    {
+        $this->sale_id = $saleId;
+        $this->save();
+    }
+
+    /**
+     * Check if payment is linked to order (pre-sale)
+     */
+    public function isPreSalePayment(): bool
+    {
+        return $this->order_id !== null && $this->sale_id === null;
     }
 }

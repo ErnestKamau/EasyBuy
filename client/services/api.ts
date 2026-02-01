@@ -64,6 +64,8 @@ export interface User {
   gender?: 'male' | 'female' | 'other' | 'Male' | 'Female';
   role?: 'admin' | 'customer';
   email_verified_at?: string | null;
+  wallet_balance: number; // Current balance (positive = credit, negative = debt)
+  max_debt_limit: number; // Maximum debt allowed (e.g., -5000)
   created_at: string;
   updated_at: string;
 }
@@ -704,7 +706,12 @@ export const paymentsApi = {
 
 // M-Pesa API
 export const mpesaApi = {
-  async initiateStkPush(saleId: number, phoneNumber: string, amount: number): Promise<{
+  async initiateStkPush(params: {
+    saleId?: number;
+    orderId?: number;
+    phoneNumber: string;
+    amount: number;
+  }): Promise<{
     success: boolean;
     message: string;
     data?: {
@@ -725,9 +732,10 @@ export const mpesaApi = {
           payment_id: number;
         };
       }>('/mpesa/initiate', {
-        sale_id: saleId,
-        phone_number: phoneNumber,
-        amount: amount,
+        sale_id: params.saleId,
+        order_id: params.orderId,
+        phone_number: params.phoneNumber,
+        amount: params.amount,
       });
       return data;
     } catch (error: any) {
@@ -873,5 +881,106 @@ export const notificationsApi = {
     await api.delete('/notifications/device-token', {
       data: { device_token: deviceToken },
     });
+  },
+};
+
+// Pickup Slots interfaces
+export interface PickupSlotResponse {
+  time: string;
+  available_capacity: number;
+  max_capacity: number;
+  is_full: boolean;
+}
+
+export interface AvailableSlotsResponse {
+  success: boolean;
+  date: string;
+  slots: PickupSlotResponse[];
+}
+
+// Pickup Slots API
+export const pickupSlotsApi = {
+  async getAvailableSlots(date: string): Promise<PickupSlotResponse[]> {
+    const { data } = await api.get<AvailableSlotsResponse>(`/pickup-slots?date=${date}`);
+    return data.slots;
+  },
+
+  async checkSlotAvailability(pickupTime: string): Promise<{ available: boolean; available_capacity: number }> {
+    const { data} = await api.get<{ success: boolean; data: { available: boolean; available_capacity: number } }>(`/pickup-slots/check?pickup_time=${encodeURIComponent(pickupTime)}`);
+    return data.data;
+  },
+};
+
+// Awaiting Pickup API
+export const awaitingPickupApi = {
+  async getAwaitingPickupOrders(date?: string): Promise<Order[]> {
+    const params = date ? `?date=${date}` : '';
+    const { data } = await api.get<{ success: boolean; data: Order[] }>(`/awaiting-pickup${params}`);
+    return data.data;
+  },
+
+  async verifyQrCode(qrCode: string): Promise<Order> {
+    const { data } = await api.post<{ success: boolean; message: string; data: Order }>('/awaiting-pickup/verify-qr', {
+      qr_code: qrCode,
+    });
+    return data.data;
+  },
+
+  async addPayment(orderId: number, payment: { amount: number; payment_method: 'cash' | 'card' | 'mpesa'; notes?: string }): Promise<Order> {
+    const { data } = await api.post<{ success: boolean; message: string; data: { order: Order; payment: Payment } }>(`/awaiting-pickup/${orderId}/add-payment`, payment);
+    return data.data.order;
+  },
+
+ async confirmPickup(orderId: number): Promise<Order> {
+    const { data } = await api.post<{ success: boolean; message: string; data: Order }>(`/awaiting-pickup/${orderId}/confirm`);
+    return data.data;
+  },
+
+  async cancelOrder(orderId: number, reason: string, refundToWallet?: boolean): Promise<Order> {
+    const { data } = await api.post<{ success: boolean; message: string; data: Order }>(`/awaiting-pickup/${orderId}/cancel`, {
+      reason,
+      refund_to_wallet: refundToWallet,
+    });
+    return data.data;
+  },
+
+  async getOverdueOrders(): Promise<{ orders: Order[]; graceHours: number; count: number }> {
+    const { data } = await api.get<{ success: boolean; data: Order[]; meta: { grace_hours: number; count: number } }>('/awaiting-pickup/overdue');
+    return {
+      orders: data.data,
+      graceHours: data.meta.grace_hours,
+      count: data.meta.count,
+    };
+  },
+};
+
+// Wallet API
+export interface WalletTransaction {
+  id: number;
+  user_id: number;
+  amount: number;
+  type: 'credit' | 'debit';
+  description: string;
+  reference_id?: string; // e.g., order_id or sale_id
+  reference_type?: string; 
+  balance_after: number;
+  created_at: string;
+}
+
+export const walletApi = {
+  async getTransactions(params?: { type?: 'credit' | 'debit'; date_from?: string; date_to?: string; page?: number }): Promise<{ data: WalletTransaction[]; current_page: number; last_page: number }> {
+    const queryParams = new URLSearchParams();
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.date_from) queryParams.append('date_from', params.date_from);
+    if (params?.date_to) queryParams.append('date_to', params.date_to);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const { data } = await api.get<{ success: boolean; data: { data: WalletTransaction[]; current_page: number; last_page: number } }>(`/wallet/transactions?${queryParams.toString()}`);
+    return data.data;
+  },
+
+  async getSummary(): Promise<{ current_balance: number; total_credited: number; total_spent: number }> {
+    const { data } = await api.get<{ success: boolean; data: { current_balance: number; total_credited: number; total_spent: number } }>('/wallet/summary');
+    return data.data;
   },
 };

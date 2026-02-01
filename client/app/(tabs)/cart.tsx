@@ -1,5 +1,5 @@
 // app/(tabs)/cart.tsx - Theme-integrated version
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,11 +10,12 @@ import {
   Alert,
   Dimensions,
   StatusBar,
-} from 'react-native';
-import { router } from 'expo-router';
-import { useCart } from '@/contexts/CartContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { ToastService } from '@/utils/toastService';
+} from "react-native";
+import { router } from "expo-router";
+import { useCart } from "@/contexts/CartContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/app/_layout";
+import { ToastService } from "@/utils/toastService";
 import {
   ArrowLeft,
   Plus,
@@ -25,12 +26,13 @@ import {
   MapPin,
   Clock,
   Truck,
-} from 'lucide-react-native';
+} from "lucide-react-native";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 
 // Helper function to create dynamic styles
-const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet.create({
+const createDynamicStyles = (currentTheme: any, themeName: string) =>
+  StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: currentTheme.background,
@@ -40,50 +42,50 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
       color: currentTheme.textSecondary,
     },
     header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       paddingHorizontal: 20,
       paddingVertical: 16,
       paddingTop: 60,
       backgroundColor: currentTheme.surface,
       borderBottomWidth: 1,
       borderBottomColor: currentTheme.border,
-      shadowColor: '#000',
+      shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: themeName === 'dark' ? 0.3 : 0.05,
+      shadowOpacity: themeName === "dark" ? 0.3 : 0.05,
       shadowRadius: 4,
-      elevation: themeName === 'dark' ? 8 : 2,
+      elevation: themeName === "dark" ? 8 : 2,
     },
     headerTitle: {
       fontSize: 20,
-      fontWeight: '700',
+      fontWeight: "700",
       color: currentTheme.text,
     },
     clearButtonText: {
       fontSize: 14,
-      fontWeight: '600',
+      fontWeight: "600",
       color: currentTheme.error,
     },
     emptyCartIcon: {
       width: 120,
       height: 120,
       borderRadius: 60,
-      backgroundColor: currentTheme.border + '40',
-      justifyContent: 'center',
-      alignItems: 'center',
+      backgroundColor: currentTheme.border + "40",
+      justifyContent: "center",
+      alignItems: "center",
       marginBottom: 24,
     },
     emptyCartTitle: {
       fontSize: 24,
-      fontWeight: '700',
+      fontWeight: "700",
       color: currentTheme.text,
       marginBottom: 8,
     },
     emptyCartSubtitle: {
       fontSize: 16,
       color: currentTheme.textSecondary,
-      textAlign: 'center',
+      textAlign: "center",
       marginBottom: 32,
     },
     shopNowButton: {
@@ -93,14 +95,14 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
       borderRadius: 12,
     },
     shopNowButtonText: {
-      color: '#FFFFFF',
+      color: "#FFFFFF",
       fontSize: 16,
-      fontWeight: '600',
+      fontWeight: "600",
     },
     cartHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
       paddingHorizontal: 20,
       paddingVertical: 16,
       backgroundColor: currentTheme.surface,
@@ -109,34 +111,34 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
     },
     cartItemsCount: {
       fontSize: 16,
-      fontWeight: '600',
+      fontWeight: "600",
       color: currentTheme.text,
     },
     deliveryText: {
       fontSize: 14,
       color: currentTheme.primary,
-      fontWeight: '500',
+      fontWeight: "500",
     },
     cartItemsList: {
       backgroundColor: currentTheme.surface,
       paddingVertical: 8,
     },
     cartItem: {
-      flexDirection: 'row',
+      flexDirection: "row",
       paddingHorizontal: 20,
       paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: currentTheme.border + '40',
+      borderBottomColor: currentTheme.border + "40",
     },
     itemImage: {
       width: 64,
       height: 64,
       borderRadius: 8,
-      backgroundColor: currentTheme.border + '40',
+      backgroundColor: currentTheme.border + "40",
     },
     itemName: {
       fontSize: 16,
-      fontWeight: '600',
+      fontWeight: "600",
       color: currentTheme.text,
       marginBottom: 4,
     },
@@ -148,12 +150,12 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
     itemWeight: {
       fontSize: 12,
       color: currentTheme.primary,
-      fontWeight: '600',
+      fontWeight: "600",
       marginBottom: 6,
     },
     itemPrice: {
       fontSize: 14,
-      fontWeight: '600',
+      fontWeight: "600",
       color: currentTheme.text,
     },
     itemQuantityMultiplier: {
@@ -162,8 +164,8 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
       marginLeft: 4,
     },
     quantityControls: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       backgroundColor: currentTheme.background,
       borderRadius: 8,
       padding: 2,
@@ -174,15 +176,15 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
       height: 28,
       borderRadius: 6,
       backgroundColor: currentTheme.surface,
-      justifyContent: 'center',
-      alignItems: 'center',
-      shadowColor: '#000',
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: "#000",
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: themeName === 'dark' ? 0.2 : 0.05,
+      shadowOpacity: themeName === "dark" ? 0.2 : 0.05,
       shadowRadius: 2,
-      elevation: themeName === 'dark' ? 3 : 1,
-      borderWidth: themeName === 'dark' ? 1 : 0,
-      borderColor: themeName === 'dark' ? currentTheme.border : 'transparent',
+      elevation: themeName === "dark" ? 3 : 1,
+      borderWidth: themeName === "dark" ? 1 : 0,
+      borderColor: themeName === "dark" ? currentTheme.border : "transparent",
     },
     disabledButton: {
       backgroundColor: currentTheme.background,
@@ -191,15 +193,15 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
     },
     quantityText: {
       fontSize: 14,
-      fontWeight: '600',
+      fontWeight: "600",
       color: currentTheme.text,
       marginHorizontal: 8,
       minWidth: 35,
-      textAlign: 'center',
+      textAlign: "center",
     },
     subtotalText: {
       fontSize: 14,
-      fontWeight: '700',
+      fontWeight: "700",
       color: currentTheme.primary,
     },
     orderSummary: {
@@ -207,12 +209,12 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
       marginTop: 8,
       paddingHorizontal: 20,
       paddingVertical: 20,
-      borderWidth: themeName === 'dark' ? 1 : 0,
-      borderColor: themeName === 'dark' ? currentTheme.border : 'transparent',
+      borderWidth: themeName === "dark" ? 1 : 0,
+      borderColor: themeName === "dark" ? currentTheme.border : "transparent",
     },
     summaryTitle: {
       fontSize: 18,
-      fontWeight: '700',
+      fontWeight: "700",
       color: currentTheme.text,
       marginBottom: 16,
     },
@@ -222,7 +224,7 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
     },
     summaryValue: {
       fontSize: 14,
-      fontWeight: '500',
+      fontWeight: "500",
       color: currentTheme.text,
     },
     summaryDivider: {
@@ -232,28 +234,28 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
     },
     totalLabel: {
       fontSize: 16,
-      fontWeight: '700',
+      fontWeight: "700",
       color: currentTheme.text,
     },
     totalValue: {
       fontSize: 18,
-      fontWeight: '700',
+      fontWeight: "700",
       color: currentTheme.primary,
     },
     checkoutBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       backgroundColor: currentTheme.surface,
       paddingHorizontal: 20,
       paddingVertical: 16,
       paddingBottom: 34,
       borderTopWidth: 1,
       borderTopColor: currentTheme.border,
-      shadowColor: '#000',
+      shadowColor: "#000",
       shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: themeName === 'dark' ? 0.3 : 0.1,
+      shadowOpacity: themeName === "dark" ? 0.3 : 0.1,
       shadowRadius: 8,
-      elevation: themeName === 'dark' ? 15 : 8,
+      elevation: themeName === "dark" ? 15 : 8,
     },
     totalLabelSmall: {
       fontSize: 14,
@@ -261,12 +263,12 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
     },
     totalAmountLarge: {
       fontSize: 20,
-      fontWeight: '800',
+      fontWeight: "800",
       color: currentTheme.text,
     },
     checkoutButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       backgroundColor: currentTheme.primary,
       paddingVertical: 16,
       paddingHorizontal: 24,
@@ -284,11 +286,11 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
       elevation: 0,
     },
     checkoutButtonText: {
-      color: '#FFFFFF',
+      color: "#FFFFFF",
       fontSize: 16,
-      fontWeight: '700',
+      fontWeight: "700",
     },
-});
+  });
 
 // Weight increment function: 0 → 0.5kg → 1kg → 1.5kg → 2kg → 2.5kg...
 const getNextWeight = (currentWeight: number, increment: boolean): number => {
@@ -304,10 +306,10 @@ const getNextWeight = (currentWeight: number, increment: boolean): number => {
 // Format weight as fraction: 1/2KG, 1KG, 1 1/2KG, 2KG...
 const formatWeightAsFraction = (weight: number): string => {
   if (weight === 0) return "0KG";
-  
+
   const whole = Math.floor(weight);
   const decimal = weight - whole;
-  
+
   if (decimal === 0) {
     return `${whole}KG`;
   } else if (decimal === 0.5) {
@@ -317,31 +319,42 @@ const formatWeightAsFraction = (weight: number): string => {
       return `${whole} 1/2KG`;
     }
   }
-  
+
   return `${weight}KG`;
 };
 
 // Helper function for quantity changes
-const useCartHandlers = (state: any, updateItem: any, removeItem: any, clearCart: any, setIsCheckingOut: any) => {
+const useCartHandlers = (
+  state: any,
+  updateItem: any,
+  removeItem: any,
+  clearCart: any,
+  setIsCheckingOut: any,
+) => {
   const handleRemoveItem = (itemId: string) => {
     Alert.alert(
-      'Remove Item',
-      'Are you sure you want to remove this item from your cart?',
+      "Remove Item",
+      "Are you sure you want to remove this item from your cart?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "Remove",
+          style: "destructive",
           onPress: () => {
             removeItem(itemId);
-            ToastService.showSuccess('Removed', 'Item removed from cart');
+            ToastService.showSuccess("Removed", "Item removed from cart");
           },
         },
-      ]
+      ],
     );
   };
 
-  const handleQuantityChange = (itemId: string, currentQuantity: number, change: number, weight?: number) => {
+  const handleQuantityChange = (
+    itemId: string,
+    currentQuantity: number,
+    change: number,
+    weight?: number,
+  ) => {
     const newQuantity = currentQuantity + change;
     if (newQuantity <= 0) {
       handleRemoveItem(itemId);
@@ -350,7 +363,13 @@ const useCartHandlers = (state: any, updateItem: any, removeItem: any, clearCart
     }
   };
 
-  const handleWeightChange = (itemId: string, currentQuantity: number, currentWeight: number, increment: boolean, maxWeight?: number) => {
+  const handleWeightChange = (
+    itemId: string,
+    currentQuantity: number,
+    currentWeight: number,
+    increment: boolean,
+    maxWeight?: number,
+  ) => {
     const newWeight = getNextWeight(currentWeight, increment);
     // If weight reaches 0, remove the item from cart
     if (newWeight <= 0) {
@@ -365,69 +384,97 @@ const useCartHandlers = (state: any, updateItem: any, removeItem: any, clearCart
 
   const handleClearCart = () => {
     Alert.alert(
-      'Clear Cart',
-      'Are you sure you want to remove all items from your cart?',
+      "Clear Cart",
+      "Are you sure you want to remove all items from your cart?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Clear All',
-          style: 'destructive',
+          text: "Clear All",
+          style: "destructive",
           onPress: () => {
             clearCart();
-            ToastService.showSuccess('Cart Cleared', 'All items removed from cart');
+            ToastService.showSuccess(
+              "Cart Cleared",
+              "All items removed from cart",
+            );
           },
         },
-      ]
+      ],
     );
   };
 
   const handleCheckout = () => {
     if (state.items.length === 0) {
-      ToastService.showError('Empty Cart', 'Please add items to your cart before checkout');
+      ToastService.showError(
+        "Empty Cart",
+        "Please add items to your cart before checkout",
+      );
       return;
     }
-    
+
     setIsCheckingOut(true);
     // Note: router is accessed from the global scope within the component
     // This function will be used within the CartScreen component context
     setIsCheckingOut(false);
   };
 
-  return { handleQuantityChange, handleWeightChange, handleRemoveItem, handleClearCart };
+  return {
+    handleQuantityChange,
+    handleWeightChange,
+    handleRemoveItem,
+    handleClearCart,
+  };
 };
 
 export default function CartScreen(): React.ReactElement {
   const { state, updateItem, removeItem, clearCart } = useCart();
+  const { user } = useAuth();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryType, setDeliveryType] = useState<"pickup" | "delivery">(
+    "pickup",
+  );
   const { currentTheme, themeName } = useTheme();
 
   // Dynamic styles based on theme
   const dynamicStyles = createDynamicStyles(currentTheme, themeName);
-  
+
   // Cart handlers
-  const cartHandlers = useCartHandlers(state, updateItem, removeItem, clearCart, setIsCheckingOut);
-  
+  const cartHandlers = useCartHandlers(
+    state,
+    updateItem,
+    removeItem,
+    clearCart,
+    setIsCheckingOut,
+  );
+
   // Override handleCheckout to use local router
   const handleCheckout = () => {
     if (state.items.length === 0) {
-      ToastService.showError('Empty Cart', 'Please add items to your cart before checkout');
+      ToastService.showError(
+        "Empty Cart",
+        "Please add items to your cart before checkout",
+      );
       return;
     }
-    
+
     setIsCheckingOut(true);
     router.push({
-      pathname: '/checkout',
-      params: { deliveryType: deliveryType }
+      pathname: "/checkout",
+      params: { deliveryType: deliveryType },
     } as any);
     setIsCheckingOut(false);
   };
-  
-  const { handleQuantityChange, handleWeightChange, handleRemoveItem, handleClearCart } = cartHandlers;
+
+  const {
+    handleQuantityChange,
+    handleWeightChange,
+    handleRemoveItem,
+    handleClearCart,
+  } = cartHandlers;
 
   const renderCartItem = (item: any) => {
     const isWeightBased = item.product.kilograms_in_stock && item.weight;
-    const displayPrice = isWeightBased 
+    const displayPrice = isWeightBased
       ? item.product.sale_price * (item.weight || 1) // sale_price is price per kg
       : item.product.sale_price;
 
@@ -435,27 +482,40 @@ export default function CartScreen(): React.ReactElement {
       <View key={item.id} style={dynamicStyles.cartItem}>
         <View style={styles.itemImageContainer}>
           <Image
-            source={{ uri: item.product.image_url || 'https://via.placeholder.com/80x80' }}
+            source={{
+              uri:
+                item.product.image_url || "https://via.placeholder.com/80x80",
+            }}
             style={dynamicStyles.itemImage}
           />
         </View>
-        
+
         <View style={styles.itemDetails}>
-          <Text style={dynamicStyles.itemName} numberOfLines={2}>{item.product.name}</Text>
-          <Text style={dynamicStyles.itemCategory}>{item.product.category_name}</Text>
-          
+          <Text style={dynamicStyles.itemName} numberOfLines={2}>
+            {item.product.name}
+          </Text>
+          <Text style={dynamicStyles.itemCategory}>
+            {item.product.category_name}
+          </Text>
+
           {isWeightBased && (
-            <Text style={dynamicStyles.itemWeight}>{formatWeightAsFraction(item.weight)}</Text>
+            <Text style={dynamicStyles.itemWeight}>
+              {formatWeightAsFraction(item.weight)}
+            </Text>
           )}
-          
+
           <View style={styles.itemPriceRow}>
-            <Text style={dynamicStyles.itemPrice}>Ksh {displayPrice.toLocaleString()}</Text>
+            <Text style={dynamicStyles.itemPrice}>
+              Ksh {displayPrice.toLocaleString()}
+            </Text>
             {!isWeightBased && item.quantity > 1 && (
-              <Text style={dynamicStyles.itemQuantityMultiplier}>x {item.quantity}</Text>
+              <Text style={dynamicStyles.itemQuantityMultiplier}>
+                x {item.quantity}
+              </Text>
             )}
           </View>
         </View>
-        
+
         <View style={styles.itemControls}>
           <TouchableOpacity
             style={styles.removeButton}
@@ -463,47 +523,102 @@ export default function CartScreen(): React.ReactElement {
           >
             <Trash2 size={16} color={currentTheme.error} />
           </TouchableOpacity>
-          
+
           <View style={dynamicStyles.quantityControls}>
             {isWeightBased ? (
               <>
                 <TouchableOpacity
-                  style={[dynamicStyles.quantityButton, item.weight <= 0 && dynamicStyles.disabledButton]}
-                  onPress={() => handleWeightChange(item.id, item.quantity, item.weight, false, item.product.in_stock)}
+                  style={[
+                    dynamicStyles.quantityButton,
+                    item.weight <= 0 && dynamicStyles.disabledButton,
+                  ]}
+                  onPress={() =>
+                    handleWeightChange(
+                      item.id,
+                      item.quantity,
+                      item.weight,
+                      false,
+                      item.product.in_stock,
+                    )
+                  }
                   disabled={item.weight <= 0}
                 >
-                  <Minus size={14} color={item.weight <= 0 ? currentTheme.textSecondary : currentTheme.text} />
+                  <Minus
+                    size={14}
+                    color={
+                      item.weight <= 0
+                        ? currentTheme.textSecondary
+                        : currentTheme.text
+                    }
+                  />
                 </TouchableOpacity>
-                <Text style={dynamicStyles.quantityText}>{formatWeightAsFraction(item.weight)}</Text>
+                <Text style={dynamicStyles.quantityText}>
+                  {formatWeightAsFraction(item.weight)}
+                </Text>
                 <TouchableOpacity
-                  style={[dynamicStyles.quantityButton, item.weight >= (item.product.in_stock || 0) && dynamicStyles.disabledButton]}
-                  onPress={() => handleWeightChange(item.id, item.quantity, item.weight, true, item.product.in_stock)}
+                  style={[
+                    dynamicStyles.quantityButton,
+                    item.weight >= (item.product.in_stock || 0) &&
+                      dynamicStyles.disabledButton,
+                  ]}
+                  onPress={() =>
+                    handleWeightChange(
+                      item.id,
+                      item.quantity,
+                      item.weight,
+                      true,
+                      item.product.in_stock,
+                    )
+                  }
                   disabled={item.weight >= (item.product.in_stock || 0)}
                 >
-                  <Plus size={14} color={item.weight >= (item.product.in_stock || 0) ? currentTheme.textSecondary : currentTheme.text} />
+                  <Plus
+                    size={14}
+                    color={
+                      item.weight >= (item.product.in_stock || 0)
+                        ? currentTheme.textSecondary
+                        : currentTheme.text
+                    }
+                  />
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <TouchableOpacity
-                  style={[dynamicStyles.quantityButton, item.quantity <= 1 && dynamicStyles.disabledButton]}
-                  onPress={() => handleQuantityChange(item.id, item.quantity, -1)}
+                  style={[
+                    dynamicStyles.quantityButton,
+                    item.quantity <= 1 && dynamicStyles.disabledButton,
+                  ]}
+                  onPress={() =>
+                    handleQuantityChange(item.id, item.quantity, -1)
+                  }
                   disabled={item.quantity <= 1}
                 >
-                  <Minus size={14} color={item.quantity <= 1 ? currentTheme.textSecondary : currentTheme.text} />
+                  <Minus
+                    size={14}
+                    color={
+                      item.quantity <= 1
+                        ? currentTheme.textSecondary
+                        : currentTheme.text
+                    }
+                  />
                 </TouchableOpacity>
                 <Text style={dynamicStyles.quantityText}>{item.quantity}</Text>
                 <TouchableOpacity
                   style={dynamicStyles.quantityButton}
-                  onPress={() => handleQuantityChange(item.id, item.quantity, 1)}
+                  onPress={() =>
+                    handleQuantityChange(item.id, item.quantity, 1)
+                  }
                 >
                   <Plus size={14} color={currentTheme.text} />
                 </TouchableOpacity>
               </>
             )}
           </View>
-          
-          <Text style={dynamicStyles.subtotalText}>Ksh {item.subtotal.toLocaleString()}</Text>
+
+          <Text style={dynamicStyles.subtotalText}>
+            Ksh {item.subtotal.toLocaleString()}
+          </Text>
         </View>
       </View>
     );
@@ -511,7 +626,12 @@ export default function CartScreen(): React.ReactElement {
 
   if (state.isLoading) {
     return (
-      <View style={[styles.centerContainer, { backgroundColor: currentTheme.background }]}>
+      <View
+        style={[
+          styles.centerContainer,
+          { backgroundColor: currentTheme.background },
+        ]}
+      >
         <Text style={dynamicStyles.loadingText}>Loading cart...</Text>
       </View>
     );
@@ -519,18 +639,24 @@ export default function CartScreen(): React.ReactElement {
 
   return (
     <View style={dynamicStyles.container}>
-      <StatusBar 
-        barStyle={themeName === 'dark' ? "light-content" : "dark-content"} 
-        backgroundColor={currentTheme.surface} 
+      <StatusBar
+        barStyle={themeName === "dark" ? "light-content" : "dark-content"}
+        backgroundColor={currentTheme.surface}
       />
-      
+
       <View style={dynamicStyles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.headerButton}
+        >
           <ArrowLeft size={24} color={currentTheme.text} />
         </TouchableOpacity>
         <Text style={dynamicStyles.headerTitle}>My Cart</Text>
         {state.items.length > 0 && (
-          <TouchableOpacity onPress={handleClearCart} style={styles.clearButton}>
+          <TouchableOpacity
+            onPress={handleClearCart}
+            style={styles.clearButton}
+          >
             <Text style={dynamicStyles.clearButtonText}>Clear</Text>
           </TouchableOpacity>
         )}
@@ -542,93 +668,187 @@ export default function CartScreen(): React.ReactElement {
             <ShoppingBag size={64} color={currentTheme.textSecondary} />
           </View>
           <Text style={dynamicStyles.emptyCartTitle}>Your cart is empty</Text>
-          <Text style={dynamicStyles.emptyCartSubtitle}>Add some items to get started</Text>
+          <Text style={dynamicStyles.emptyCartSubtitle}>
+            Add some items to get started
+          </Text>
           <TouchableOpacity
             style={dynamicStyles.shopNowButton}
-            onPress={() => router.push('/(tabs)/' as any)}
+            onPress={() => router.push("/(tabs)/" as any)}
           >
             <Text style={dynamicStyles.shopNowButtonText}>Start Shopping</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <>
-          <ScrollView style={styles.cartItemsContainer} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.cartItemsContainer}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={dynamicStyles.cartHeader}>
               <Text style={dynamicStyles.cartItemsCount}>
-                {state.totalItems} item{state.totalItems !== 1 ? 's' : ''}
+                {state.totalItems} item{state.totalItems !== 1 ? "s" : ""}
               </Text>
               <View style={styles.deliveryOptions}>
                 <TouchableOpacity
                   style={[
                     styles.deliveryOption,
-                    deliveryType === 'pickup' && { backgroundColor: currentTheme.primary + '20', borderColor: currentTheme.primary }
+                    deliveryType === "pickup" && {
+                      backgroundColor: currentTheme.primary + "20",
+                      borderColor: currentTheme.primary,
+                    },
                   ]}
-                  onPress={() => setDeliveryType('pickup')}
+                  onPress={() => setDeliveryType("pickup")}
                 >
-                  <MapPin size={14} color={deliveryType === 'pickup' ? currentTheme.primary : currentTheme.textSecondary} />
-                  <Text style={[
-                    dynamicStyles.deliveryText,
-                    deliveryType === 'pickup' && { color: currentTheme.primary, fontWeight: '600' }
-                  ]}>Pickup</Text>
+                  <MapPin
+                    size={14}
+                    color={
+                      deliveryType === "pickup"
+                        ? currentTheme.primary
+                        : currentTheme.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      dynamicStyles.deliveryText,
+                      deliveryType === "pickup" && {
+                        color: currentTheme.primary,
+                        fontWeight: "600",
+                      },
+                    ]}
+                  >
+                    Pickup
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
                     styles.deliveryOption,
-                    deliveryType === 'delivery' && { backgroundColor: currentTheme.primary + '20', borderColor: currentTheme.primary }
+                    deliveryType === "delivery" && {
+                      backgroundColor: currentTheme.primary + "20",
+                      borderColor: currentTheme.primary,
+                    },
                   ]}
-                  onPress={() => setDeliveryType('delivery')}
+                  onPress={() => setDeliveryType("delivery")}
                 >
-                  <Truck size={14} color={deliveryType === 'delivery' ? currentTheme.primary : currentTheme.textSecondary} />
-                  <Text style={[
-                    dynamicStyles.deliveryText,
-                    deliveryType === 'delivery' && { color: currentTheme.primary, fontWeight: '600' }
-                  ]}>Delivery</Text>
+                  <Truck
+                    size={14}
+                    color={
+                      deliveryType === "delivery"
+                        ? currentTheme.primary
+                        : currentTheme.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      dynamicStyles.deliveryText,
+                      deliveryType === "delivery" && {
+                        color: currentTheme.primary,
+                        fontWeight: "600",
+                      },
+                    ]}
+                  >
+                    Delivery
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
-            
+
             <View style={dynamicStyles.cartItemsList}>
               {state.items.map(renderCartItem)}
             </View>
-            
+
             <View style={dynamicStyles.orderSummary}>
               <Text style={dynamicStyles.summaryTitle}>Order Summary</Text>
-              
+
               <View style={styles.summaryRow}>
-                <Text style={dynamicStyles.summaryLabel}>Subtotal ({state.totalItems} items)</Text>
-                <Text style={dynamicStyles.summaryValue}>Ksh {state.totalAmount.toLocaleString()}</Text>
+                <Text style={dynamicStyles.summaryLabel}>
+                  Subtotal ({state.totalItems} items)
+                </Text>
+                <Text style={dynamicStyles.summaryValue}>
+                  Ksh {state.totalAmount.toLocaleString()}
+                </Text>
               </View>
-              
+
               <View style={styles.summaryRow}>
                 <Text style={dynamicStyles.summaryLabel}>Delivery</Text>
-                <Text style={dynamicStyles.summaryValue}>{deliveryType === 'pickup' ? 'Pickup at shop' : 'Home delivery'}</Text>
+                <Text style={dynamicStyles.summaryValue}>
+                  {deliveryType === "pickup"
+                    ? "Pickup at shop"
+                    : "Home delivery"}
+                </Text>
               </View>
-              
+
               <View style={dynamicStyles.summaryDivider} />
-              
-              <View style={styles.summaryRow}>
-                <Text style={dynamicStyles.totalLabel}>Total</Text>
-                <Text style={dynamicStyles.totalValue}>Ksh {state.totalAmount.toLocaleString()}</Text>
-              </View>
+
+              {/* Show wallet credit if user has positive balance */}
+              {user && user.wallet_balance > 0 && (
+                <>
+                  <View style={styles.summaryRow}>
+                    <Text
+                      style={[
+                        dynamicStyles.summaryLabel,
+                        { color: currentTheme.success },
+                      ]}
+                    >
+                      Wallet Credit
+                    </Text>
+                    <Text
+                      style={[
+                        dynamicStyles.summaryValue,
+                        { color: currentTheme.success },
+                      ]}
+                    >
+                      - Ksh{" "}
+                      {Math.min(
+                        user.wallet_balance,
+                        state.totalAmount,
+                      ).toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={dynamicStyles.totalLabel}>Amount Due</Text>
+                    <Text style={dynamicStyles.totalValue}>
+                      Ksh{" "}
+                      {Math.max(
+                        0,
+                        state.totalAmount - user.wallet_balance,
+                      ).toLocaleString()}
+                    </Text>
+                  </View>
+                </>
+              )}
+              {/* Show total if no wallet credit */}
+              {(!user || user.wallet_balance <= 0) && (
+                <View style={styles.summaryRow}>
+                  <Text style={dynamicStyles.totalLabel}>Total</Text>
+                  <Text style={dynamicStyles.totalValue}>
+                    Ksh {state.totalAmount.toLocaleString()}
+                  </Text>
+                </View>
+              )}
             </View>
-            
+
             <View style={styles.bottomSpacing} />
           </ScrollView>
 
           <View style={dynamicStyles.checkoutBar}>
             <View style={styles.totalContainer}>
               <Text style={dynamicStyles.totalLabelSmall}>Total</Text>
-              <Text style={dynamicStyles.totalAmountLarge}>Ksh {state.totalAmount.toLocaleString()}</Text>
+              <Text style={dynamicStyles.totalAmountLarge}>
+                Ksh {state.totalAmount.toLocaleString()}
+              </Text>
             </View>
-            
+
             <TouchableOpacity
-              style={[dynamicStyles.checkoutButton, isCheckingOut && dynamicStyles.disabledCheckoutButton]}
+              style={[
+                dynamicStyles.checkoutButton,
+                isCheckingOut && dynamicStyles.disabledCheckoutButton,
+              ]}
               onPress={handleCheckout}
               disabled={isCheckingOut}
             >
               <CreditCard size={18} color="#FFFFFF" />
               <Text style={dynamicStyles.checkoutButtonText}>
-                {isCheckingOut ? 'Processing...' : 'Place Order'}
+                {isCheckingOut ? "Processing..." : "Place Order"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -642,8 +862,8 @@ export default function CartScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   centerContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerButton: {
     padding: 4,
@@ -654,31 +874,31 @@ const styles = StyleSheet.create({
   },
   emptyCart: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 40,
   },
   cartItemsContainer: {
     flex: 1,
   },
   deliveryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   deliveryOptions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   deliveryOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: "#E5E5E5",
   },
   itemImageContainer: {
     marginRight: 16,
@@ -688,11 +908,11 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   itemPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   itemControls: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     minWidth: 80,
   },
   removeButton: {
@@ -700,9 +920,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 8,
   },
   bottomSpacing: {

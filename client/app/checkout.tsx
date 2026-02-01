@@ -14,6 +14,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Theme } from "@/constants/Themes";
 import { ordersApi, CartItemForOrder } from "@/services/api";
+import { useAuth } from "@/app/_layout";
 import { ToastService } from "@/utils/toastService";
 import {
   ArrowLeft,
@@ -30,6 +31,7 @@ type DeliveryType = "pickup" | "delivery";
 
 export default function CheckoutScreen() {
   const { state, clearCart } = useCart();
+  const { user } = useAuth();
   const { currentTheme, themeName } = useTheme();
   const isDark = themeName === "dark";
   const params = useLocalSearchParams();
@@ -40,9 +42,24 @@ export default function CheckoutScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
+  // Debt enforcement: if user has negative balance, force M-Pesa/Debt only
+  const hasDebt = user && user.wallet_balance < 0;
+  const canUseCash = !hasDebt;
+
   const handlePlaceOrder = async () => {
     if (state.items.length === 0) {
       ToastService.showError("Empty Cart", "Your cart is empty");
+      return;
+    }
+
+    // Determine current user phone number - required for M-Pesa
+    const phoneNumber = user?.phone_number;
+    if (selectedPayment === "mpesa" && !phoneNumber) {
+      ToastService.showError(
+        "Phone Number Required",
+        "Please update your profile with a phone number for M-Pesa payment.",
+      );
+      // Ideally redirect to profile or show input, but for now block
       return;
     }
 
@@ -63,19 +80,68 @@ export default function CheckoutScreen() {
         selectedPayment,
       );
 
+      // Trigger STK Push if M-Pesa
+      if (selectedPayment === "mpesa" && phoneNumber) {
+        // Calculate amount due (accounting for wallet credit)
+        const amountDue = Math.max(
+          0,
+          state.totalAmount - (user?.wallet_balance || 0),
+        );
+
+        if (amountDue > 0) {
+          ToastService.showInfo(
+            "Initiating Payment",
+            "Sending M-Pesa prompt to your phone...",
+          );
+          // Import mpesaApi dynamically to avoid circular dependencies if any, or just use import
+          const { mpesaApi } = require("@/services/api");
+
+          const stkResponse = await mpesaApi.initiateStkPush({
+            orderId: order.id,
+            phoneNumber: phoneNumber,
+            amount: amountDue,
+          });
+
+          if (!stkResponse.success) {
+            ToastService.showError(
+              "Payment Initiation Failed",
+              stkResponse.message,
+            );
+            // Order is created but payment failed. We still clear cart and show success but warn about payment?
+            // Or maybe we treat it as success since order is pending payment.
+            // Continuing flow...
+          } else {
+            ToastService.showSuccess(
+              "Prompt Sent",
+              "Please enter your PIN on your phone to complete payment.",
+            );
+          }
+        }
+      }
+
       // Clear the cart after successful order creation
       clearCart();
       setOrderPlaced(true);
 
-      ToastService.showSuccess(
-        "Order Placed!",
-        `Your order ${order.order_number || `#${order.id}`} has been placed successfully`,
-      );
+      // Determine success message based on payment method
+      const successTitle =
+        selectedPayment === "mpesa"
+          ? "Order Placed - Check Phone"
+          : "Order Placed!";
+      const successMsg =
+        selectedPayment === "mpesa"
+          ? `Order ${order.order_number} created. Please complete payment on your phone.`
+          : `Your order ${order.order_number || `#${order.id}`} has been placed successfully`;
+
+      ToastService.showSuccess(successTitle, successMsg);
 
       // Navigate to success screen or back to home
-      setTimeout(() => {
-        router.replace("/(tabs)/" as any);
-      }, 3000);
+      setTimeout(
+        () => {
+          router.replace("/(tabs)/" as any);
+        },
+        selectedPayment === "mpesa" ? 5000 : 3000,
+      ); // Give more time to read M-Pesa msg
     } catch (error) {
       console.error("Order creation failed:", error);
       ToastService.showError(
@@ -88,6 +154,14 @@ export default function CheckoutScreen() {
   };
 
   const handlePaymentMethodSelect = (method: PaymentMethod) => {
+    // Block cash selection if user has debt
+    if (method === "cash" && !canUseCash) {
+      ToastService.showError(
+        "Payment Restricted",
+        "You must clear your debt first. Please use M-Pesa or increase your debt limit.",
+      );
+      return;
+    }
     setSelectedPayment(method);
   };
 
@@ -199,12 +273,42 @@ export default function CheckoutScreen() {
 
           <View style={styles.summaryDivider} />
 
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>
-              Ksh {state.totalAmount.toLocaleString()}
-            </Text>
-          </View>
+          {/* Show wallet credit if user has positive balance */}
+          {user && user.wallet_balance > 0 && (
+            <>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Wallet Credit</Text>
+                <Text
+                  style={[styles.summaryValue, { color: currentTheme.success }]}
+                >
+                  - Ksh{" "}
+                  {Math.min(
+                    user.wallet_balance,
+                    state.totalAmount,
+                  ).toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Amount Due</Text>
+                <Text style={styles.totalValue}>
+                  Ksh{" "}
+                  {Math.max(
+                    0,
+                    state.totalAmount - user.wallet_balance,
+                  ).toLocaleString()}
+                </Text>
+              </View>
+            </>
+          )}
+          {/* Show total if no wallet credit */}
+          {(!user || user.wallet_balance <= 0) && (
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalValue}>
+                Ksh {state.totalAmount.toLocaleString()}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Delivery Option */}
@@ -294,24 +398,23 @@ export default function CheckoutScreen() {
 
           {selectedPayment === "mpesa" && (
             <View style={styles.paybillInstructions}>
-              <Text style={styles.paybillTitle}>Paybill Instructions:</Text>
+              <Text style={styles.paybillTitle}>M-Pesa Payment:</Text>
               <Text style={styles.paybillStep}>
-                1. Go to M-Pesa on your phone
-              </Text>
-              <Text style={styles.paybillStep}>2. Select "Pay Bill"</Text>
-              <Text style={styles.paybillStep}>
-                3. Enter Paybill Number:{" "}
-                <Text style={styles.paybillHighlight}>542542</Text>
+                1. Click "Place Order" below
               </Text>
               <Text style={styles.paybillStep}>
-                4. Enter Account Number:{" "}
-                <Text style={styles.paybillHighlight}>88881</Text>
+                2. A prompt will appear on your phone
               </Text>
               <Text style={styles.paybillStep}>
-                5. Enter Amount: KSh {state.totalAmount.toLocaleString()}
+                3. Enter your M-Pesa PIN to complete payment
               </Text>
-              <Text style={styles.paybillStep}>
-                6. Enter your M-Pesa PIN and confirm
+              <Text
+                style={[
+                  styles.paybillStep,
+                  { marginTop: 8, fontStyle: "italic", fontSize: 13 },
+                ]}
+              >
+                (Phone: {user?.phone_number || "No phone number set"})
               </Text>
             </View>
           )}
@@ -320,13 +423,21 @@ export default function CheckoutScreen() {
             style={[
               styles.paymentOption,
               selectedPayment === "cash" && styles.selectedPaymentOption,
+              !canUseCash && styles.disabledPaymentOption,
             ]}
             onPress={() => handlePaymentMethodSelect("cash")}
+            disabled={!canUseCash}
           >
             <View style={styles.paymentIcon}>
               <CreditCard
                 size={24}
-                color={selectedPayment === "cash" ? "#22C55E" : "#64748B"}
+                color={
+                  !canUseCash
+                    ? "#94A3B8"
+                    : selectedPayment === "cash"
+                      ? "#22C55E"
+                      : "#64748B"
+                }
               />
             </View>
             <View style={styles.paymentContent}>
@@ -334,18 +445,22 @@ export default function CheckoutScreen() {
                 style={[
                   styles.paymentTitle,
                   selectedPayment === "cash" && styles.selectedPaymentTitle,
+                  !canUseCash && styles.disabledPaymentTitle,
                 ]}
               >
-                Cash Payment
+                Cash Payment {!canUseCash && "(Unavailable)"}
               </Text>
               <Text style={styles.paymentDescription}>
-                Pay with cash when you collect your order
+                {!canUseCash
+                  ? "Clear your debt to use cash payment"
+                  : "Pay with cash when you collect your order"}
               </Text>
             </View>
             <View
               style={[
                 styles.radioButton,
                 selectedPayment === "cash" && styles.selectedRadioButton,
+                !canUseCash && styles.disabledRadioButton,
               ]}
             />
           </TouchableOpacity>
@@ -727,6 +842,17 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     selectedRadioButton: {
       borderColor: theme.success,
       backgroundColor: theme.success,
+    },
+    disabledPaymentOption: {
+      opacity: 0.5,
+      backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
+    },
+    disabledPaymentTitle: {
+      color: theme.textSecondary,
+    },
+    disabledRadioButton: {
+      borderColor: theme.textSecondary,
+      backgroundColor: "transparent",
     },
 
     // Note

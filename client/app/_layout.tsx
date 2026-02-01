@@ -535,6 +535,15 @@ function RootLayoutNav() {
             />
 
             <Stack.Screen
+              name="awaiting-pickup"
+              options={{
+                title: "Awaiting Pickup",
+                presentation: "card",
+                headerShown: false,
+              }}
+            />
+
+            <Stack.Screen
               name="checkout"
               options={{
                 title: "Checkout",
@@ -582,6 +591,12 @@ function RootLayoutNav() {
               options={{
                 title: "About EasyBuy",
                 presentation: "modal",
+              }}
+            />
+            <Stack.Screen
+              name="wallet"
+              options={{
+                headerShown: false,
               }}
             />
           </Stack>

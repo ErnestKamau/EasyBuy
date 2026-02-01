@@ -11,6 +11,9 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\MpesaController;
 use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PickupSlotController;
+use App\Http\Controllers\Api\AwaitingPickupController;
+use App\Http\Controllers\Api\WalletController;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -96,9 +99,33 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // M-Pesa
     Route::prefix('mpesa')->group(function () {
+        Route::post('/stkpush', [MpesaController::class, 'stkPush']);
+        Route::post('/query', [MpesaController::class, 'queryStkStatus']);
         Route::post('/initiate', [MpesaController::class, 'initiateStkPush']);
         Route::get('/transactions', [MpesaController::class, 'transactions']);
         Route::get('/transactions/{mpesaTransaction}/verify', [MpesaController::class, 'verify']);
+    });
+
+    // Wallet
+    Route::prefix('wallet')->group(function () {
+        Route::get('/transactions', [WalletController::class, 'index']);
+        Route::get('/summary', [WalletController::class, 'summary']);
+    });
+
+    // Pickup Slots
+    Route::prefix('pickup-slots')->group(function () {
+        Route::get('/', [PickupSlotController::class, 'index']);
+        Route::post('/check', [PickupSlotController::class, 'check']);
+    });
+
+    // Awaiting Pickup (Admin operations)
+    Route::prefix('awaiting-pickup')->group(function () {
+        Route::get('/', [AwaitingPickupController::class, 'index']);
+        Route::post('/verify-qr', [AwaitingPickupController::class, 'verifyQrCode']);
+        Route::post('/{order}/add-payment', [AwaitingPickupController::class, 'addPayment']);
+        Route::post('/{order}/confirm', [AwaitingPickupController::class, 'confirmPickup']);
+        Route::post('/{order}/cancel', [AwaitingPickupController::class, 'cancel']);
+        Route::get('/overdue', [AwaitingPickupController::class, 'overdue']);
     });
 
     // Notifications

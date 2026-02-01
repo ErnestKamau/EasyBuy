@@ -19,7 +19,9 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "EasyBuy needs location access to provide accurate delivery estimates."
       },
-      "associatedDomains": ["applinks:yourdomain.com"]
+      "associatedDomains": [
+        "applinks:yourdomain.com"
+      ]
     },
     "android": {
       "package": "com.easybuy.app",
@@ -35,7 +37,10 @@
               "scheme": "easybuy"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "permissions": [
@@ -47,7 +52,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-location"
+      "expo-location",
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true

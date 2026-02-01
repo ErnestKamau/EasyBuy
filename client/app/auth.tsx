@@ -1339,7 +1339,6 @@ const createStyles = (theme: any, isDark: boolean) =>
       padding: 24,
       minHeight: 400,
       marginTop: -4,
-      borderWidth: 2,
     },
     headerContainer: {
       alignItems: "center",
