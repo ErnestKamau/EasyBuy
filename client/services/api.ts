@@ -444,12 +444,14 @@ export const ordersApi = {
   async createOrder(
     items: CartItemForOrder[],
     notes?: string,
-    paymentMethod?: 'cash' | 'mpesa' | 'debt'
+    paymentMethod?: 'cash' | 'mpesa' | 'card',
+    pickupTime?: string | null
   ): Promise<Order> {
     const { data } = await api.post<{ success: boolean; data: Order }>('/orders', {
       items,
       notes: notes || '',
       payment_status: paymentMethod === 'debt' ? 'debt' : paymentMethod === 'mpesa' ? 'pending' : 'pending',
+      pickup_time: pickupTime || undefined,
     });
     return data.data;
   },
@@ -963,7 +965,7 @@ export interface WalletTransaction {
   description: string;
   reference_id?: string; // e.g., order_id or sale_id
   reference_type?: string; 
-  balance_after: number;
+  balance_after?: number;
   created_at: string;
 }
 

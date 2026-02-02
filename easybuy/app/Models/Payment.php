@@ -56,19 +56,8 @@ class Payment extends Model
         });
 
         static::saved(function ($payment) {
-            // Update sale's total_paid and payment status when payment is saved
-            // Reload the sale relationship to ensure we have the latest data
-            $payment->load('sale');
-            if ($payment->sale) {
-                // Always update if payment status is completed or refunded
-                // Also update if status changed (for new payments that are immediately completed)
-                if (in_array($payment->status, ['completed', 'refunded']) || $payment->wasChanged('status')) {
-                    // Refresh the sale to get latest data
-                    $payment->sale->refresh();
-                    $payment->sale->recalculateTotalPaid();
-                    $payment->sale->updatePaymentStatus();
-                }
-            }
+            $payment->syncSaleStatus();
+            $payment->syncOrderStatus();
         });
     }
 
@@ -223,5 +212,56 @@ class Payment extends Model
     public function isPreSalePayment(): bool
     {
         return $this->order_id !== null && $this->sale_id === null;
+    }
+
+    /**
+     * Sync sale status after payment update
+     */
+    public function syncSaleStatus(): void
+    {
+        $this->load('sale');
+        if ($this->sale) {
+            if (in_array($this->status, ['completed', 'refunded']) || $this->wasChanged('status')) {
+                $this->sale->refresh();
+                $this->sale->recalculateTotalPaid();
+                $this->sale->updatePaymentStatus();
+            }
+        }
+    }
+
+    /**
+     * Sync order status after payment update
+     */
+    public function syncOrderStatus(): void
+    {
+        $this->load('order');
+        
+        if ($this->order && !$this->sale && ($this->status === 'completed' || $this->wasChanged('status'))) {
+            $order = $this->order;
+            $order->refresh();
+
+            $paidAmount = Payment::where('order_id', $order->id)
+                ->where('status', 'completed')
+                ->sum('amount');
+
+            if ($paidAmount >= $order->total_amount) {
+                $order->payment_status = 'fully-paid';
+
+                if ($order->order_status === 'pending') {
+                    try {
+                        $order->confirm();
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to auto-confirm order", [
+                            'order_id' => $order->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+            } elseif ($paidAmount > 0) {
+                $order->payment_status = 'partially-paid';
+            }
+
+            $order->save();
+        }
     }
 }

@@ -172,7 +172,10 @@ export default function WalletHistoryScreen() {
             {isCredit ? "+" : "-"} KES {item.amount.toLocaleString()}
           </Text>
           <Text style={styles.balanceAfter}>
-            Bal: {item.balance_after.toLocaleString()}
+            Bal:{" "}
+            {item.balance_after !== undefined && item.balance_after !== null
+              ? item.balance_after.toLocaleString()
+              : "N/A"}
           </Text>
         </View>
       </View>

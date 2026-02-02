@@ -81,6 +81,7 @@ class OrderController extends Controller
             'items.*.weight' => 'nullable|numeric|min:0.001', // Frontend sends 'weight', backend uses 'kilogram'
             'payment_status' => 'sometimes|in:pending,fully-paid,partially-paid,debt,failed',
             'notes' => 'nullable|string',
+            'pickup_time' => 'nullable|date|after:now',
         ]);
 
         DB::beginTransaction();
@@ -89,6 +90,7 @@ class OrderController extends Controller
                 'user_id' => $validated['user_id'] ?? $request->user()->id ?? null,
                 'payment_status' => $validated['payment_status'] ?? 'pending',
                 'notes' => $validated['notes'] ?? null,
+                'pickup_time' => $validated['pickup_time'] ?? null,
             ]);
 
             foreach ($validated['items'] as $itemData) {

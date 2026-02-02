@@ -1,5 +1,5 @@
 // app/checkout.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,12 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCart } from "@/contexts/CartContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Theme } from "@/constants/Themes";
-import { ordersApi, CartItemForOrder } from "@/services/api";
+import {
+  ordersApi,
+  CartItemForOrder,
+  pickupSlotsApi,
+  PickupSlotResponse,
+} from "@/services/api";
 import { useAuth } from "@/app/_layout";
 import { ToastService } from "@/utils/toastService";
 import {
@@ -26,7 +31,7 @@ import {
   AlertTriangle,
 } from "lucide-react-native";
 
-type PaymentMethod = "cash" | "mpesa" | "debt";
+type PaymentMethod = "cash" | "mpesa" | "card";
 type DeliveryType = "pickup" | "delivery";
 
 export default function CheckoutScreen() {
@@ -41,8 +46,48 @@ export default function CheckoutScreen() {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [selectedPickupTime, setSelectedPickupTime] = useState<string | null>(
+    null,
+  );
+  const [availableSlots, setAvailableSlots] = useState<PickupSlotResponse[]>(
+    [],
+  );
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
-  // Debt enforcement: if user has negative balance, force M-Pesa/Debt only
+  // Load available pickup slots when delivery type is pickup
+  useEffect(() => {
+    if (selectedDelivery === "pickup") {
+      loadPickupSlots();
+    }
+  }, [selectedDelivery]);
+
+  const loadPickupSlots = async () => {
+    try {
+      setLoadingSlots(true);
+      // Get slots for today
+      const today = new Date().toISOString().split("T")[0];
+      const slots = await pickupSlotsApi.getAvailableSlots(today);
+      setAvailableSlots(slots);
+    } catch (error) {
+      console.error("Failed to load pickup slots:", error);
+      ToastService.showError("Error", "Failed to load pickup times");
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  const handlePaymentMethodSelect = (method: PaymentMethod) => {
+    if (method === "cash" && !canUseCash) {
+      ToastService.showError(
+        "Payment Blocked",
+        "You must clear your debt before using cash payment. Please use M-Pesa or Card.",
+      );
+      return;
+    }
+    setSelectedPayment(method);
+  };
+
+  // Debt enforcement: if user has negative balance, force M-Pesa/Card only
   const hasDebt = user && user.wallet_balance < 0;
   const canUseCash = !hasDebt;
 
@@ -73,11 +118,22 @@ export default function CheckoutScreen() {
         weight: item.weight,
       }));
 
+      // Validate pickup time for pickup orders
+      if (selectedDelivery === "pickup" && !selectedPickupTime) {
+        ToastService.showError(
+          "Pickup Time Required",
+          "Please select a pickup time",
+        );
+        setIsProcessing(false);
+        return;
+      }
+
       // Create the order
       const order = await ordersApi.createOrder(
         orderItems,
-        `Payment method: ${selectedPayment === "cash" ? "Cash" : selectedPayment === "mpesa" ? "M-Pesa" : "Debt"}`,
+        `Payment method: ${selectedPayment === "cash" ? "Cash" : selectedPayment === "mpesa" ? "M-Pesa" : "Card"}`,
         selectedPayment,
+        selectedDelivery === "pickup" ? selectedPickupTime : undefined,
       );
 
       // Trigger STK Push if M-Pesa
@@ -153,18 +209,6 @@ export default function CheckoutScreen() {
     }
   };
 
-  const handlePaymentMethodSelect = (method: PaymentMethod) => {
-    // Block cash selection if user has debt
-    if (method === "cash" && !canUseCash) {
-      ToastService.showError(
-        "Payment Restricted",
-        "You must clear your debt first. Please use M-Pesa or increase your debt limit.",
-      );
-      return;
-    }
-    setSelectedPayment(method);
-  };
-
   // Initialize styles with current theme
   const styles = createStyles(currentTheme, isDark);
 
@@ -212,12 +256,6 @@ export default function CheckoutScreen() {
                     ? "Pay via M-Pesa"
                     : "Pay at the shop"}
                 </Text>
-              </View>
-            )}
-            {selectedPayment === "debt" && (
-              <View style={styles.stepItem}>
-                <AlertTriangle size={20} color="#F59E0B" />
-                <Text style={styles.stepText}>Payment due within 7 days</Text>
               </View>
             )}
           </View>
@@ -385,12 +423,105 @@ export default function CheckoutScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Pickup Time Selection (only show if pickup is selected) */}
+        {selectedDelivery === "pickup" && (
+          <View style={styles.deliveryCard}>
+            <Text style={styles.sectionTitle}>Select Pickup Time</Text>
+            <Text style={styles.paymentSubtitle}>
+              Choose when you'll collect your order
+            </Text>
+
+            {loadingSlots ? (
+              <View style={{ padding: 20, alignItems: "center" }}>
+                <ActivityIndicator size="large" color={currentTheme.primary} />
+                <Text
+                  style={{ color: currentTheme.textSecondary, marginTop: 10 }}
+                >
+                  Loading available times...
+                </Text>
+              </View>
+            ) : availableSlots.length === 0 ? (
+              <View style={{ padding: 20, alignItems: "center" }}>
+                <Clock size={40} color={currentTheme.textSecondary} />
+                <Text
+                  style={{ color: currentTheme.textSecondary, marginTop: 10 }}
+                >
+                  No pickup slots available
+                </Text>
+              </View>
+            ) : (
+              <View style={{ marginTop: 12 }}>
+                {availableSlots.slice(0, 6).map((slot) => (
+                  <TouchableOpacity
+                    key={slot.time}
+                    style={[
+                      styles.paymentOption,
+                      selectedPickupTime === slot.datetime &&
+                        styles.selectedPaymentOption,
+                      !slot.available && styles.disabledPaymentOption,
+                    ]}
+                    onPress={() => {
+                      if (slot.available) {
+                        setSelectedPickupTime(slot.datetime);
+                      } else {
+                        ToastService.showWarning(
+                          "Slot Full",
+                          "This time slot is fully booked",
+                        );
+                      }
+                    }}
+                    disabled={!slot.available}
+                  >
+                    <View style={styles.paymentIcon}>
+                      <Clock
+                        size={20}
+                        color={
+                          !slot.available
+                            ? "#94A3B8"
+                            : selectedPickupTime === slot.datetime
+                              ? "#22C55E"
+                              : "#64748B"
+                        }
+                      />
+                    </View>
+                    <View style={styles.paymentContent}>
+                      <Text
+                        style={[
+                          styles.paymentTitle,
+                          selectedPickupTime === slot.datetime &&
+                            styles.selectedPaymentTitle,
+                          !slot.available && styles.disabledPaymentTitle,
+                        ]}
+                      >
+                        {slot.label}
+                      </Text>
+                      <Text style={styles.paymentDescription}>
+                        {slot.available
+                          ? `${slot.remaining} slots available`
+                          : "Fully booked"}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.radioButton,
+                        selectedPickupTime === slot.datetime &&
+                          styles.selectedRadioButton,
+                        !slot.available && styles.disabledRadioButton,
+                      ]}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Payment Method */}
         <View style={styles.paymentCard}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
           <Text style={styles.paymentSubtitle}>
-            {selectedPayment === "debt"
-              ? "Payment will be due within 7 days"
+            {selectedPayment === "card"
+              ? "Pay via Debit/Credit Card"
               : selectedPayment === "mpesa"
                 ? "Pay via M-Pesa Paybill"
                 : "You will pay when you collect your order"}
@@ -502,52 +633,37 @@ export default function CheckoutScreen() {
           <TouchableOpacity
             style={[
               styles.paymentOption,
-              selectedPayment === "debt" && styles.selectedPaymentOption,
+              selectedPayment === "card" && styles.selectedPaymentOption,
             ]}
-            onPress={() => handlePaymentMethodSelect("debt")}
+            onPress={() => handlePaymentMethodSelect("card")}
           >
             <View style={styles.paymentIcon}>
               <CreditCard
                 size={24}
-                color={selectedPayment === "debt" ? "#22C55E" : "#64748B"}
+                color={selectedPayment === "card" ? "#22C55E" : "#64748B"}
               />
             </View>
             <View style={styles.paymentContent}>
               <Text
                 style={[
                   styles.paymentTitle,
-                  selectedPayment === "debt" && styles.selectedPaymentTitle,
+                  selectedPayment === "card" && styles.selectedPaymentTitle,
                 ]}
               >
-                Pay on Debt
+                Card Payment
               </Text>
               <Text style={styles.paymentDescription}>
-                Pay later (7 days maximum)
+                Pay with Debit or Credit Card
               </Text>
             </View>
             <View
               style={[
                 styles.radioButton,
-                selectedPayment === "debt" && styles.selectedRadioButton,
+                selectedPayment === "card" && styles.selectedRadioButton,
               ]}
             />
           </TouchableOpacity>
         </View>
-
-        {/* Important Note */}
-        {selectedPayment === "debt" && (
-          <View style={styles.noteCard}>
-            <AlertTriangle size={20} color="#F59E0B" />
-            <View style={styles.noteContent}>
-              <Text style={styles.noteTitle}>Debt Payment Terms</Text>
-              <Text style={styles.noteDescription}>
-                This order will be on debt. Payment must be completed within 7
-                days. You and the admin will be notified 2 days before the due
-                date.
-              </Text>
-            </View>
-          </View>
-        )}
       </ScrollView>
 
       {/* Bottom Action */}
