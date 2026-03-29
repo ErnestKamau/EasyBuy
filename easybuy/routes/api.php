@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\WalletController;
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/auth/social/{provider}', [AuthController::class, 'socialLogin']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/verify-email-code', [AuthController::class, 'verifyEmailCode']);
 Route::post('/resend-email-verification-code', [AuthController::class, 'resendEmailVerificationCode']);

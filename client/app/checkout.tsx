@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCart } from "@/contexts/CartContext";
@@ -19,7 +20,7 @@ import {
   pickupSlotsApi,
   PickupSlotResponse,
 } from "@/services/api";
-import { useAuth } from "@/app/_layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { ToastService } from "@/utils/toastService";
 import {
   ArrowLeft,
@@ -53,6 +54,8 @@ export default function CheckoutScreen() {
     [],
   );
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  const [tempSelectedTime, setTempSelectedTime] = useState<string | null>(null);
 
   // Load available pickup slots when delivery type is pickup
   useEffect(() => {
@@ -440,7 +443,7 @@ export default function CheckoutScreen() {
                   Loading available times...
                 </Text>
               </View>
-            ) : availableSlots.length === 0 ? (
+            ) : !availableSlots || availableSlots.length === 0 ? (
               <View style={{ padding: 20, alignItems: "center" }}>
                 <Clock size={40} color={currentTheme.textSecondary} />
                 <Text
@@ -450,68 +453,47 @@ export default function CheckoutScreen() {
                 </Text>
               </View>
             ) : (
-              <View style={{ marginTop: 12 }}>
-                {availableSlots.slice(0, 6).map((slot) => (
-                  <TouchableOpacity
-                    key={slot.time}
+              <TouchableOpacity
+                style={[
+                  styles.paymentOption,
+                  selectedPickupTime && styles.selectedPaymentOption,
+                ]}
+                onPress={() => {
+                  setTempSelectedTime(selectedPickupTime);
+                  setShowPickupModal(true);
+                }}
+              >
+                <View style={styles.paymentIcon}>
+                  <Clock
+                    size={24}
+                    color={selectedPickupTime ? "#22C55E" : "#64748B"}
+                  />
+                </View>
+                <View style={styles.paymentContent}>
+                  <Text
                     style={[
-                      styles.paymentOption,
-                      selectedPickupTime === slot.datetime &&
-                        styles.selectedPaymentOption,
-                      !slot.available && styles.disabledPaymentOption,
+                      styles.paymentTitle,
+                      selectedPickupTime && styles.selectedPaymentTitle,
                     ]}
-                    onPress={() => {
-                      if (slot.available) {
-                        setSelectedPickupTime(slot.datetime);
-                      } else {
-                        ToastService.showWarning(
-                          "Slot Full",
-                          "This time slot is fully booked",
-                        );
-                      }
-                    }}
-                    disabled={!slot.available}
                   >
-                    <View style={styles.paymentIcon}>
-                      <Clock
-                        size={20}
-                        color={
-                          !slot.available
-                            ? "#94A3B8"
-                            : selectedPickupTime === slot.datetime
-                              ? "#22C55E"
-                              : "#64748B"
-                        }
-                      />
-                    </View>
-                    <View style={styles.paymentContent}>
-                      <Text
-                        style={[
-                          styles.paymentTitle,
-                          selectedPickupTime === slot.datetime &&
-                            styles.selectedPaymentTitle,
-                          !slot.available && styles.disabledPaymentTitle,
-                        ]}
-                      >
-                        {slot.label}
-                      </Text>
-                      <Text style={styles.paymentDescription}>
-                        {slot.available
-                          ? `${slot.remaining} slots available`
-                          : "Fully booked"}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.radioButton,
-                        selectedPickupTime === slot.datetime &&
-                          styles.selectedRadioButton,
-                        !slot.available && styles.disabledRadioButton,
-                      ]}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
+                    {selectedPickupTime
+                      ? availableSlots.find(s => s.datetime === selectedPickupTime)?.label ||
+                        "Time Selected"
+                      : "Select Pickup Time"}
+                  </Text>
+                  <Text style={styles.paymentDescription}>
+                    {selectedPickupTime
+                      ? "Tap to change"
+                      : "Choose from available times"}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.radioButton,
+                    selectedPickupTime && styles.selectedRadioButton,
+                  ]}
+                />
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -693,6 +675,85 @@ export default function CheckoutScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Pickup Time Modal */}
+      <Modal
+        visible={showPickupModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPickupModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: currentTheme.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: currentTheme.text }]}>
+                Select Pickup Time
+              </Text>
+              <TouchableOpacity onPress={() => setShowPickupModal(false)}>
+                <Text style={[styles.modalClose, { color: currentTheme.primary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView}>
+              {availableSlots.map((slot) => (
+                <TouchableOpacity
+                  key={slot.time}
+                  style={[
+                    styles.modalSlotItem,
+                    { borderBottomColor: currentTheme.border },
+                    tempSelectedTime === slot.datetime && {
+                      backgroundColor: currentTheme.primary + "15",
+                      borderLeftWidth: 4,
+                      borderLeftColor: currentTheme.primary,
+                    },
+                    !slot.available && { opacity: 0.5 },
+                  ]}
+                  onPress={() => {
+                    if (slot.available) {
+                      setTempSelectedTime(slot.datetime);
+                    } else {
+                      ToastService.showWarning("Slot Full", "This time slot is fully booked");
+                    }
+                  }}
+                  disabled={!slot.available}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.slotLabel, { color: currentTheme.text }]}>
+                      {slot.label}
+                    </Text>
+                    <Text style={[styles.slotAvailability, { color: currentTheme.textSecondary }]}>
+                      {slot.available
+                        ? `${slot.remaining} slots available`
+                        : "Fully booked"}
+                    </Text>
+                  </View>
+                  {tempSelectedTime === slot.datetime && (
+                    <CheckCircle size={24} color={currentTheme.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalConfirmButton, { backgroundColor: currentTheme.primary }]}
+                onPress={() => {
+                  if (tempSelectedTime) {
+                    setSelectedPickupTime(tempSelectedTime);
+                    setShowPickupModal(false);
+                  } else {
+                    ToastService.showError("No Selection", "Please select a time slot");
+                  }
+                }}
+              >
+                <Text style={styles.modalConfirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1029,6 +1090,65 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       backgroundColor: theme.textSecondary,
     },
     placeOrderButtonText: {
+      color: "#FFFFFF",
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    // Modal Styles
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "flex-end",
+    },
+    modalContent: {
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 20,
+      maxHeight: "80%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    modalClose: {
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    modalScrollView: {
+      maxHeight: 400,
+    },
+    modalSlotItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 16,
+      borderBottomWidth: 1,
+    },
+    slotLabel: {
+      fontSize: 16,
+      fontWeight: "600",
+      marginBottom: 4,
+    },
+    slotAvailability: {
+      fontSize: 14,
+    },
+    modalFooter: {
+      padding: 20,
+      paddingTop: 16,
+    },
+    modalConfirmButton: {
+      padding: 16,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    modalConfirmText: {
       color: "#FFFFFF",
       fontSize: 16,
       fontWeight: "700",

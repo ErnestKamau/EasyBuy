@@ -12,11 +12,12 @@ import {
   Notification,
   NotificationPreference,
 } from "@/services/api";
-import { useAuth } from "@/app/_layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { Platform } from "react-native";
 import { websocketService } from "@/services/websocket";
 
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -215,7 +216,13 @@ export function NotificationProvider({
         return null;
       }
 
-      const token = (await Notifications.getExpoPushTokenAsync()).data;
+      const token = (
+        await Notifications.getExpoPushTokenAsync({
+          projectId:
+            Constants.expoConfig?.extra?.eas?.projectId ??
+            Constants.easConfig?.projectId,
+        })
+      ).data;
       const platform = Platform.OS === "ios" ? "ios" : "android";
 
       // Register token with backend

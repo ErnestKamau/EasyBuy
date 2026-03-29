@@ -12,7 +12,7 @@ import {
   StatusBar,
 } from "react-native";
 import { router } from "expo-router";
-import { useAuth } from "@/app/_layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Theme } from "@/constants/Themes";
 import { walletApi, WalletTransaction } from "@/services/api";

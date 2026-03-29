@@ -29,6 +29,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#22C55E"
       },
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -53,7 +54,8 @@
     "plugins": [
       "expo-router",
       "expo-location",
-      "expo-barcode-scanner"
+      "expo-notifications",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true

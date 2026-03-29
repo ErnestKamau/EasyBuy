@@ -14,7 +14,7 @@ import {
   StatusBar,
 } from "react-native";
 import { router } from "expo-router";
-import { useAuth } from "@/app/_layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Theme } from "@/constants/Themes";
 import { awaitingPickupApi, Order } from "@/services/api";
@@ -24,16 +24,11 @@ import {
   QrCode,
   DollarSign,
   CheckCircle,
-  XCircle,
   Clock,
   AlertTriangle,
   CreditCard,
-  Smartphone,
-  Ban,
 } from "lucide-react-native";
 
-// Note: You'll need to install expo-barcode-scanner for QR functionality
-// Run: npx expo install expo-barcode-scanner
 
 export default function AwaitingPickupScreen() {
   const { user } = useAuth();
@@ -114,7 +109,7 @@ export default function AwaitingPickupScreen() {
   const addPayment = async () => {
     if (!selectedOrder) return;
 
-    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+    if (!paymentForm.amount || Number.parseFloat(paymentForm.amount) <= 0) {
       ToastService.showError("Invalid Amount", "Please enter a valid amount");
       return;
     }
@@ -123,7 +118,7 @@ export default function AwaitingPickupScreen() {
       const updatedOrder = await awaitingPickupApi.addPayment(
         selectedOrder.id,
         {
-          amount: parseFloat(paymentForm.amount),
+          amount: Number.parseFloat(paymentForm.amount),
           payment_method: paymentForm.paymentMethod,
           notes: paymentForm.notes || undefined,
         },

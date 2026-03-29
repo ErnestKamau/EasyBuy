@@ -10,7 +10,7 @@ import {
   StatusBar,
 } from "react-native";
 import { router } from "expo-router";
-import { useAuth } from "@/app/_layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext"; // Import theme hook
 import { ToastService } from "@/utils/toastService";
 import {

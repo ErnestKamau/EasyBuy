@@ -195,6 +195,28 @@ export const authApi = {
     }
   },
 
+  async socialLogin(provider: string, token: string): Promise<AuthResponse> {
+    try {
+      const { data } = await api.post<AuthResponse>(`/auth/social/${provider}`, {
+        provider,
+        token,
+      });
+
+      if (data.access_token) {
+        await tokenManager.setToken(data.access_token);
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error("Social login API error:", error);
+      if (error.response) {
+        const errorData = error.response.data;
+        throw new Error(errorData?.message || `Failed to authenticate with ${provider}`);
+      }
+      throw error;
+    }
+  },
+
   async logout(): Promise<void> {
     try {
       await api.post("/logout");
@@ -260,8 +282,14 @@ export const authApi = {
 
   async forgotPassword(email: string): Promise<void> {
     try {
-      await api.post("/forgot-password", { email });
+      console.log("Calling forgot-password API with email:", email);
+      const response = await api.post("/forgot-password", { email });
+      console.log("Forgot password response:", response);
     } catch (error: any) {
+      console.log("Forgot password API error:", error);
+      console.log("Error code:", error.code);
+      console.log("Error request:", error.request);
+      console.log("Error config:", error.config);
       if (error.response) {
         const errorData = error.response.data;
         const errorMsg = errorData?.message || errorData?.error || 'Failed to send password reset code';
@@ -431,6 +459,7 @@ export interface Order {
   total_amount: number;
   items?: OrderItem[];
   sale?: Sale;
+  pickup_time?: string;
 }
 
 export interface CartItemForOrder {
@@ -903,8 +932,8 @@ export interface AvailableSlotsResponse {
 // Pickup Slots API
 export const pickupSlotsApi = {
   async getAvailableSlots(date: string): Promise<PickupSlotResponse[]> {
-    const { data } = await api.get<AvailableSlotsResponse>(`/pickup-slots?date=${date}`);
-    return data.slots;
+    const { data } = await api.get<{ success: boolean; data: { date: string; slots: PickupSlotResponse[] } }>(`/pickup-slots?date=${date}`);
+    return data.data.slots;
   },
 
   async checkSlotAvailability(pickupTime: string): Promise<{ available: boolean; available_capacity: number }> {

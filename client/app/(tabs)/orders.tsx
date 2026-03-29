@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth } from "@/app/_layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { ordersApi, Order } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
 import {

@@ -17,7 +17,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -39,9 +39,12 @@ import {
 import LottieView from "lottie-react-native";
 import { authApi, RegisterData, LoginData } from "../services/api";
 import { ToastService } from "@/utils/toastService";
-import { useAuth } from "./_layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { defaultFontFamily, headingFontFamily } from "@/constants/Fonts";
+import CodeInput from "@/components/CodeInput";
+import NumericKeypad from "@/components/NumericKeypad";
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -134,15 +137,30 @@ type AuthScreen =
 export default function AuthScreens() {
   const params = useLocalSearchParams();
   const { currentTheme, themeName } = useTheme();
-  const { login } = useAuth();
+  const { login, socialLogin } = useAuth();
   const isDark = themeName === "dark";
 
   const [currentScreen, setCurrentScreen] = useState<AuthScreen>(
     (params.mode as AuthScreen) || "login",
   );
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Initialize Google Sign-In
+  useEffect(() => {
+    if (GoogleSignin) {
+      try {
+        GoogleSignin.configure({
+          webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+          offlineAccess: true,
+        });
+      } catch (error) {
+        console.log("GoogleSignin configuration error:", error);
+      }
+    }
+  }, []);
 
   // Login state
   const [loginData, setLoginData] = useState<LoginData>({
@@ -206,6 +224,42 @@ export default function AuthScreens() {
       setLoading(false);
     }
   }, [loginData, login]);
+
+  // Handle Google Login
+  const handleGoogleLogin = useCallback(async () => {
+    setGoogleLoading(true);
+    try {
+      if (!GoogleSignin) {
+        ToastService.showError("Error", "Google Sign-In is not available in this build.");
+        return;
+      }
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
+
+      if (!idToken) {
+        throw new Error("No ID token received from Google");
+      }
+
+      await socialLogin("google", idToken);
+      
+      ToastService.showSuccess("Welcome!", "Successfully logged in with Google");
+      router.replace("/(tabs)");
+    } catch (error: any) {
+      console.log("Google Sign-In Error:", error);
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        ToastService.showError("Process in Progress", "Google Sign-In is already running");
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        ToastService.showError("Error", "Google Play Services not available");
+      } else {
+        ToastService.showError("Google Authentication Failed", error.message || "An unexpected error occurred");
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [socialLogin, router]);
 
   // Handle registration
   const handleRegister = useCallback(async () => {
@@ -514,7 +568,9 @@ export default function AuthScreens() {
               showPassword={showPassword}
               setShowPassword={setShowPassword}
               loading={loading}
+              googleLoading={googleLoading}
               onLogin={handleLogin}
+              onGoogleLogin={handleGoogleLogin}
               onSwitchToRegister={() => setCurrentScreen("register")}
               onForgotPassword={() => setCurrentScreen("forgot-password")}
               styles={styles}
@@ -626,25 +682,29 @@ export default function AuthScreens() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            {
-              paddingTop: Math.max(insets.top, 20), // Reduce top margin by 10px
-              paddingBottom: Math.max(insets.bottom, 20),
-            },
-          ]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+      {currentScreen === "email-verification" ? (
+        renderScreen()
+      ) : (
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
         >
-          {renderScreen()}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingTop: Math.max(insets.top, 20),
+                paddingBottom: Math.max(insets.bottom, 20),
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {renderScreen()}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
@@ -870,7 +930,9 @@ const LoginScreen = ({
   showPassword,
   setShowPassword,
   loading,
+  googleLoading,
   onLogin,
+  onGoogleLogin,
   onSwitchToRegister,
   onForgotPassword,
   styles,
@@ -963,6 +1025,30 @@ const LoginScreen = ({
         <ActivityIndicator color={styles.primaryButtonText.color} />
       ) : (
         <Text style={styles.primaryButtonText}>Login</Text>
+      )}
+    </TouchableOpacity>
+
+    <View style={styles.socialDivider}>
+      <View style={styles.socialDividerLine} />
+      <Text style={styles.socialDividerText}>OR</Text>
+      <View style={styles.socialDividerLine} />
+    </View>
+
+    <TouchableOpacity
+      style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+      onPress={onGoogleLogin}
+      disabled={googleLoading || loading}
+      activeOpacity={0.8}
+    >
+      {googleLoading ? (
+        <ActivityIndicator color="#000" />
+      ) : (
+        <>
+          <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+             <Text style={{ color: '#4285F4', fontWeight: 'bold', fontSize: 18 }}>G</Text>
+          </View>
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
+        </>
       )}
     </TouchableOpacity>
 
@@ -1072,47 +1158,35 @@ const EmailVerificationScreen = ({
 
     <View style={styles.iconContainer}>
       <View style={styles.iconWrapper}>
-        <LottieAnimation
-          source={require("@/assets/lottie/email-verification.json")}
-          size={300}
-          autoPlay={true}
-          loop={true}
-          fallbackIcon={Mail}
-          fallbackColor={styles.iconColor}
-        />
+        <Mail size={80} color={styles.iconColor} strokeWidth={1.5} />
       </View>
     </View>
 
     <View style={styles.headerContainer}>
-      <Text style={styles.title}>Verification</Text>
-      <Text style={styles.subtitle}>Enter the code to continue.</Text>
+      <Text style={styles.title}>Verify Email</Text>
+      <Text style={styles.subtitle}>Enter the 4-digit code sent to</Text>
     </View>
 
     <Text style={styles.emailText}>
-      We sent a code to <Text style={styles.emailHighlight}>{email}</Text>
+      {email} <Text style={styles.emailHighlight} onPress={onBack}>Edit</Text>
     </Text>
 
     <View style={styles.codeContainer}>
       {code.map((digit: string, index: number) => (
         <TextInput
-          key={`code-input-${index}`}
-          ref={(ref) => {
-            if (codeInputRefs?.current) {
-              codeInputRefs.current[index] = ref;
-            }
+          key={index}
+          ref={(el) => {
+            codeInputRefs.current[index] = el;
           }}
           style={styles.codeInput}
           value={digit}
-          onChangeText={(value) => onCodeChange(index, value)}
-          onKeyPress={({ nativeEvent }) => {
-            if (onKeyPress) {
-              onKeyPress(index, nativeEvent.key);
-            }
-          }}
-          keyboardType="number-pad"
+          onChangeText={(text) => onCodeChange(index, text)}
+          onKeyPress={({ nativeEvent }) => onKeyPress(index, nativeEvent.key)}
+          keyboardType="numeric"
           maxLength={1}
           selectTextOnFocus
-          autoFocus={index === 0}
+          placeholder="0"
+          placeholderTextColor={styles.placeholderColor}
         />
       ))}
     </View>
@@ -1126,28 +1200,18 @@ const EmailVerificationScreen = ({
       {loading ? (
         <ActivityIndicator color={styles.primaryButtonText.color} />
       ) : (
-        <Text style={styles.primaryButtonText}>Continue</Text>
+        <Text style={styles.primaryButtonText}>Verify</Text>
       )}
     </TouchableOpacity>
 
     <TouchableOpacity
       style={styles.linkContainer}
       onPress={onResend}
+      disabled={loading}
       activeOpacity={0.7}
     >
       <Text style={styles.linkText}>
-        Didn't receive the code?{" "}
-        <Text style={styles.linkTextBold}>Send Again</Text>
-      </Text>
-    </TouchableOpacity>
-
-    <TouchableOpacity
-      style={styles.linkContainer}
-      onPress={onBack}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.linkText}>
-        <ArrowLeft size={14} color={styles.linkText.color} /> Back to log in?
+        Didn't receive code? <Text style={styles.linkTextBold}>Resend</Text>
       </Text>
     </TouchableOpacity>
   </View>
@@ -1340,6 +1404,10 @@ const createStyles = (theme: any, isDark: boolean) =>
       minHeight: 400,
       marginTop: -4,
     },
+    fullscreenContainer: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
     headerContainer: {
       alignItems: "center",
       marginBottom: 28,
@@ -1432,6 +1500,45 @@ const createStyles = (theme: any, isDark: boolean) =>
       fontWeight: "600",
       fontFamily: defaultFontFamily,
     },
+    socialDivider: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginVertical: 20,
+    },
+    socialDividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
+    },
+    socialDividerText: {
+      marginHorizontal: 16,
+      color: theme.textSecondary,
+      fontSize: 14,
+      fontFamily: defaultFontFamily,
+    },
+    googleButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#fff",
+      borderWidth: 1,
+      borderColor: isDark ? "transparent" : "#e5e7eb",
+      borderRadius: 16,
+      paddingVertical: 14,
+      marginBottom: 20,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    googleButtonText: {
+      color: "#000",
+      fontSize: 16,
+      fontWeight: "600",
+      marginLeft: 12,
+      fontFamily: defaultFontFamily,
+    },
     checkboxContainer: {
       flexDirection: "row",
       alignItems: "center",
@@ -1484,6 +1591,13 @@ const createStyles = (theme: any, isDark: boolean) =>
       justifyContent: "center",
       alignItems: "center",
       position: "relative",
+    },
+    emailIconWrapper: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      justifyContent: "center",
+      alignItems: "center",
     },
     iconColor: theme.primary,
     checkmarkOverlay: {

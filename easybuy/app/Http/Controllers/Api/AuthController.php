@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Mail\EmailVerificationCode;
@@ -203,6 +204,124 @@ class AuthController extends Controller
             'access_token' => $token,
             'token_type' => 'Bearer',
         ]);
+    }
+
+    /**
+     * Handle social login (Google)
+     */
+    public function socialLogin(Request $request)
+    {
+        $validated = $request->validate([
+            'provider' => 'required|string|in:google',
+            'token' => 'required|string',
+        ]);
+
+        $provider = $validated['provider'];
+        $token = $validated['token'];
+
+        try {
+            $socialUser = null;
+
+            if ($provider === 'google') {
+                // Verify Google ID Token using Google's API
+                // This is more reliable for mobile apps than Socialite's userFromToken which expects an Access Token
+                $response = \Illuminate\Support\Facades\Http::get("https://oauth2.googleapis.com/tokeninfo?id_token={$token}");
+                
+                if ($response->failed()) {
+                    \Log::error('Google ID Token verification failed: ' . $response->body());
+                    return response()->json(['message' => 'Invalid social token.'], 401);
+                }
+                
+                $payload = $response->json();
+                
+                // Verify the audience (client ID) matches our web client ID
+                if ($payload['aud'] !== config('services.google.client_id')) {
+                    \Log::error('Google ID Token audience mismatch. Expected: ' . config('services.google.client_id') . ', Got: ' . $payload['aud']);
+                    return response()->json(['message' => 'Invalid audience.'], 401);
+                }
+
+                // Map payload to a consistent social user object
+                $socialUser = (object)[
+                    'id' => $payload['sub'],
+                    'email' => $payload['email'],
+                    'name' => $payload['name'] ?? (($payload['given_name'] ?? '') . ' ' . ($payload['family_name'] ?? '')),
+                ];
+            } else {
+                // Fallback to Socialite for other providers if needed
+                $socialUser = \Laravel\Socialite\Facades\Socialite::driver($provider)->userFromToken($token);
+            }
+            
+            if (!$socialUser) {
+                return response()->json(['message' => 'Invalid social user data.'], 401);
+            }
+
+            // Find or create the user
+            $user = User::where('provider', $provider)
+                ->where('provider_id', $socialUser->id ?? $socialUser->getId())
+                ->first();
+
+            if (!$user) {
+                // Check if user exists with the same email
+                $email = $socialUser->email ?? $socialUser->getEmail();
+                $user = User::where('email', $email)->first();
+
+                if ($user) {
+                    // Update existing user with provider info
+                    $user->update([
+                        'provider' => $provider,
+                        'provider_id' => $socialUser->id ?? $socialUser->getId(),
+                        'provider_token' => $token,
+                        'email_verified_at' => $user->email_verified_at ?? now(),
+                    ]);
+                } else {
+                    // Create new user
+                    $name = $socialUser->name ?? $socialUser->getName();
+                    $username = strtolower(str_replace(' ', '', $name)) . '_' . rand(100, 999);
+                    
+                    while (User::where('username', $username)->exists()) {
+                        $username = strtolower(str_replace(' ', '', $name)) . '_' . rand(100, 999);
+                    }
+
+                    $nameParts = explode(' ', $name);
+                    $firstName = $nameParts[0] ?? '';
+                    $lastName = $nameParts[1] ?? ($nameParts[count($nameParts)-1] ?? '');
+
+                    $user = User::create([
+                        'username' => $username,
+                        'first_name' => $firstName,
+                        'last_name' => $lastName,
+                        'email' => $email,
+                        'password' => Hash::make(Str::random(24)),
+                        'provider' => $provider,
+                        'provider_id' => $socialUser->id ?? $socialUser->getId(),
+                        'provider_token' => $token,
+                        'email_verified_at' => now(),
+                        'role' => 'customer',
+                    ]);
+                }
+            } else {
+                // Update token
+                $user->update([
+                    'provider_token' => $token,
+                ]);
+            }
+
+            $accessToken = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'message' => 'Successfully authenticated with ' . ucfirst($provider),
+                'user' => $user,
+                'access_token' => $accessToken,
+                'token_type' => 'Bearer',
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Social Login Error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Authentication failed. Please try again.',
+                'error' => $e->getMessage()
+            ], 401);
+        }
     }
 
     public function logout(Request $request)
