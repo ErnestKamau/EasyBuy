@@ -43,6 +43,12 @@ Route::prefix('products')->group(function () {
     Route::get('/{product}', [ProductController::class, 'show']);
 });
 
+// M-Pesa callback endpoints (public - for M-Pesa API callbacks)
+Route::prefix('mpesa')->group(function () {
+    Route::post('/validate', [MpesaController::class, 'validateC2bTransaction']);
+    Route::post('/callback', [MpesaController::class, 'callback']);
+});
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
@@ -100,9 +106,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // M-Pesa
     Route::prefix('mpesa')->group(function () {
+        // Protected M-Pesa endpoints (requires authentication)
         Route::post('/stkpush', [MpesaController::class, 'stkPush']);
         Route::post('/query', [MpesaController::class, 'queryStkStatus']);
         Route::post('/initiate', [MpesaController::class, 'initiateStkPush']);
+        Route::post('/register-c2b', [MpesaController::class, 'registerC2bUrls']);
+        Route::post('/simulate-c2b', [MpesaController::class, 'simulateC2b']);
         Route::get('/transactions', [MpesaController::class, 'transactions']);
         Route::get('/transactions/{mpesaTransaction}/verify', [MpesaController::class, 'verify']);
     });

@@ -479,7 +479,7 @@ export const ordersApi = {
     const { data } = await api.post<{ success: boolean; data: Order }>('/orders', {
       items,
       notes: notes || '',
-      payment_status: paymentMethod === 'debt' ? 'debt' : paymentMethod === 'mpesa' ? 'pending' : 'pending',
+      payment_status: paymentMethod === 'cash' ? 'pending' : paymentMethod === 'mpesa' ? 'pending' : 'pending',
       pickup_time: pickupTime || undefined,
     });
     return data.data;
@@ -773,6 +773,46 @@ export const mpesaApi = {
       return {
         success: false,
         message: error.response?.data?.message || error.message || 'Failed to initiate payment',
+      };
+    }
+  },
+
+  async queryStkStatus(checkoutRequestId: string): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      status: 'pending' | 'success' | 'failed';
+      result_code?: string;
+      result_desc?: string;
+      payment?: {
+        id: number;
+        status: string;
+        amount: number;
+      };
+    };
+  }> {
+    try {
+      const { data } = await api.post<{
+        success: boolean;
+        message: string;
+        data: {
+          status: 'pending' | 'success' | 'failed';
+          result_code?: string;
+          result_desc?: string;
+          payment?: {
+            id: number;
+            status: string;
+            amount: number;
+          };
+        };
+      }>('/mpesa/query', {
+        checkout_request_id: checkoutRequestId,
+      });
+      return data;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to query payment status',
       };
     }
   },

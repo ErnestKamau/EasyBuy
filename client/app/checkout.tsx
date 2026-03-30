@@ -1,5 +1,5 @@
 // app/checkout.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import {
   CartItemForOrder,
   pickupSlotsApi,
   PickupSlotResponse,
+  mpesaApi,
 } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ToastService } from "@/utils/toastService";
@@ -56,6 +57,13 @@ export default function CheckoutScreen() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [tempSelectedTime, setTempSelectedTime] = useState<string | null>(null);
+  
+  // M-Pesa payment polling state
+  const [paymentPolling, setPaymentPolling] = useState(false);
+  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingCountRef = useRef(0);
 
   // Load available pickup slots when delivery type is pickup
   useEffect(() => {
@@ -63,6 +71,15 @@ export default function CheckoutScreen() {
       loadPickupSlots();
     }
   }, [selectedDelivery]);
+
+  // Cleanup polling interval on component unmount
+  useEffect(() => {
+    return () => {
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const loadPickupSlots = async () => {
     try {
@@ -93,6 +110,64 @@ export default function CheckoutScreen() {
   // Debt enforcement: if user has negative balance, force M-Pesa/Card only
   const hasDebt = user && user.wallet_balance < 0;
   const canUseCash = !hasDebt;
+
+  const pollPaymentStatus = async (requestId: string) => {
+    if (pollingCountRef.current >= 30) {
+      // Timeout after 30 attempts (60 seconds with 2s intervals)
+      setPaymentPolling(false);
+      ToastService.showError(
+        "Payment Timeout",
+        "Please check your M-Pesa app to confirm payment status",
+      );
+      // Don't redirect - let user manually check
+      return;
+    }
+
+    try {
+      pollingCountRef.current += 1;
+      const result = await mpesaApi.queryStkStatus(requestId);
+
+      if (result.success && result.data) {
+        const status = result.data.status;
+
+        if (status === 'success') {
+          setPaymentStatus('success');
+          setPaymentPolling(false);
+          pollingCountRef.current = 0;
+          ToastService.showSuccess(
+            "Payment Successful",
+            "Your payment has been processed",
+          );
+          // Payment is captured in callback, order is ready
+          setTimeout(() => {
+            router.replace("/(tabs)/" as any);
+          }, 2000);
+          return;
+        } else if (status === 'failed') {
+          setPaymentStatus('failed');
+          setPaymentPolling(false);
+          pollingCountRef.current = 0;
+          ToastService.showError(
+            "Payment Failed",
+            result.data.result_desc || 'Payment was not successful',
+          );
+          return;
+        }
+        // Still pending, continue polling
+      }
+
+      // Continue polling after 2 seconds
+      pollingTimeoutRef.current = setTimeout(() => {
+        pollPaymentStatus(requestId);
+      }, 2000) as any;
+    } catch (error) {
+      console.error('Polling error:', error);
+      // Continue polling even on error
+      pollingTimeoutRef.current = setTimeout(() => {
+        pollPaymentStatus(requestId);
+      }, 3000) as any;
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (state.items.length === 0) {
@@ -170,10 +245,21 @@ export default function CheckoutScreen() {
             // Or maybe we treat it as success since order is pending payment.
             // Continuing flow...
           } else {
-            ToastService.showSuccess(
-              "Prompt Sent",
-              "Please enter your PIN on your phone to complete payment.",
-            );
+            // Start polling for payment status
+            const reqId = stkResponse.data?.checkout_request_id;
+            if (reqId) {
+              setCheckoutRequestId(reqId);
+              setPaymentPolling(true);
+              pollingCountRef.current = 0;
+              
+              ToastService.showSuccess(
+                "Prompt Sent",
+                "Please enter your PIN on your phone to complete payment.",
+              );
+              
+              // Start polling immediately
+              pollPaymentStatus(reqId);
+            }
           }
         }
       }
@@ -224,14 +310,27 @@ export default function CheckoutScreen() {
         />
 
         <View style={styles.successContent}>
-          <View style={styles.successIcon}>
-            <CheckCircle size={80} color={currentTheme.success} />
-          </View>
-
-          <Text style={styles.successTitle}>Order Placed Successfully!</Text>
-          <Text style={styles.successMessage}>
-            Your order has been received and will be prepared for pickup.
-          </Text>
+          {paymentPolling ? (
+            <>
+              <View style={styles.successIcon}>
+                <ActivityIndicator size="large" color={currentTheme.primary} />
+              </View>
+              <Text style={styles.successTitle}>Processing Payment...</Text>
+              <Text style={styles.successMessage}>
+                Please complete the payment on your phone. This may take a few moments.
+              </Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.successIcon}>
+                <CheckCircle size={80} color={currentTheme.success} />
+              </View>
+              <Text style={styles.successTitle}>Order Placed Successfully!</Text>
+              <Text style={styles.successMessage}>
+                Your order has been received and will be prepared for pickup.
+              </Text>
+            </>
+          )}
 
           <View style={styles.nextSteps}>
             <View style={styles.stepItem}>
@@ -251,7 +350,7 @@ export default function CheckoutScreen() {
                 </Text>
               </View>
             )}
-            {selectedPayment !== "debt" && (
+            {selectedPayment !== "cash" && (
               <View style={styles.stepItem}>
                 <CreditCard size={20} color={currentTheme.success} />
                 <Text style={styles.stepText}>

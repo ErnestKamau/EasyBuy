@@ -54,7 +54,10 @@ return [
         'passkey' => env('MPESA_PASSKEY'),
         'auth_url' => env('MPESA_AUTH_URL', 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'),
         'stk_push_url' => env('MPESA_STK_PUSH_URL', 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'),
+        'c2b_register_url' => env('MPESA_C2B_REGISTER_URL', 'https://sandbox.safaricom.co.ke/mpesa/c2b/v2/registerurl'),
+        'c2b_simulate_url' => env('MPESA_C2B_SIMULATE_URL', 'https://sandbox.safaricom.co.ke/mpesa/c2b/v2/simulate'),
         'callback_url' => env('MPESA_CALLBACK_URL', env('APP_URL') . '/api/mpesa/callback'),
+        'validate_url' => env('MPESA_VALIDATE_URL', env('APP_URL') . '/api/mpesa/validate'),
         'environment' => env('MPESA_ENVIRONMENT', 'sandbox'), // sandbox or production
     ],
 
