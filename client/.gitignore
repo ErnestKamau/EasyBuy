@@ -32,6 +32,15 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
 
 # typescript
 *.tsbuildinfo
+
+# Android secrets
+android/local.properties
+android/app/google-services.json
+google-services.json
+
+# iOS secrets
+ios/GoogleService-Info.plist

@@ -25,6 +25,11 @@
     },
     "android": {
       "package": "com.easybuy.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyA0k0vYkq9LyDoMfSWJeUPKSWwWCkqWldo"
+        }
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#22C55E"

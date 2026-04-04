@@ -60,5 +60,9 @@ return [
         'validate_url' => env('MPESA_VALIDATE_URL', env('APP_URL') . '/api/mpesa/validate'),
         'environment' => env('MPESA_ENVIRONMENT', 'sandbox'), // sandbox or production
     ],
+    'google_maps' => [
+        'backend_key' => env('GOOGLE_MAPS_BACKEND_KEY'),
+        'mobile_key'  => env('GOOGLE_MAPS_MOBILE_KEY'),
+    ],
 
 ];

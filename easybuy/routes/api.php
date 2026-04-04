@@ -47,6 +47,8 @@ Route::prefix('products')->group(function () {
 Route::prefix('mpesa')->group(function () {
     Route::post('/validate', [MpesaController::class, 'validateC2bTransaction']);
     Route::post('/callback', [MpesaController::class, 'callback']);
+    Route::post('/register-c2b', [MpesaController::class, 'registerC2bUrls']);
+    Route::post('/simulate-c2b', [MpesaController::class, 'simulateC2b']);
 });
 
 // Protected routes
@@ -110,8 +112,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/stkpush', [MpesaController::class, 'stkPush']);
         Route::post('/query', [MpesaController::class, 'queryStkStatus']);
         Route::post('/initiate', [MpesaController::class, 'initiateStkPush']);
-        Route::post('/register-c2b', [MpesaController::class, 'registerC2bUrls']);
-        Route::post('/simulate-c2b', [MpesaController::class, 'simulateC2b']);
         Route::get('/transactions', [MpesaController::class, 'transactions']);
         Route::get('/transactions/{mpesaTransaction}/verify', [MpesaController::class, 'verify']);
     });
@@ -153,4 +153,9 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // M-Pesa callback (public route, no auth required)
-Route::post('/mpesa/callback', [MpesaController::class, 'callback']);
+// Route::post('/mpesa/callback', [MpesaController::class, 'callback']);
+
+Route::prefix('payments')->group(function () {
+    Route::post('/callback', [MpesaController::class, 'callback']);
+    Route::post('/validate', [MpesaController::class, 'validateC2bTransaction']);
+});
