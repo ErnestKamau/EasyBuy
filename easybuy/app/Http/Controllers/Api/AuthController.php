@@ -93,37 +93,32 @@ class AuthController extends Controller
             throw $e;
         }
 
-        event(new Registered($user));
-
-        // Generate 4-digit verification code
         $code = str_pad((string) rand(0, 9999), 4, '0', STR_PAD_LEFT);
 
-        // Store code in database with expiration (10 minutes)
+        // Store OTP code with 10-minute expiry
         DB::table('email_verification_codes')->insert([
-            'email' => $user->email,
-            'code' => Hash::make($code),
+            'email'      => $user->email,
+            'code'       => Hash::make($code),
             'created_at' => Carbon::now(),
         ]);
 
-        // Send email with code
+        // Queue verification email — returns immediately, sent by worker in background
         try {
-            Mail::to($user->email)->send(new EmailVerificationCode(
+            Mail::to($user->email)->queue(new EmailVerificationCode(
                 $code,
                 $user->first_name ?: $user->username
             ));
         } catch (\Exception $e) {
-            // Log error but don't fail registration
-            \Log::error('Failed to send verification email: ' . $e->getMessage());
+            \Log::error('Failed to queue verification email: ' . $e->getMessage());
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message' => 'User registered successfully. Please check your email for verification code.',
-            'user' => $user,
+            'message'      => 'User registered successfully. Please check your email for verification code.',
+            'user'         => $user,
             'access_token' => $token,
-            'token_type' => 'Bearer',
-            'code' => $code, // Remove this in production - only for testing
+            'token_type'   => 'Bearer',
         ], 201);
     }
 
@@ -402,15 +397,15 @@ class AuthController extends Controller
             ]
         );
 
-        // Send email with code
+        // Queue email — don't block the HTTP response waiting for mail delivery
         try {
-            Mail::to($user->email)->send(new PasswordResetCode(
+            Mail::to($user->email)->queue(new PasswordResetCode(
                 $code,
                 $user->first_name ?: $user->username
             ));
         } catch (\Exception $e) {
             // Log error but don't fail the request
-            \Log::error('Failed to send password reset email: ' . $e->getMessage());
+            \Log::error('Failed to queue password reset email: ' . $e->getMessage());
         }
 
         return response()->json([
@@ -528,15 +523,15 @@ class AuthController extends Controller
             'created_at' => Carbon::now(),
         ]);
 
-        // Send email with code
+        // Queue email — don't block the HTTP response waiting for mail delivery
         try {
-            Mail::to($user->email)->send(new EmailVerificationCode(
+            Mail::to($user->email)->queue(new EmailVerificationCode(
                 $code,
                 $user->first_name ?: $user->username
             ));
         } catch (\Exception $e) {
             // Log error but don't fail the request
-            \Log::error('Failed to send verification email: ' . $e->getMessage());
+            \Log::error('Failed to queue verification email: ' . $e->getMessage());
         }
 
         return response()->json([

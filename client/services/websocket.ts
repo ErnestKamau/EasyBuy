@@ -4,24 +4,25 @@ import { tokenManager } from './api';
 
 type Socket = ReturnType<typeof io>;
 
-// Get the base URL for WebSocket connection
-// Laravel Echo Server runs on port 6001 by default
+// Get the WebSocket server URL.
+// Reads EXPO_PUBLIC_ECHO_HOST and EXPO_PUBLIC_ECHO_PORT from .env so the
+// Echo Server address is configured independently of the REST API URL.
 const getWebSocketUrl = (): string => {
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:8000';
-  // Extract host and port, use port 6001 for Echo Server
-  const url = new URL(apiUrl);
-  // For mobile, use the same hostname but port 6001
-  // If using Android emulator, 10.0.2.2 maps to localhost
-  const hostname = url.hostname === '10.0.2.2' ? '10.0.2.2' : url.hostname;
-  // Mirror the API scheme — use https (WSS) in production, http (WS) for local emulator
-  const scheme = url.protocol === 'https:' ? 'https' : 'http';
-  return `${scheme}://${hostname}:6001`;
+  const host = process.env.EXPO_PUBLIC_ECHO_HOST || 'http://10.0.2.2';
+  const port = process.env.EXPO_PUBLIC_ECHO_PORT || '6001';
+  // Normalise: strip trailing slash and any path from the host
+  const baseHost = host.replace(/\/+$/, '');
+  // Don't append port for standard HTTP/HTTPS ports — the URL is already correct
+  if (port === '443' || port === '80') {
+    return baseHost;
+  }
+  return `${baseHost}:${port}`;
 };
 
-// Get auth endpoint URL
+// Get the Laravel broadcasting auth endpoint URL
 const getAuthUrl = (): string => {
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:8000';
-  return `${apiUrl.replace('/api', '')}/broadcasting/auth`;
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:8000/api';
+  return `${apiUrl.replace(/\/api\/?$/, '')}/broadcasting/auth`;
 };
 
 export interface WebSocketEvent {
@@ -36,12 +37,13 @@ class WebSocketService {
   private readonly reconnectDelay = 1000;
   private readonly listeners: Map<string, Set<(data: any) => void>> = new Map();
   private isConnecting = false;
+  private permanentlyFailed = false; // true after maxReconnectAttempts exhausted
 
   /**
    * Connect to Laravel Echo Server
    */
   async connect(userId: number, userRole: string): Promise<void> {
-    if (this.socket?.connected || this.isConnecting) {
+    if (this.socket?.connected || this.isConnecting || this.permanentlyFailed) {
       return;
     }
 
@@ -107,12 +109,23 @@ class WebSocketService {
     });
 
     this.socket.on('connect_error', (error: any) => {
-      console.error('WebSocket connection error:', error);
       this.isConnecting = false;
       this.reconnectAttempts++;
-      
+
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.warn('Max reconnection attempts reached');
+        // Stop retrying — server unreachable. App continues with REST polling.
+        this.permanentlyFailed = true;
+        this.socket?.disconnect();
+        this.socket = null;
+        console.warn(
+          `[WebSocket] Unreachable after ${this.maxReconnectAttempts} attempts (${getWebSocketUrl()}). ` +
+          'Real-time notifications disabled — falling back to REST polling.',
+        );
+      } else {
+        console.warn(
+          `[WebSocket] connect_error (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}):`,
+          error?.message ?? error,
+        );
       }
     });
 
