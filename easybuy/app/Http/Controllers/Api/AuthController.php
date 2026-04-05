@@ -280,7 +280,6 @@ class AuthController extends Controller
                     $nameParts = explode(' ', $name);
                     $firstName = $nameParts[0] ?? '';
                     $lastName = $nameParts[1] ?? ($nameParts[count($nameParts)-1] ?? '');
-
                     $user = User::create([
                         'username' => $username,
                         'first_name' => $firstName,
@@ -293,6 +292,9 @@ class AuthController extends Controller
                         'email_verified_at' => now(),
                         'role' => 'customer',
                     ]);
+
+                    // Assign the Spatie role to ensure sync with the role column
+                    $user->assignRole('customer');
                 }
             } else {
                 // Update token
@@ -301,6 +303,7 @@ class AuthController extends Controller
                 ]);
             }
 
+            // Generate token for the user
             $accessToken = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
@@ -310,12 +313,16 @@ class AuthController extends Controller
                 'token_type' => 'Bearer',
             ]);
 
-        } catch (\Exception $e) {
-            \Log::error('Social Login Error: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::error('Social Login Error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'message' => 'Authentication failed. Please try again.',
                 'error' => $e->getMessage()
-            ], 401);
+            ], 500);
         }
     }
 

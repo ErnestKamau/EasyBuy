@@ -26,33 +26,26 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage inventory',
         ];
 
-        // Create permissions for both guards
+        // Create permissions
         foreach ($permissionNames as $name) {
             Permission::findOrCreate($name, 'web');
-            Permission::findOrCreate($name, 'api');
         }
 
         // --- Create Roles and Assign Permissions ---
 
         // ADMIN
-        $adminWeb = Role::findOrCreate('admin', 'web');
-        $adminApi = Role::findOrCreate('admin', 'api');
-        $adminWeb->givePermissionTo(Permission::where('guard_name', 'web')->get());
-        $adminApi->givePermissionTo(Permission::where('guard_name', 'api')->get());
+        $admin = Role::findOrCreate('admin', 'web');
+        $admin->givePermissionTo(Permission::where('guard_name', 'web')->get());
 
         // RIDER
-        $riderWeb = Role::findOrCreate('rider', 'web');
-        $riderApi = Role::findOrCreate('rider', 'api');
+        $rider = Role::findOrCreate('rider', 'web');
         $riderPermissions = ['deliver orders', 'view tracking'];
-        $riderWeb->givePermissionTo($riderPermissions);
-        $riderApi->givePermissionTo($riderPermissions);
+        $rider->givePermissionTo($riderPermissions);
 
         // CUSTOMER
-        $customerWeb = Role::findOrCreate('customer', 'web');
-        $customerApi = Role::findOrCreate('customer', 'api');
+        $customer = Role::findOrCreate('customer', 'web');
         $customerPermissions = ['view tracking'];
-        $customerWeb->givePermissionTo($customerPermissions);
-        $customerApi->givePermissionTo($customerPermissions);
+        $customer->givePermissionTo($customerPermissions);
 
         // --- sync existing users ---
         User::all()->each(function ($user) {
