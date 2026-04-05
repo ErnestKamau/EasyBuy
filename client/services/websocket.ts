@@ -13,7 +13,9 @@ const getWebSocketUrl = (): string => {
   // For mobile, use the same hostname but port 6001
   // If using Android emulator, 10.0.2.2 maps to localhost
   const hostname = url.hostname === '10.0.2.2' ? '10.0.2.2' : url.hostname;
-  return `http://${hostname}:6001`;
+  // Mirror the API scheme — use https (WSS) in production, http (WS) for local emulator
+  const scheme = url.protocol === 'https:' ? 'https' : 'http';
+  return `${scheme}://${hostname}:6001`;
 };
 
 // Get auth endpoint URL

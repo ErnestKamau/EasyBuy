@@ -957,15 +957,18 @@ export const notificationsApi = {
 
 // Pickup Slots interfaces
 export interface PickupSlotResponse {
-  time: string;
-  available_capacity: number;
-  max_capacity: number;
-  is_full: boolean;
+  time: string;      // "HH:mm" key, e.g. "09:00"
+  datetime: string;  // ISO 8601 timestamp — used as the slot identifier sent to the backend
+  label: string;     // Human-readable label, e.g. "Morning 9am"
+  available: boolean; // false when remaining === 0
+  capacity: number;  // max_orders config value
+  booked: number;    // orders already booked in this slot
+  remaining: number; // capacity - booked (minimum 0)
 }
 
 export interface AvailableSlotsResponse {
   success: boolean;
-  date: string;
+  date: string;      // "YYYY-MM-DD"
   slots: PickupSlotResponse[];
 }
 

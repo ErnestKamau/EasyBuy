@@ -27,7 +27,7 @@
       "package": "com.easybuy.app",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyA0k0vYkq9LyDoMfSWJeUPKSWwWCkqWldo"
+          "apiKey": "$GOOGLE_MAPS_API_KEY"
         }
       },
       "adaptiveIcon": {
