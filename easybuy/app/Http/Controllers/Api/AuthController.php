@@ -307,7 +307,7 @@ class AuthController extends Controller
             $accessToken = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
-                'message' => 'Successfully authenticated with ' . ucfirst($provider),
+                'message' => 'Welcome, ' . $user->username . '!',
                 'user' => $user,
                 'access_token' => $accessToken,
                 'token_type' => 'Bearer',

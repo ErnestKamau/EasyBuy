@@ -99,6 +99,10 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
       const response = await authApi.socialLogin(provider, token);
       setUser(response.user);
       setIsAuthenticated(true);
+      ToastService.showSuccess(
+        "Login Successful!",
+        `Welcome back, ${response.user.username}`,
+      );
     } catch (error) {
       console.log("Social login failed", error);
       throw error;

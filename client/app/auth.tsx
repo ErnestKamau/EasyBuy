@@ -244,8 +244,6 @@ export default function AuthScreens() {
       }
 
       await socialLogin("google", idToken);
-      
-      ToastService.showSuccess("Welcome!", "Successfully logged in with Google");
       router.replace("/(tabs)");
     } catch (error: any) {
       console.log("Google Sign-In Error:", error);
