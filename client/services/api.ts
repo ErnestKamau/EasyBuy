@@ -3,7 +3,7 @@ import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:8000/api";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "https://api.eazybuy.org/api";
 
 console.log('API Base URL:', BASE_URL);
 
