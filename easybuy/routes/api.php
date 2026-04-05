@@ -150,6 +150,44 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/device-token', [NotificationController::class, 'registerDeviceToken']);
         Route::delete('/device-token', [NotificationController::class, 'unregisterDeviceToken']);
     });
+
+    // -------------------------------------------------------------------------
+    // Delivery System — Customer Routes
+    // -------------------------------------------------------------------------
+    Route::prefix('orders/{order}')->group(function () {
+        // Live tracking data (driver GPS + route polyline + ETA)
+        Route::get('/tracking', [\App\Http\Controllers\Api\DeliveryController::class, 'tracking']);
+        // Customer confirms they received the delivery
+        Route::post('/confirm-delivery', [\App\Http\Controllers\Api\DeliveryController::class, 'confirmDelivery']);
+    });
+});
+
+// -------------------------------------------------------------------------
+// Delivery System — Rider-only Routes (role check is inside the controller)
+// -------------------------------------------------------------------------
+Route::middleware('auth:sanctum')->prefix('rider')->group(function () {
+    // GPS ping — called every 3 seconds while on active delivery
+    Route::post('/location', [\App\Http\Controllers\Api\DriverLocationController::class, 'update']);
+    // Toggle online/offline status
+    Route::post('/status', [\App\Http\Controllers\Api\DriverLocationController::class, 'setStatus']);
+    // Rider's active delivery
+    Route::get('/deliveries/active', [\App\Http\Controllers\Api\DeliveryController::class, 'active']);
+    // Accept an assigned delivery (3-minute window from assignment time)
+    Route::post('/deliveries/{order}/accept', [\App\Http\Controllers\Api\DeliveryController::class, 'accept']);
+    // Mark trip as started (en_route)
+    Route::post('/deliveries/{order}/start', [\App\Http\Controllers\Api\DeliveryController::class, 'start']);
+});
+
+// -------------------------------------------------------------------------
+// Delivery System — Admin-only Routes (role check is inside the controller)
+// -------------------------------------------------------------------------
+Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+    // List riders who are online and available for assignment
+    Route::get('/drivers/available', [\App\Http\Controllers\Api\AdminDeliveryController::class, 'availableDrivers']);
+    // Assign a driver to a delivery order
+    Route::post('/orders/{order}/assign-driver', [\App\Http\Controllers\Api\AdminDeliveryController::class, 'assignDriver']);
+    // Admin force-starts the trip (override waiting for driver tap)
+    Route::post('/orders/{order}/start-trip', [\App\Http\Controllers\Api\AdminDeliveryController::class, 'startTrip']);
 });
 
 // M-Pesa callback (public route, no auth required)

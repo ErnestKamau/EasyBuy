@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasFactory, Notifiable, HasApiTokens, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -37,6 +38,11 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at',
         'wallet_balance',
         'max_debt_limit',
+        // Rider fields
+        'online_status',
+        'vehicle_type',
+        'vehicle_registration',
+        'fcm_token',
     ];
 
     /**
@@ -119,5 +125,34 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getTotalDebtAttribute(): float
     {
         return abs(min(0, (float) $this->wallet_balance));
+    }
+
+    // -------------------------------------------------------------------------
+    // Role & Rider Helpers
+    // -------------------------------------------------------------------------
+
+    public function isRider(): bool    { return $this->role === 'rider'; }
+    public function isAdmin(): bool    { return $this->role === 'admin'; }
+    public function isCustomer(): bool { return $this->role === 'customer'; }
+    public function isOnline(): bool   { return $this->online_status === 'online'; }
+
+    /**
+     * Get the active delivery order assigned to this rider.
+     * Returns null if rider has no active delivery.
+     */
+    public function activeDelivery()
+    {
+        return $this->hasOne(Order::class, 'driver_id')
+            ->whereIn('fulfillment_status', ['assigned', 'driver_accepted', 'en_route']);
+    }
+
+    /**
+     * Check if this rider can accept a new delivery
+     */
+    public function isAvailableForDelivery(): bool
+    {
+        return $this->isRider()
+            && $this->isOnline()
+            && $this->activeDelivery()->doesntExist();
     }
 }

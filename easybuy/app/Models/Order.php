@@ -27,12 +27,30 @@ class Order extends Model
         'cancelled_at',
         'cancellation_reason',
         'reminder_sent',
+        // Delivery fields
+        'type',
+        'driver_id',
+        'delivery_address',
+        'delivery_lat',
+        'delivery_lng',
+        'delivery_fee',
+        'driver_assigned_at',
+        'driver_accepted_at',
+        'trip_started_at',
+        'delivered_at',
     ];
 
     protected $casts = [
-        'order_date' => 'date',
-        'pickup_time' => 'datetime',
-        'cancelled_at' => 'datetime',
+        'order_date'          => 'date',
+        'pickup_time'         => 'datetime',
+        'cancelled_at'        => 'datetime',
+        'delivery_lat'        => 'decimal:8',
+        'delivery_lng'        => 'decimal:8',
+        'delivery_fee'        => 'decimal:2',
+        'driver_assigned_at'  => 'datetime',
+        'driver_accepted_at'  => 'datetime',
+        'trip_started_at'     => 'datetime',
+        'delivered_at'        => 'datetime',
     ];
 
     /**
@@ -97,6 +115,22 @@ class Order extends Model
     public function sale(): HasOne
     {
         return $this->hasOne(Sale::class);
+    }
+
+    /**
+     * Get the assigned driver for this order
+     */
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'driver_id');
+    }
+
+    /**
+     * Get GPS location history for this delivery
+     */
+    public function driverLocations(): HasMany
+    {
+        return $this->hasMany(DriverLocation::class);
     }
 
     /**
@@ -289,10 +323,52 @@ class Order extends Model
         if (!$this->pickup_time) {
             return null;
         }
-        
+
         $start = $this->pickup_time->format('g:i A');
         $end = $this->pickup_time->copy()->addHour()->format('g:i A');
-        
+
         return "{$start} - {$end}";
+    }
+
+    // -------------------------------------------------------------------------
+    // Delivery Lifecycle Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Check if this order is a delivery (not pickup)
+     */
+    public function isDelivery(): bool
+    {
+        return $this->type === 'delivery';
+    }
+
+    /**
+     * Check if a driver has been assigned and is awaiting acceptance
+     */
+    public function isAwaitingDriverAcceptance(): bool
+    {
+        return $this->fulfillment_status === 'assigned';
+    }
+
+    /**
+     * Check if the 3-minute acceptance window has expired
+     */
+    public function isDriverAcceptanceTimedOut(int $minutes = 3): bool
+    {
+        return $this->isAwaitingDriverAcceptance()
+            && $this->driver_assigned_at
+            && $this->driver_assigned_at->addMinutes($minutes)->isPast();
+    }
+
+    /**
+     * Reset a timed-out assignment back to pending so admin can reassign
+     */
+    public function resetTimedOutAssignment(): void
+    {
+        $this->update([
+            'fulfillment_status' => 'pending',
+            'driver_id'          => null,
+            'driver_assigned_at' => null,
+        ]);
     }
 }
