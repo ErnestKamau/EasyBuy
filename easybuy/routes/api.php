@@ -188,6 +188,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/orders/{order}/assign-driver', [\App\Http\Controllers\Api\AdminDeliveryController::class, 'assignDriver']);
     // Admin force-starts the trip (override waiting for driver tap)
     Route::post('/orders/{order}/start-trip', [\App\Http\Controllers\Api\AdminDeliveryController::class, 'startTrip']);
+
+    // Dashboard Statistics
+    Route::get('/dashboard/stats', [\App\Http\Controllers\Api\AdminDashboardController::class, 'stats']);
 });
 
 // M-Pesa callback (public route, no auth required)

@@ -1058,3 +1058,49 @@ export const walletApi = {
     return data.data;
   },
 };
+
+export interface DashboardStats {
+  revenue: {
+    today: number;
+    this_week: number;
+    this_month: number;
+  };
+  orders: {
+    total: number;
+    pending: number;
+    confirmed: number;
+    cancelled: number;
+    delivered: number;
+  };
+  products: {
+    total: number;
+    low_stock: number;
+    out_of_stock: number;
+  };
+  riders: {
+    total: number;
+    online: number;
+    active: number;
+  };
+  sales_trend: Array<{
+    date: string;
+    full_date: string;
+    count: number;
+    revenue: number;
+  }>;
+  recent_orders: Array<{
+    id: number;
+    order_number: string;
+    customer: string;
+    amount: number;
+    status: string;
+    created_at: string;
+  }>;
+}
+
+export const adminApi = {
+  async getDashboardStats(): Promise<DashboardStats> {
+    const { data } = await api.get<{ success: boolean; data: DashboardStats }>('/admin/dashboard/stats');
+    return data.data;
+  },
+};

@@ -34,6 +34,8 @@ import {
   api,
   Notification,
   notificationsApi,
+  adminApi,
+  DashboardStats,
 } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
 import {
@@ -56,6 +58,7 @@ import {
   CreditCard,
   Menu,
   Home,
+  Truck,
   ChevronLeft,
   ChevronRight,
   Search,
@@ -78,6 +81,7 @@ export default function AdminScreen() {
   );
   const [unpaidSales, setUnpaidSales] = useState<Sale[]>([]);
   const [debts, setDebts] = useState<Sale[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -85,6 +89,7 @@ export default function AdminScreen() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState<
+    | "dashboard"
     | "categories"
     | "products"
     | "orders"
@@ -92,7 +97,7 @@ export default function AdminScreen() {
     | "alerts"
     | "sales"
     | "notifications"
-  >("orders");
+  >("dashboard");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationTab, setNotificationTab] = useState<"unread" | "read">(
     "unread",
@@ -201,6 +206,7 @@ export default function AdminScreen() {
         analyticsData,
         unpaidData,
         debtsData,
+        dashboardData,
       ] = await Promise.all([
         productsApi.getCategories(),
         productsApi.getProducts(),
@@ -210,6 +216,7 @@ export default function AdminScreen() {
         salesApi.getAnalytics().catch(() => null),
         salesApi.getUnpaidSales().catch(() => ({ data: [], count: 0 })),
         salesApi.getDebts().catch(() => ({ data: [], count: 0 })),
+        adminApi.getDashboardStats().catch(() => null),
       ]);
 
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
@@ -220,6 +227,7 @@ export default function AdminScreen() {
       setSalesAnalytics(analyticsData);
       setUnpaidSales(Array.isArray(unpaidData?.data) ? unpaidData.data : []);
       setDebts(Array.isArray(debtsData?.data) ? debtsData.data : []);
+      setDashboardStats(dashboardData);
     } catch (error) {
       ToastService.showApiError(error, "Failed to load admin data");
     } finally {
@@ -672,11 +680,11 @@ export default function AdminScreen() {
       if (paymentForm.method === "mpesa" && response.data) {
         const { mpesaApi } = await import("@/services/api");
         try {
-          const stkResponse = await mpesaApi.initiateStkPush(
-            selectedSale.id,
-            paymentForm.phone_number,
-            parseFloat(paymentForm.amount),
-          );
+          const stkResponse = await mpesaApi.initiateStkPush({
+            saleId: selectedSale.id,
+            phoneNumber: paymentForm.phone_number,
+            amount: Number.parseFloat(paymentForm.amount),
+          });
           if (stkResponse.success) {
             ToastService.showSuccess(
               "Success",
@@ -1278,11 +1286,102 @@ export default function AdminScreen() {
     );
   }
 
-  // Pagination helper functions
   const getPaginatedData = <T,>(data: T[], page: number, perPage: number) => {
     const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    return data.slice(startIndex, endIndex);
+    return data.slice(startIndex, startIndex + perPage);
+  };
+
+  const renderDashboard = () => {
+    if (!dashboardStats) return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 100 }}>
+        <ActivityIndicator size="large" color="#6366F1" />
+        <Text style={{ marginTop: 16, color: currentTheme.textSecondary }}>Loading insights...</Text>
+      </View>
+    );
+
+    const formatCurrency = (amount: number) => `KES ${amount.toLocaleString()}`;
+
+    const renderCard = (title: string, value: string | number, icon: any, color: string, subValue?: string) => {
+      const Icon = icon;
+      return (
+        <View style={styles.dashboardCard}>
+          <View style={styles.dashboardCardHeader}>
+            <View style={[styles.dashboardCardIcon, { backgroundColor: `${color}20` }]}>
+              <Icon size={20} color={color} />
+            </View>
+            <Text style={styles.dashboardCardTitle}>{title}</Text>
+          </View>
+          <Text style={styles.dashboardCardValue}>{value}</Text>
+          {subValue && <Text style={styles.dashboardCardSubValue}>{subValue}</Text>}
+        </View>
+      );
+    };
+
+    const maxRevenue = Math.max(...dashboardStats.sales_trend.map(d => d.revenue), 1);
+
+    return (
+      <View style={styles.dashboardSection}>
+        <View style={styles.dashboardGrid}>
+          {renderCard("Today's Revenue", formatCurrency(dashboardStats.revenue.today), TrendingUp, "#22C55E", `Month: ${formatCurrency(dashboardStats.revenue.this_month)}`)}
+          {renderCard("Pending Orders", dashboardStats.orders.pending, ShoppingBag, "#3B82F6", `${dashboardStats.orders.total} Total`)}
+          {renderCard("Low Stock", dashboardStats.products.low_stock, Package, "#EF4444", `${dashboardStats.products.out_of_stock} Out of Stock`)}
+          {renderCard("Riders Online", dashboardStats.riders.online, Truck, "#8B5CF6", `${dashboardStats.riders.active} Active`)}
+        </View>
+
+        <View style={styles.chartSection}>
+          <View style={styles.chartHeader}>
+            <Text style={styles.chartTitle}>Sales Trend (Last 14 Days)</Text>
+            <TrendingUp size={20} color="#6366F1" />
+          </View>
+          <View style={styles.chartContainer}>
+            {dashboardStats.sales_trend.map((day) => (
+              <View key={day.full_date} style={styles.chartBarContainer}>
+                <View 
+                  style={[
+                    styles.chartBar, 
+                    { 
+                      height: `${(day.revenue / maxRevenue) * 100}%`,
+                      minHeight: day.revenue > 0 ? 5 : 0 
+                    }
+                  ]} 
+                />
+                <Text style={styles.chartLabel}>{day.date}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.recentActivitySection}>
+          <Text style={styles.recentActivityTitle}>Recent Orders</Text>
+          {dashboardStats.recent_orders.length > 0 ? (
+            dashboardStats.recent_orders.map((order) => (
+              <TouchableOpacity key={order.id} style={styles.activityItem} onPress={() => {
+                setActiveTab('orders');
+              }}>
+                <View style={[styles.activityIcon, { backgroundColor: order.status === 'delivered' ? '#22C55E20' : '#3B82F620' }]}>
+                  <ShoppingBag size={20} color={order.status === 'delivered' ? '#22C55E' : '#3B82F6'} />
+                </View>
+                <View style={styles.activityInfo}>
+                  <Text style={styles.activityTitle}>{order.customer}</Text>
+                  <Text style={styles.activitySubtitle}>{order.order_number} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.activityAmount}>{formatCurrency(order.amount)}</Text>
+                  <Text style={[styles.activitySubtitle, { fontSize: 10 }]}>{order.status}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <Text style={styles.noOrdersSubtext}>No recent orders found</Text>
+            </View>
+          )}
+          <TouchableOpacity style={styles.viewAllButton} onPress={() => setActiveTab('orders')}>
+            <Text style={styles.viewAllText}>View All Orders</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   const getTotalPages = (dataLength: number, perPage: number) => {
@@ -1654,6 +1753,13 @@ export default function AdminScreen() {
   const filteredCategories = filterCategories(categories);
 
   const menuItems = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: Home,
+      count: 0,
+      color: "#6366F1",
+    },
     {
       id: "orders",
       label: "Orders",
@@ -2196,6 +2302,8 @@ export default function AdminScreen() {
 
         {/* Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {activeTab === "dashboard" && renderDashboard()}
+
           {activeTab === "categories" && (
             <View style={styles.tabContent}>
               <View style={styles.sectionHeader}>
@@ -4405,5 +4513,158 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       color: theme.text,
       minWidth: 100,
       textAlign: "center",
+    },
+
+    // Dashboard Styles
+    dashboardSection: {
+      padding: 16,
+    },
+    dashboardGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+      marginBottom: 20,
+    },
+    dashboardCard: {
+      flex: 1,
+      minWidth: "45%",
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      padding: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    dashboardCardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    dashboardCardIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    dashboardCardTitle: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: theme.textSecondary,
+    },
+    dashboardCardValue: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 4,
+    },
+    dashboardCardSubValue: {
+      fontSize: 11,
+      color: theme.textSecondary,
+    },
+    chartSection: {
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    chartHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    chartTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    chartContainer: {
+      height: 180,
+      flexDirection: "row",
+      alignItems: "flex-end",
+      justifyContent: "space-between",
+      paddingTop: 10,
+    },
+    chartBarContainer: {
+      flex: 1,
+      alignItems: "center",
+      height: "100%",
+      justifyContent: "flex-end",
+    },
+    chartBar: {
+      width: 12,
+      borderRadius: 6,
+      backgroundColor: "#6366F1",
+    },
+    chartLabel: {
+      fontSize: 9,
+      color: theme.textSecondary,
+      marginTop: 8,
+      transform: [{ rotate: "-45deg" }],
+    },
+    recentActivitySection: {
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    recentActivityTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 16,
+    },
+    activityItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    activityIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
+    activityInfo: {
+      flex: 1,
+    },
+    activityTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.text,
+      marginBottom: 2,
+    },
+    activitySubtitle: {
+      fontSize: 12,
+      color: theme.textSecondary,
+    },
+    activityAmount: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.success,
+    },
+    viewAllButton: {
+      marginTop: 12,
+      alignItems: "center",
+      paddingVertical: 10,
+    },
+    viewAllText: {
+      fontSize: 14,
+      color: "#6366F1",
+      fontWeight: "600",
     },
   });
