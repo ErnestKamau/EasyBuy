@@ -186,12 +186,14 @@ export default function AuthScreens() {
   // Forgot password state
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
 
-  // Verification state
+  // Verification state — pre-populate from URL params when redirected here after registration
   const [verificationCode, setVerificationCode] = useState(["", "", "", ""]);
-  const [userEmail, setUserEmail] = useState("");
+  const [userEmail, setUserEmail] = useState(
+    (params.email as string) || "",
+  );
   const [verificationFlow, setVerificationFlow] = useState<
     "registration" | "password-reset" | null
-  >(null);
+  >(params.mode === "email-verification" ? "registration" : null);
 
   // Reset password state
   const [resetPasswordData, setResetPasswordData] = useState({

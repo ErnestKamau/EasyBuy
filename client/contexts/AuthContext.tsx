@@ -159,60 +159,67 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
     if (loading) return;
 
     const currentSegment = segments[0];
+    const isVerified = !!(user?.email_verified_at);
 
-    // If authenticated, redirect to tabs if on auth/onboarding
     if (isAuthenticated) {
-      if (currentSegment === "onboarding" || currentSegment === "auth") {
+      if (!isVerified) {
+        // Authenticated but email not verified — send to OTP screen
+        if (currentSegment !== "auth") {
+          router.replace({
+            pathname: "/auth",
+            params: { mode: "email-verification", email: user?.email ?? "" },
+          } as any);
+        }
+        setTimeout(() => setInitialNavigationComplete(true), 100);
+      } else if (currentSegment === "onboarding" || currentSegment === "auth") {
         router.replace("/(tabs)");
-        // Wait a bit for navigation, then mark complete
         setTimeout(() => setInitialNavigationComplete(true), 100);
       } else {
-        // Already on tabs, mark complete immediately
         setInitialNavigationComplete(true);
       }
       return;
     }
 
-    // If not authenticated, ensure we're on onboarding
-    if (!isAuthenticated) {
-      if (currentSegment !== "onboarding" && currentSegment !== "auth") {
-        router.replace("/onboarding");
-        // Wait a bit for navigation to complete, then mark as done
-        setTimeout(() => setInitialNavigationComplete(true), 100);
-      } else {
-        // Already on onboarding or auth, mark complete immediately
-        setInitialNavigationComplete(true);
-      }
+    // Not authenticated — ensure we're on onboarding
+    if (currentSegment !== "onboarding" && currentSegment !== "auth") {
+      router.replace("/onboarding");
+      setTimeout(() => setInitialNavigationComplete(true), 100);
+    } else {
+      setInitialNavigationComplete(true);
     }
-  }, [loading, isAuthenticated, segments, router]);
+  }, [loading, isAuthenticated, user, segments, router]);
 
   // Navigation guard - handles route changes
   useEffect(() => {
-    // Wait for auth check to complete
     if (loading) return;
 
     const currentSegment = segments[0];
-    const inAuthGroup =
-      currentSegment === "auth" || currentSegment === "onboarding";
-    const inOnboarding = currentSegment === "onboarding";
-    const inAuth = currentSegment === "auth";
+    const inAuthGroup = currentSegment === "auth" || currentSegment === "onboarding";
+    const isVerified = !!(user?.email_verified_at);
 
-    // If authenticated, go to tabs (and redirect away from auth/onboarding screens)
     if (isAuthenticated) {
+      if (!isVerified) {
+        // Block unverified users from reaching tabs
+        if (currentSegment !== "auth") {
+          router.replace({
+            pathname: "/auth",
+            params: { mode: "email-verification", email: user?.email ?? "" },
+          } as any);
+        }
+        return;
+      }
+      // Verified users: push away from auth/onboarding to tabs
       if (inAuthGroup) {
         router.replace("/(tabs)");
       }
       return;
     }
 
-    // If not authenticated, always start from onboarding first
-    if (!isAuthenticated) {
-      if (inOnboarding || inAuth) {
-        return;
-      }
+    // Not authenticated
+    if (!inAuthGroup) {
       router.replace("/onboarding");
     }
-  }, [isAuthenticated, loading, segments, router]);
+  }, [isAuthenticated, loading, user, segments, router]);
 
   const contextValue = useMemo<AuthContextType>(
     () => ({

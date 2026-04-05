@@ -347,4 +347,374 @@ _Run `sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorc
 
 ---
 
+## 🗄️ Database Schema
+
+> All tables follow Laravel conventions: `id` is an auto-incrementing `BIGINT UNSIGNED PRIMARY KEY`. `timestamps()` produces `created_at` and `updated_at` (`TIMESTAMP NULL`). `softDeletes()` produces `deleted_at` (`TIMESTAMP NULL`).
+
+---
+
+### `users`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK, auto-increment | |
+| `username` | varchar(255) | NOT NULL | Renamed from `name` |
+| `first_name` | varchar(255) | NOT NULL | |
+| `last_name` | varchar(255) | NOT NULL | |
+| `email` | varchar(255) | UNIQUE, NOT NULL | |
+| `email_verified_at` | timestamp | NULL | |
+| `password` | varchar(255) | NULL | Nullable for social-login users |
+| `phone_number` | varchar(255) | UNIQUE, NULL | |
+| `gender` | enum | NULL | `male`, `female` |
+| `role` | enum | DEFAULT `customer` | `admin`, `customer`, `transporter` |
+| `wallet_balance` | decimal(10,2) | DEFAULT 0 | |
+| `max_debt_limit` | decimal(10,2) | DEFAULT -5000 | |
+| `profile_photo` | varchar(255) | NULL | |
+| `national_id_number` | int | UNIQUE, NULL | |
+| `date_of_birth` | date | NULL | |
+| `provider` | varchar(255) | NULL | `google`, `facebook` |
+| `provider_id` | varchar(255) | NULL | |
+| `provider_token` | text | NULL | |
+| `provider_refresh_token` | text | NULL | |
+| `remember_token` | varchar(100) | NULL | |
+| `created_at` / `updated_at` | timestamp | NULL | |
+
+---
+
+### `password_reset_tokens`
+
+| Column | Type | Constraints |
+|---|---|---|
+| `email` | varchar(255) | PK |
+| `token` | varchar(255) | NOT NULL |
+| `created_at` | timestamp | NULL |
+
+---
+
+### `sessions`
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | varchar(255) | PK |
+| `user_id` | bigint unsigned | NULL, INDEX → `users.id` |
+| `ip_address` | varchar(45) | NULL |
+| `user_agent` | text | NULL |
+| `payload` | longtext | NOT NULL |
+| `last_activity` | int | INDEX |
+
+---
+
+### `email_verification_codes`
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | bigint unsigned | PK |
+| `email` | varchar(255) | INDEX |
+| `code` | varchar(255) | NOT NULL |
+| `created_at` | timestamp | NULL |
+
+---
+
+### `personal_access_tokens` *(Sanctum)*
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | bigint unsigned | PK |
+| `tokenable_type` | varchar(255) | NOT NULL (morph) |
+| `tokenable_id` | bigint unsigned | NOT NULL (morph) |
+| `name` | text | NOT NULL |
+| `token` | varchar(64) | UNIQUE |
+| `abilities` | text | NULL |
+| `last_used_at` | timestamp | NULL |
+| `expires_at` | timestamp | NULL, INDEX |
+| `created_at` / `updated_at` | timestamp | NULL |
+
+---
+
+### `categories`
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | bigint unsigned | PK |
+| `name` | varchar(255) | UNIQUE |
+| `is_active` | tinyint(1) | DEFAULT 1 |
+| `created_at` / `updated_at` | timestamp | NULL |
+
+---
+
+### `products`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK | |
+| `name` | varchar(255) | UNIQUE | |
+| `image_url` | varchar(500) | NULL | |
+| `category_id` | bigint unsigned | FK → `categories.id` CASCADE, INDEX | |
+| `description` | text | NULL | |
+| `kilograms_in_stock` | decimal(8,3) | NULL | Total kg weight of one unit |
+| `cost_price` | decimal(10,2) | NOT NULL | |
+| `sale_price` | decimal(10,2) | NOT NULL | |
+| `in_stock` | decimal(10,3) | DEFAULT 0 | Supports fractional kg quantities |
+| `minimum_stock` | decimal(10,3) | NULL | Low-stock alert threshold |
+| `is_active` | tinyint(1) | DEFAULT 1, INDEX | |
+| `created_at` / `updated_at` | timestamp | NULL | |
+
+---
+
+### `orders`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK | |
+| `order_number` | varchar(255) | UNIQUE | |
+| `user_id` | bigint unsigned | NULL, FK → `users.id` SET NULL, INDEX | |
+| `order_status` | enum | DEFAULT `pending`, INDEX | `pending`, `confirmed`, `cancelled` |
+| `payment_status` | enum | DEFAULT `pending`, INDEX | `pending`, `fully-paid`, `partially-paid`, `debt`, `failed` |
+| `fulfillment_status` | enum | DEFAULT `pending`, INDEX | `pending`, `ready`, `picked_up` |
+| `pickup_verification_code` | varchar(20) | NULL, INDEX | For QR verification |
+| `pickup_qr_code` | varchar(255) | NULL | |
+| `order_date` | date | NOT NULL, INDEX | |
+| `order_time` | time | NOT NULL, INDEX | |
+| `pickup_time` | datetime | NULL, INDEX | Scheduled pickup |
+| `reminder_sent` | tinyint(1) | DEFAULT 0 | Pickup reminder flag |
+| `cancelled_at` | datetime | NULL | |
+| `cancellation_reason` | text | NULL | |
+| `notes` | text | NULL | |
+| `created_at` / `updated_at` | timestamp | NULL | |
+
+---
+
+### `order_items`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK | |
+| `order_id` | bigint unsigned | FK → `orders.id` CASCADE, INDEX | |
+| `product_id` | bigint unsigned | FK → `products.id` CASCADE, INDEX | |
+| `quantity` | int unsigned | DEFAULT 0 | Unit quantity |
+| `kilogram` | decimal(8,3) | NULL | Weight for kg-based items |
+| `unit_price` | decimal(10,2) | NOT NULL | Price snapshot at order time |
+| `created_at` / `updated_at` | timestamp | NULL | |
+
+---
+
+### `sales`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK | |
+| `sale_number` | varchar(255) | UNIQUE, INDEX | |
+| `order_id` | bigint unsigned | UNIQUE, FK → `orders.id` CASCADE, INDEX | 1-to-1 with order |
+| `total_amount` | decimal(10,2) | NOT NULL | |
+| `total_paid` | decimal(10,2) | DEFAULT 0 | Running sum of completed payments |
+| `cost_amount` | decimal(10,2) | DEFAULT 0 | |
+| `profit_amount` | decimal(10,2) | DEFAULT 0 | |
+| `payment_status` | enum | DEFAULT `no-payment`, INDEX | `fully-paid`, `partial-payment`, `no-payment`, `overdue` |
+| `fulfillment_status` | enum | DEFAULT `unfulfilled`, INDEX | `unfulfilled`, `fulfilled` |
+| `due_date` | datetime | NULL, INDEX | Debt due date |
+| `receipt_generated` | tinyint(1) | DEFAULT 0 | |
+| `made_on` | datetime | NOT NULL, INDEX | |
+| `fulfilled_at` | datetime | NULL, INDEX | When customer picked up |
+| `created_at` / `updated_at` | timestamp | NULL | |
+| `deleted_at` | timestamp | NULL | Soft deletes |
+
+---
+
+### `sale_items`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK | |
+| `sale_id` | bigint unsigned | FK → `sales.id` CASCADE, INDEX | |
+| `product_id` | bigint unsigned | FK → `products.id` CASCADE, INDEX | |
+| `quantity` | int unsigned | DEFAULT 0 | |
+| `kilogram` | decimal(8,3) | NULL | |
+| `unit_price` | decimal(10,2) | NOT NULL | |
+| `cost_price` | decimal(10,2) | NOT NULL | |
+| `created_at` / `updated_at` | timestamp | NULL | |
+
+---
+
+### `payments`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK | |
+| `payment_number` | varchar(255) | UNIQUE, INDEX | |
+| `order_id` | bigint unsigned | NULL, FK → `orders.id` CASCADE, INDEX | Pre-sale payment link |
+| `sale_id` | bigint unsigned | NULL, FK → `sales.id` CASCADE, INDEX | |
+| `payment_method` | enum | DEFAULT `cash`, INDEX | `mpesa`, `cash`, `card` |
+| `amount` | decimal(10,2) | NOT NULL | |
+| `mpesa_transaction_id` | varchar(255) | NULL | |
+| `stripe_payment_intent_id` | varchar(255) | NULL | |
+| `status` | enum | DEFAULT `pending`, INDEX | `pending`, `completed`, `failed`, `refunded` |
+| `reference` | varchar(255) | NULL | |
+| `notes` | text | NULL | |
+| `paid_at` | datetime | NOT NULL, INDEX | |
+| `refunded_at` | datetime | NULL | |
+| `refund_amount` | decimal(10,2) | NULL | |
+| `created_at` / `updated_at` | timestamp | NULL | |
+| `deleted_at` | timestamp | NULL | Soft deletes |
+
+---
+
+### `mpesa_transactions`
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | bigint unsigned | PK |
+| `payment_id` | bigint unsigned | UNIQUE, FK → `payments.id` CASCADE, INDEX |
+| `transaction_id` | varchar(255) | UNIQUE, INDEX |
+| `checkout_request_id` | varchar(255) | UNIQUE, INDEX |
+| `merchant_request_id` | varchar(255) | NULL |
+| `account_reference` | varchar(255) | NULL |
+| `amount` | decimal(10,2) | NOT NULL |
+| `phone_number` | varchar(15) | NOT NULL |
+| `transaction_desc` | varchar(255) | NULL |
+| `status` | enum | DEFAULT `pending`, INDEX – `pending`, `success`, `failed`, `cancelled` |
+| `mpesa_receipt_number` | varchar(255) | NULL |
+| `transaction_date` | datetime | NULL |
+| `result_code` | int | NULL |
+| `result_desc` | varchar(255) | NULL |
+| `callback_data` | json | NULL |
+| `created_at` / `updated_at` | timestamp | NULL |
+
+---
+
+### `wallet_transactions`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK | |
+| `user_id` | bigint unsigned | FK → `users.id` CASCADE, INDEX | |
+| `order_id` | bigint unsigned | NULL, FK → `orders.id` SET NULL, INDEX | |
+| `sale_id` | bigint unsigned | NULL, FK → `sales.id` SET NULL, INDEX | |
+| `amount` | decimal(10,2) | NOT NULL | Positive = credit, Negative = debit |
+| `type` | enum | NOT NULL, INDEX | `overpayment`, `underpayment`, `order_payment`, `refund`, `adjustment` |
+| `description` | text | NULL | |
+| `created_at` / `updated_at` | timestamp | NULL, INDEX | |
+
+---
+
+### `device_tokens`
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | bigint unsigned | PK |
+| `user_id` | bigint unsigned | FK → `users.id` CASCADE, INDEX |
+| `device_token` | varchar(255) | UNIQUE, INDEX |
+| `platform` | enum | DEFAULT `android` – `ios`, `android` |
+| `created_at` / `updated_at` | timestamp | NULL |
+
+---
+
+### `notifications`
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint unsigned | PK | |
+| `user_id` | bigint unsigned | NULL, FK → `users.id` CASCADE, INDEX | NULL = admin broadcast |
+| `type` | enum | NOT NULL, INDEX | `order_placed`, `order_confirmed`, `order_cancelled`, `debt_warning_2days`, `debt_warning_admin_2days`, `debt_overdue`, `debt_overdue_admin`, `payment_received`, `payment_received_admin`, `sale_fully_paid`, `low_stock_alert`, `refund_processed`, `new_product_available` |
+| `title` | varchar(255) | NOT NULL | |
+| `message` | text | NOT NULL | |
+| `data` | json | NULL | Deep-link payload (order_id, sale_id, etc.) |
+| `priority` | enum | DEFAULT `medium` | `low`, `medium`, `high` |
+| `read_at` | timestamp | NULL, INDEX | |
+| `archived_at` | timestamp | NULL | |
+| `created_at` / `updated_at` | timestamp | NULL, INDEX | |
+
+---
+
+### `notification_preferences`
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | bigint unsigned | PK |
+| `user_id` | bigint unsigned | FK → `users.id` CASCADE, INDEX |
+| `type` | enum | Same values as `notifications.type` |
+| `enabled` | tinyint(1) | DEFAULT 1 |
+| `push_enabled` | tinyint(1) | DEFAULT 1 |
+| `created_at` / `updated_at` | timestamp | NULL |
+| — | UNIQUE | (`user_id`, `type`) |
+
+---
+
+### Framework / Queue Tables
+
+#### `cache`
+| Column | Type |
+|---|---|
+| `key` | varchar(255) PK |
+| `value` | mediumtext |
+| `expiration` | int |
+
+#### `cache_locks`
+| Column | Type |
+|---|---|
+| `key` | varchar(255) PK |
+| `owner` | varchar(255) |
+| `expiration` | int |
+
+#### `jobs`
+| Column | Type |
+|---|---|
+| `id` | bigint unsigned PK |
+| `queue` | varchar(255) INDEX |
+| `payload` | longtext |
+| `attempts` | tinyint unsigned |
+| `reserved_at` | int unsigned NULL |
+| `available_at` | int unsigned |
+| `created_at` | int unsigned |
+
+#### `job_batches`
+| Column | Type |
+|---|---|
+| `id` | varchar(255) PK |
+| `name` | varchar(255) |
+| `total_jobs` | int |
+| `pending_jobs` | int |
+| `failed_jobs` | int |
+| `failed_job_ids` | longtext |
+| `options` | mediumtext NULL |
+| `cancelled_at` | int NULL |
+| `created_at` | int |
+| `finished_at` | int NULL |
+
+#### `failed_jobs`
+| Column | Type |
+|---|---|
+| `id` | bigint unsigned PK |
+| `uuid` | varchar(255) UNIQUE |
+| `connection` | text |
+| `queue` | text |
+| `payload` | longtext |
+| `exception` | longtext |
+| `failed_at` | timestamp DEFAULT CURRENT_TIMESTAMP |
+
+---
+
+### Entity Relationship Overview
+
+```mermaid
+erDiagram
+    users ||--o{ orders : "places"
+    users ||--o{ wallet_transactions : "has"
+    users ||--o{ device_tokens : "owns"
+    users ||--o{ notifications : "receives"
+    users ||--o{ notification_preferences : "configures"
+    categories ||--o{ products : "contains"
+    orders ||--o{ order_items : "has"
+    orders ||--|| sales : "generates"
+    orders ||--o{ payments : "pre-sale payment"
+    orders ||--o{ wallet_transactions : "linked to"
+    products ||--o{ order_items : "in"
+    products ||--o{ sale_items : "in"
+    sales ||--o{ sale_items : "has"
+    sales ||--o{ payments : "receives"
+    sales ||--o{ wallet_transactions : "linked to"
+    payments ||--|| mpesa_transactions : "M-Pesa detail"
+```
+
+---
+
 © 2026 EasyBuy Engineering Team. Built for scale and performance.
