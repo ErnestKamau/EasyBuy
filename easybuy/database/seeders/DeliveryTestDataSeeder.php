@@ -36,6 +36,7 @@ class DeliveryTestDataSeeder extends Seeder
                 'phone_number' => '0711000000',
                 'password' => Hash::make('password'),
                 'role' => 'admin',
+                'email_verified_at' => now(),
             ]
         );
         $admin->assignRole('admin');
@@ -52,6 +53,7 @@ class DeliveryTestDataSeeder extends Seeder
                     'password' => Hash::make('password'),
                     'role' => 'rider',
                     'online_status' => 'online',
+                    'email_verified_at' => now(),
                 ]
             );
             $rider->assignRole('rider');
@@ -78,6 +80,7 @@ class DeliveryTestDataSeeder extends Seeder
                     'phone_number' => "073300000{$i}",
                     'password' => Hash::make('password'),
                     'role' => 'customer',
+                    'email_verified_at' => now(),
                 ]
             );
             $customer->assignRole('customer');
