@@ -59,6 +59,7 @@ class DeliveryTestDataSeeder extends Seeder
 
             // Create initial location for riders near a "shop" point
             DriverLocation::create([
+                'id' => (string) Str::uuid(),
                 'driver_id' => $rider->id,
                 'latitude' => -1.2833 + (rand(-10, 10) / 1000),
                 'longitude' => 36.8167 + (rand(-10, 10) / 1000),
