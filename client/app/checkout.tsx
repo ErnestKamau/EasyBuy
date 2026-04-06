@@ -469,7 +469,7 @@ export default function CheckoutScreen() {
             <Text style={styles.summaryValue}>
               {selectedDelivery === "pickup"
                 ? "Pickup at shop"
-                : "Home delivery"}
+                : "Delivery"}
             </Text>
           </View>
 
@@ -581,7 +581,7 @@ export default function CheckoutScreen() {
                     styles.selectedPaymentTitle,
                 ]}
               >
-                Home Delivery
+                Delivery
               </Text>
               <Text style={styles.paymentDescription}>
                 We'll deliver your order to your location
