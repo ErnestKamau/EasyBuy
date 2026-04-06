@@ -115,13 +115,11 @@ class DeliveryTestDataSeeder extends Seeder
         // 4. Create Orders
         // Order 1: Pending Delivery (Needs Assignment)
         $order1 = Order::create([
-            'order_number' => 'ORD-' . strtoupper(Str::random(8)),
             'user_id' => $customers[0]->id,
             'order_status' => 'pending',
+            'fulfillment_status' => 'pending',
             'payment_status' => 'pending',
             'type' => 'delivery',
-            'order_date' => Carbon::now()->toDateString(),
-            'order_time' => Carbon::now()->toTimeString(),
             'delivery_address' => 'Nairobi CBD, Kenya',
             'delivery_lat' => -1.2858,
             'delivery_lng' => 36.8219,
@@ -131,14 +129,11 @@ class DeliveryTestDataSeeder extends Seeder
 
         // Order 2: Assigned Delivery (Waiting for Rider Acceptance)
         $order2 = Order::create([
-            'order_number' => 'ORD-' . strtoupper(Str::random(8)),
             'user_id' => $customers[1]->id,
             'order_status' => 'confirmed',
             'fulfillment_status' => 'assigned',
             'payment_status' => 'fully-paid',
             'type' => 'delivery',
-            'order_date' => Carbon::now()->toDateString(),
-            'order_time' => Carbon::now()->subMinutes(10)->toTimeString(),
             'driver_id' => $riders[0]->id,
             'driver_assigned_at' => Carbon::now()->subMinutes(1),
             'delivery_address' => 'Westlands, Nairobi',
@@ -150,14 +145,11 @@ class DeliveryTestDataSeeder extends Seeder
 
         // Order 3: In Transit Delivery
         $order3 = Order::create([
-            'order_number' => 'ORD-' . strtoupper(Str::random(8)),
             'user_id' => $customers[2]->id,
             'order_status' => 'confirmed',
-            'fulfillment_status' => 'picked_up',
+            'fulfillment_status' => 'picked_up', // Note: using picked_up which is valid and indicates transition
             'payment_status' => 'fully-paid',
             'type' => 'delivery',
-            'order_date' => Carbon::now()->toDateString(),
-            'order_time' => Carbon::now()->subHours(1)->toTimeString(),
             'driver_id' => $riders[1]->id,
             'driver_assigned_at' => Carbon::now()->subHours(1),
             'driver_accepted_at' => Carbon::now()->subMinutes(50),
@@ -171,14 +163,11 @@ class DeliveryTestDataSeeder extends Seeder
 
         // 5. Create a Sale for a completed order
         $order4 = Order::create([
-            'order_number' => 'ORD-' . strtoupper(Str::random(8)),
             'user_id' => $customers[0]->id,
-            'order_status' => 'delivered',
-            'fulfillment_status' => 'delivered',
+            'order_status' => 'confirmed', // 'delivered' is not valid for order_status
+            'fulfillment_status' => 'delivered', // 'delivered' is valid for fulfillment_status
             'payment_status' => 'fully-paid',
             'type' => 'pickup',
-            'order_date' => Carbon::yesterday()->toDateString(),
-            'order_time' => '10:00:00',
             'delivered_at' => Carbon::yesterday()->addHours(2),
         ]);
         $this->addItemsToOrder($order4, $allProducts->random(3));
