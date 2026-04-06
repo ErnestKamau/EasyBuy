@@ -185,7 +185,7 @@ export default function CheckoutScreen() {
           );
           // Payment is captured in callback, order is ready
           setTimeout(() => {
-            router.replace("/(tabs)/" as any);
+            router.replace("/(tabs)");
           }, 2000);
           return;
         } else if (status === 'failed') {
@@ -345,7 +345,7 @@ export default function CheckoutScreen() {
       // Navigate to success screen or back to home
       setTimeout(
         () => {
-          router.replace("/(tabs)/" as any);
+          router.replace("/(tabs)");
         },
         selectedPayment === "mpesa" ? 5000 : 3000,
       ); // Give more time to read M-Pesa msg

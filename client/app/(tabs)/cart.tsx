@@ -673,7 +673,7 @@ export default function CartScreen(): React.ReactElement {
           </Text>
           <TouchableOpacity
             style={dynamicStyles.shopNowButton}
-            onPress={() => router.push("/(tabs)/" as any)}
+            onPress={() => router.push("/(tabs)")}
           >
             <Text style={dynamicStyles.shopNowButtonText}>Start Shopping</Text>
           </TouchableOpacity>

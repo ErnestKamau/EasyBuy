@@ -120,7 +120,11 @@ function SafeAreaWrapper({ children }: { readonly children: React.ReactNode }) {
 }
 
 function RootLayoutNav() {
-  const { loading: authLoading, checkVerificationStatus } = useAuth();
+  const { 
+    isAuthenticated, 
+    loading: authLoading, 
+    checkVerificationStatus,
+  } = useAuth();
   
   // Hide splash screen once fonts and auth are loaded
   useEffect(() => {
@@ -133,6 +137,13 @@ function RootLayoutNav() {
   const { currentTheme, themeName } = useTheme();
   
   const router = useRouter();
+  
+  // Cleanly handle session transitions (login/logout) by redirecting to the hub
+  useEffect(() => {
+    if (!authLoading) {
+      router.replace("/");
+    }
+  }, [isAuthenticated, authLoading]);
 
   // Handle deep links for email verification
   useEffect(() => {
@@ -224,139 +235,156 @@ function RootLayoutNav() {
     <ThemeProvider value={navigationTheme}>
       <SafeAreaProvider>
         <SafeAreaWrapper>
-          <Stack>
-            <Stack.Screen
-              name="onboarding"
-              options={{
-                headerShown: false,
-                gestureEnabled: false,
-              }}
-            />
+          <Stack screenOptions={{ headerShown: false }}>
+            {[
+              <Stack.Screen key="index" name="index" />,
+              
+              !isAuthenticated && (
+                <Stack.Screen key="onboarding" name="onboarding" options={{ gestureEnabled: false }} />
+              ),
+              !isAuthenticated && (
+                <Stack.Screen key="auth" name="auth" options={{ gestureEnabled: false }} />
+              ),
 
-            <Stack.Screen
-              name="auth"
-              options={{
-                headerShown: false,
-                gestureEnabled: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="rider"
-              options={{
-                headerShown: false,
-                gestureEnabled: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="(tabs)"
-              options={{
-                headerShown: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="categories"
-              options={{
-                title: "Categories",
-                presentation: "card",
-                headerShown: true,
-              }}
-            />
-
-            <Stack.Screen
-              name="search"
-              options={{
-                title: "Search",
-                presentation: "card",
-                headerShown: true,
-              }}
-            />
-
-            <Stack.Screen
-              name="product/[id]"
-              options={{
-                title: "Product Details",
-                presentation: "card",
-                headerShown: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="admin"
-              options={{
-                title: "Admin Panel",
-                presentation: "card",
-                headerShown: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="awaiting-pickup"
-              options={{
-                title: "Awaiting Pickup",
-                presentation: "card",
-                headerShown: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="checkout"
-              options={{
-                title: "Checkout",
-                presentation: "card",
-                headerShown: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="order/[id]"
-              options={{
-                title: "Order Details",
-                presentation: "card",
-                headerShown: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="settings"
-              options={{
-                title: "Settings",
-                presentation: "card",
-              }}
-            />
-
-            <Stack.Screen
-              name="theme-selector"
-              options={{
-                title: "Theme Selection",
-                presentation: "card",
-                headerShown: false,
-              }}
-            />
-
-            <Stack.Screen
-              name="modal"
-              options={{
-                title: "Notifications",
-                presentation: "modal",
-              }}
-            />
-
-            <Stack.Screen
-              name="about"
-              options={{
-                title: "About EasyBuy",
-                presentation: "modal",
-              }}
-            />
-            <Stack.Screen
-              name="wallet"
-              options={{
-                headerShown: false,
-              }}
-            />
+              isAuthenticated && (
+                <Stack.Screen key="rider" name="rider" options={{ gestureEnabled: false }} />
+              ),
+              isAuthenticated && <Stack.Screen key="(tabs)" name="(tabs)" />,
+              isAuthenticated && (
+                <Stack.Screen
+                  key="categories"
+                  name="categories"
+                  options={{
+                    title: "Categories",
+                    presentation: "card",
+                    headerShown: true,
+                  }}
+                />
+              ),
+              isAuthenticated && (
+                <Stack.Screen
+                  key="search"
+                  name="search"
+                  options={{
+                    title: "Search",
+                    presentation: "card",
+                    headerShown: true,
+                  }}
+                />
+              ),
+              isAuthenticated && (
+                <Stack.Screen
+                  key="product"
+                  name="product/[id]"
+                  options={{
+                    title: "Product Details",
+                    presentation: "card",
+                  }}
+                />
+              ),
+              isAuthenticated && (
+                <Stack.Screen
+                  key="admin"
+                  name="admin"
+                  options={{
+                    title: "Admin Panel",
+                    presentation: "card",
+                  }}
+                />
+              ),
+              isAuthenticated && (
+                <Stack.Screen
+                  key="awaiting-pickup"
+                  name="awaiting-pickup"
+                  options={{
+                    title: "Awaiting Pickup",
+                    presentation: "card",
+                  }}
+                />
+              ),
+              isAuthenticated && (
+                <Stack.Screen
+                 key="checkout"
+                 name="checkout"
+                 options={{
+                   title: "Checkout",
+                   presentation: "card",
+                   headerShown: true,
+                 }}
+                />
+              ),
+              isAuthenticated && (
+                <Stack.Screen
+                  key="order-details"
+                  name="order/[id]"
+                  options={{
+                    title: "Order Details",
+                    presentation: "card",
+                  }}
+                />
+              ),
+              isAuthenticated && (
+                <Stack.Screen
+                  key="order-track"
+                  name="order/track"
+                  options={{
+                    title: "Track Order",
+                    presentation: "card",
+                  }}
+                />
+              ),
+              
+              <Stack.Screen
+                key="settings"
+                name="settings"
+                options={{
+                  title: "Settings",
+                  presentation: "card",
+                  headerShown: true,
+                }}
+              />,
+              <Stack.Screen
+                key="theme-selector"
+                name="theme-selector"
+                options={{
+                  title: "Select Theme",
+                  presentation: "modal",
+                }}
+              />,
+              <Stack.Screen
+                key="help-support"
+                name="help-support"
+                options={{
+                  title: "Help & Support",
+                  presentation: "card",
+                  headerShown: true,
+                }}
+              />,
+              <Stack.Screen
+                key="modal"
+                name="modal"
+                options={{
+                  title: "Notifications",
+                  presentation: "modal",
+                }}
+              />,
+              <Stack.Screen
+                key="about"
+                name="about"
+                options={{
+                  title: "About EasyBuy",
+                  presentation: "modal",
+                }}
+              />,
+              <Stack.Screen
+                key="wallet"
+                name="wallet"
+                options={{
+                  headerShown: false,
+                }}
+              />,
+              <Stack.Screen key="not-found" name="+not-found" />
+            ].filter(Boolean) as React.ReactElement[]}
           </Stack>
         </SafeAreaWrapper>
       </SafeAreaProvider>

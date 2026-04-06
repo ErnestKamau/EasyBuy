@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { useRouter, useSegments } from "expo-router";
+import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authApi, tokenManager, User } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
@@ -21,6 +21,7 @@ export interface AuthContextType {
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   checkVerificationStatus: () => Promise<boolean>;
+  hasSeenOnboarding: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -32,6 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
   refreshAuth: async () => {},
   checkVerificationStatus: async () => false,
+  hasSeenOnboarding: null,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -42,10 +44,8 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [initialNavigationComplete, setInitialNavigationComplete] =
-    useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
   const router = useRouter();
-  const segments = useSegments();
 
   const checkAuthStatus = useCallback(async () => {
     try {
@@ -54,7 +54,6 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
       if (!token) {
         setIsAuthenticated(false);
         setUser(null);
-        setLoading(false);
         return;
       }
 
@@ -73,8 +72,6 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
       await tokenManager.clearTokens();
       setIsAuthenticated(false);
       setUser(null);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -138,18 +135,26 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
     } finally {
       setUser(null);
       setIsAuthenticated(false);
-      setInitialNavigationComplete(false);
-      // Clear onboarding flag so user is redirected to onboarding
-      await AsyncStorage.removeItem(ONBOARDING_KEY);
-      // Navigate directly to onboarding
-      router.replace("/onboarding");
+      // Centralized navigation guards handle the redirect.
     }
-  }, [router]);
+  }, []);
+
+  // Check if user has seen onboarding
+  const checkOnboardingStatus = useCallback(async () => {
+    try {
+      const value = await AsyncStorage.getItem(ONBOARDING_KEY);
+      setHasSeenOnboarding(value === "true");
+    } catch (error) {
+      console.log("Error checking onboarding status:", error);
+      setHasSeenOnboarding(false);
+    }
+  }, []);
 
   const refreshAuth = useCallback(async () => {
     setLoading(true);
-    await checkAuthStatus();
-  }, [checkAuthStatus]);
+    await Promise.all([checkAuthStatus(), checkOnboardingStatus()]);
+    setLoading(false);
+  }, [checkAuthStatus, checkOnboardingStatus]);
 
   const checkVerificationStatus = useCallback(async () => {
     try {
@@ -165,110 +170,44 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
     }
   }, [user, checkAuthStatus]);
 
-  // Check if user has seen onboarding
-  const checkOnboardingStatus = useCallback(async () => {
-    try {
-      await AsyncStorage.getItem(ONBOARDING_KEY);
-    } catch (error) {
-      console.log("Error checking onboarding status:", error);
-    }
-  }, []);
 
   useEffect(() => {
-    checkAuthStatus();
-    checkOnboardingStatus();
+    const initialize = async () => {
+      setLoading(true);
+      await Promise.all([checkAuthStatus(), checkOnboardingStatus()]);
+      setLoading(false);
+    };
+    initialize();
   }, [checkAuthStatus, checkOnboardingStatus]);
 
-  // Immediate redirect when loading completes - prevents tabs from rendering
-  useEffect(() => {
-    if (loading) return;
+  // Initial navigation and session-based guards are now handled by app/index.tsx 
+  // and ProtectedRoute-like logic in components, or below.
 
-    const currentSegment = segments[0];
-    const isVerified = !!(user?.email_verified_at);
-
-    if (isAuthenticated) {
-      if (!isVerified) {
-        // Authenticated but email not verified — send to OTP screen
-        if (currentSegment !== "auth") {
-          router.replace({
-            pathname: "/auth",
-            params: { mode: "email-verification", email: user?.email ?? "" },
-          } as any);
-        }
-        setTimeout(() => setInitialNavigationComplete(true), 100);
-      } else if (currentSegment === "onboarding" || currentSegment === "auth") {
-        const target = user?.role === 'rider' ? '/rider' : '/(tabs)';
-        router.replace(target as any);
-        setTimeout(() => setInitialNavigationComplete(true), 100);
-      } else {
-        setInitialNavigationComplete(true);
-      }
-      return;
-    }
-
-    // Not authenticated — ensure we're on onboarding
-    if (currentSegment !== "onboarding" && currentSegment !== "auth") {
-      router.replace("/onboarding");
-      setTimeout(() => setInitialNavigationComplete(true), 100);
-    } else {
-      setInitialNavigationComplete(true);
-    }
-  }, [loading, isAuthenticated, user, segments, router]);
-
-  // Navigation guard - handles route changes
-  useEffect(() => {
-    if (loading) return;
-
-    const currentSegment = segments[0];
-    const inAuthGroup = currentSegment === "auth" || currentSegment === "onboarding";
-    const isVerified = !!(user?.email_verified_at);
-
-    if (isAuthenticated) {
-      if (!isVerified) {
-        // Block unverified users from reaching tabs
-        if (currentSegment !== "auth") {
-          router.replace({
-            pathname: "/auth",
-            params: { mode: "email-verification", email: user?.email ?? "" },
-          } as any);
-        }
-        return;
-      }
-      // Verified users: push away from auth/onboarding to target
-      if (inAuthGroup) {
-        const target = user?.role === 'rider' ? '/rider' : '/(tabs)';
-        router.replace(target as any);
-      }
-      return;
-    }
-
-    // Not authenticated
-    if (!inAuthGroup) {
-      router.replace("/onboarding");
-    }
-  }, [isAuthenticated, loading, user, segments, router]);
+  // Navigation is now handled by conditional Stack in app/_layout.tsx 
+  // and the redirection hub in app/index.tsx
 
   const contextValue = useMemo<AuthContextType>(
     () => ({
       user,
       isAuthenticated,
-      loading: loading || !initialNavigationComplete, // Combine both for UI simplicity
+      loading,
       login,
       socialLogin,
       logout,
       refreshAuth,
       checkVerificationStatus,
+      hasSeenOnboarding,
     }),
     [
       user,
       isAuthenticated,
       loading,
-      initialNavigationComplete,
       login,
       socialLogin,
       logout,
       refreshAuth,
       checkVerificationStatus,
+      hasSeenOnboarding,
     ],
   );
 

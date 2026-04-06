@@ -76,7 +76,7 @@ export default function RiderDashboard() {
     
     if (user.role !== 'rider') {
       ToastService.showError("Access Denied", "Rider account required");
-      router.replace("/(tabs)/");
+      router.replace("/(tabs)");
       return;
     }
 

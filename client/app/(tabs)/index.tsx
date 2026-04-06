@@ -239,8 +239,7 @@ export default function HomeScreen() {
     try {
       const authenticated = await isAuthenticated();
       if (!authenticated) {
-        console.log("User not authenticated, redirecting to onboarding");
-        router.replace("/onboarding");
+        // Redirection is handled by AuthContext global guard
         return;
       }
 
@@ -248,7 +247,7 @@ export default function HomeScreen() {
       await loadInitialData();
     } catch (error) {
       console.log("Auth check failed:", error);
-      router.replace("/onboarding");
+      // Redirection is handled by AuthContext global guard
     }
   };
 
@@ -261,7 +260,7 @@ export default function HomeScreen() {
 
       const wasHandled = handleCommonErrors(
         error,
-        () => router.replace("/onboarding"),
+        () => { /* Global guard handles this */ },
         (message) => ToastService.showError("Connection Error", message)
       );
 
@@ -285,7 +284,7 @@ export default function HomeScreen() {
         console.log("getCurrentUser returned null, checking auth status");
         const authenticated = await isAuthenticated();
         if (!authenticated) {
-          router.replace("/onboarding");
+          // Redirection is handled by AuthContext
         }
       }
     } catch (error) {
@@ -293,7 +292,7 @@ export default function HomeScreen() {
 
       const wasHandled = handleCommonErrors(
         error,
-        () => router.replace("/onboarding"),
+        () => { /* Redirection handled by AuthContext */ },
         (message) => console.log("User data error:", message)
       );
 
