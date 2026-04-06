@@ -30,6 +30,7 @@ class DeliveryTestDataSeeder extends Seeder
         $admin = User::firstOrCreate(
             ['email' => 'admin@easybuy.com'],
             [
+                'username' => 'admin',
                 'first_name' => 'Admin',
                 'last_name' => 'User',
                 'phone_number' => '0711000000',
@@ -44,6 +45,7 @@ class DeliveryTestDataSeeder extends Seeder
             $rider = User::firstOrCreate(
                 ['email' => "rider{$i}@easybuy.com"],
                 [
+                    'username' => "rider{$i}",
                     'first_name' => "Rider",
                     'last_name' => (string)$i,
                     'phone_number' => "072200000{$i}",
@@ -68,6 +70,7 @@ class DeliveryTestDataSeeder extends Seeder
             $customer = User::firstOrCreate(
                 ['email' => "customer{$i}@easybuy.com"],
                 [
+                    'username' => "customer{$i}",
                     'first_name' => "Customer",
                     'last_name' => (string)$i,
                     'phone_number' => "073300000{$i}",
