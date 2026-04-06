@@ -23,11 +23,21 @@ class DeliveryTestDataSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Create Roles and Permissions first
         $this->call(RolesAndPermissionsSeeder::class);
 
-        // 2. Create Users
-        $admin = User::firstOrCreate(
+        $admin = $this->createAdmin();
+        $riders = $this->createRiders();
+        $customers = $this->createCustomers();
+        
+        $allProducts = $this->createCategoriesAndProducts();
+
+        $this->createTestOrders($customers, $riders, $allProducts);
+        $this->createCompletedSale($customers, $allProducts);
+    }
+
+    private function createAdmin(): User
+    {
+        return User::firstOrCreate(
             ['email' => 'admin@easybuy.com'],
             [
                 'username' => 'admin',
@@ -39,8 +49,10 @@ class DeliveryTestDataSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
-        $admin->assignRole('admin');
+    }
 
+    private function createRiders(): array
+    {
         $riders = [];
         for ($i = 1; $i <= 3; $i++) {
             $rider = User::firstOrCreate(
@@ -59,7 +71,6 @@ class DeliveryTestDataSeeder extends Seeder
             $rider->assignRole('rider');
             $riders[] = $rider;
 
-            // Create initial location for riders near a "shop" point
             DriverLocation::create([
                 'id' => (string) Str::uuid(),
                 'driver_id' => $rider->id,
@@ -68,7 +79,11 @@ class DeliveryTestDataSeeder extends Seeder
                 'recorded_at' => Carbon::now(),
             ]);
         }
+        return $riders;
+    }
 
+    private function createCustomers(): array
+    {
         $customers = [];
         for ($i = 1; $i <= 3; $i++) {
             $customer = User::firstOrCreate(
@@ -86,8 +101,11 @@ class DeliveryTestDataSeeder extends Seeder
             $customer->assignRole('customer');
             $customers[] = $customer;
         }
+        return $customers;
+    }
 
-        // 3. Create Categories and Products
+    private function createCategoriesAndProducts()
+    {
         $categories = [
             ['name' => 'Electronics'],
             ['name' => 'Groceries'],
@@ -97,7 +115,6 @@ class DeliveryTestDataSeeder extends Seeder
         foreach ($categories as $catData) {
             $category = Category::firstOrCreate(['name' => $catData['name']], ['is_active' => true]);
             
-            // Create 3 products per category
             for ($j = 1; $j <= 3; $j++) {
                 Product::create([
                     'category_id' => $category->id,
@@ -113,9 +130,11 @@ class DeliveryTestDataSeeder extends Seeder
             }
         }
 
-        $allProducts = Product::all();
+        return Product::all();
+    }
 
-        // 4. Create Orders
+    private function createTestOrders(array $customers, array $riders, $allProducts): void
+    {
         // Order 1: Pending Delivery (Needs Assignment)
         $order1 = Order::create([
             'order_number' => 'ORD-2026-' . rand(100, 999),
@@ -131,7 +150,7 @@ class DeliveryTestDataSeeder extends Seeder
             'delivery_lng' => 36.8219,
             'delivery_fee' => 150.00,
         ]);
-        $this->addItemsToOrder($order1, $allProducts->random(2));
+        $this->addItemsToOrder($order1, $allProducts->shuffle()->take(2));
 
         // Order 2: Assigned Delivery (Waiting for Rider Acceptance)
         $order2 = Order::create([
@@ -150,7 +169,7 @@ class DeliveryTestDataSeeder extends Seeder
             'delivery_lng' => 36.8041,
             'delivery_fee' => 200.00,
         ]);
-        $this->addItemsToOrder($order2, $allProducts->random(2));
+        $this->addItemsToOrder($order2, $allProducts->shuffle()->take(2));
 
         // Order 3: In Transit Delivery
         $order3 = Order::create([
@@ -171,9 +190,11 @@ class DeliveryTestDataSeeder extends Seeder
             'delivery_lng' => 36.8153,
             'delivery_fee' => 100.00,
         ]);
-        $this->addItemsToOrder($order3, $allProducts->random(1));
+        $this->addItemsToOrder($order3, $allProducts->shuffle()->take(1));
+    }
 
-        // 5. Create a Sale for a completed order
+    private function createCompletedSale(array $customers, $allProducts): void
+    {
         $order4 = Order::create([
             'order_number' => 'ORD-2026-' . rand(100, 999),
             'user_id' => $customers[0]->id,
@@ -185,7 +206,7 @@ class DeliveryTestDataSeeder extends Seeder
             'order_time' => '10:00:00',
             'delivered_at' => Carbon::yesterday()->addHours(2),
         ]);
-        $this->addItemsToOrder($order4, $allProducts->random(3));
+        $this->addItemsToOrder($order4, $allProducts->shuffle()->take(3));
         
         $totalAmount = $order4->total_amount;
         $sale = Sale::create([

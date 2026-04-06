@@ -74,6 +74,7 @@ class OrderController extends Controller
     {
         $validated = $request->validate([
             'user_id' => 'nullable|exists:users,id',
+            'type' => 'sometimes|in:delivery,pickup',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'nullable|integer|min:1',
@@ -82,15 +83,24 @@ class OrderController extends Controller
             'payment_status' => 'sometimes|in:pending,fully-paid,partially-paid,debt,failed',
             'notes' => 'nullable|string',
             'pickup_time' => 'nullable|date|after:now',
+            'delivery_address' => 'required_if:type,delivery|string|nullable',
+            'delivery_lat' => 'required_if:type,delivery|numeric|nullable',
+            'delivery_lng' => 'required_if:type,delivery|numeric|nullable',
+            'delivery_fee' => 'sometimes|numeric|min:0',
         ]);
 
         DB::beginTransaction();
         try {
             $order = Order::create([
                 'user_id' => $validated['user_id'] ?? $request->user()->id ?? null,
+                'type' => $validated['type'] ?? 'pickup',
                 'payment_status' => $validated['payment_status'] ?? 'pending',
                 'notes' => $validated['notes'] ?? null,
                 'pickup_time' => $validated['pickup_time'] ?? null,
+                'delivery_address' => $validated['delivery_address'] ?? null,
+                'delivery_lat' => $validated['delivery_lat'] ?? null,
+                'delivery_lng' => $validated['delivery_lng'] ?? null,
+                'delivery_fee' => $validated['delivery_fee'] ?? 0,
             ]);
 
             foreach ($validated['items'] as $itemData) {
