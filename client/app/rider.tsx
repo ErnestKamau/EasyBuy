@@ -72,9 +72,11 @@ export default function RiderDashboard() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user || user.role !== 'rider') {
+    if (!user) return; // Wait for AuthContext or let it handle redirection
+    
+    if (user.role !== 'rider') {
       ToastService.showError("Access Denied", "Rider account required");
-      router.back();
+      router.replace("/(tabs)/");
       return;
     }
 
