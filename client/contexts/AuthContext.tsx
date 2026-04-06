@@ -87,12 +87,33 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
         "Login Successful!",
         `Welcome back, ${response.user.username}`,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.log("Login failed", error);
+      
+      // Handle email not verified (403 from backend)
+      if (error.response?.status === 403 || error.message?.includes("verify your email")) {
+        ToastService.showWarning(
+          "Email Not Verified",
+          "Please verify your email address before logging in."
+        );
+        
+        // Redirect to email-verification screen
+        router.replace({
+          pathname: "/auth",
+          params: { 
+            mode: "email-verification", 
+            email: credentials.email || credentials.email_or_username || "" 
+          },
+        } as any);
+        
+        // We still throw to allow the components to handle the local loading state
+        throw error;
+      }
+
       ToastService.showApiError(error, "Login Failed");
       throw new Error("Login failed. Please try again.");
     }
-  }, []);
+  }, [router]);
 
   const socialLogin = useCallback(async (provider: string, token: string) => {
     try {
