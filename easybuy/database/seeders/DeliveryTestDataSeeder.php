@@ -197,11 +197,12 @@ class DeliveryTestDataSeeder extends Seeder
         ]);
 
         Payment::create([
+            'payment_number' => 'PAY-2026-' . rand(100, 999),
             'sale_id' => $sale->id,
             'amount' => $totalAmount,
-            'method' => 'cash',
+            'payment_method' => 'cash',
             'status' => 'completed',
-            'payment_date' => Carbon::yesterday(),
+            'paid_at' => Carbon::yesterday(),
         ]);
     }
 
