@@ -196,6 +196,11 @@ class WebSocketService {
         'debt.overdue',
         'payment.received',
         'notification',
+        'order.assigned',
+        'order.accepted',
+        'order.picked_up',
+        'order.delivered',
+        'location.updated',
       ];
 
       // Set up listeners for each event type on user channel
@@ -285,6 +290,56 @@ class WebSocketService {
     }
     this.listeners.clear();
     this.isConnecting = false;
+  }
+
+  /**
+   * Subscribe to a specific order's tracking channel
+   */
+  async subscribeToOrder(orderId: number): Promise<void> {
+    if (!this.socket) return;
+
+    try {
+      const token = await tokenManager.getAccessToken();
+      if (!token) return;
+
+      const orderChannel = `private-order.${orderId}`;
+
+      this.socket.emit('subscribe', {
+        channel: orderChannel,
+        socket_id: this.socket.id,
+        token: token,
+      });
+
+      // Listen for events on this order channel
+      const orderEvents = [
+        'order.assigned',
+        'order.accepted',
+        'order.picked_up',
+        'order.delivered',
+        'location.updated',
+      ];
+
+      orderEvents.forEach(eventType => {
+        const eventName = `${orderChannel}:${eventType}`;
+        this.socket?.on(eventName, (data: any) => {
+          console.log(`Event ${eventType} on order channel ${orderId}:`, data);
+          this.handleChannelEvent({ event: eventType, data });
+        });
+      });
+    } catch (error) {
+      console.error(`Error subscribing to order ${orderId}:`, error);
+    }
+  }
+
+  /**
+   * Leave a specific order channel
+   */
+  unsubscribeFromOrder(orderId: number): void {
+    if (!this.socket) return;
+    const orderChannel = `private-order.${orderId}`;
+    this.socket.emit('unsubscribe', {
+      channel: orderChannel,
+    });
   }
 
   /**

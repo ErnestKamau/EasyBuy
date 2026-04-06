@@ -1,5 +1,6 @@
 // app/checkout.tsx
 import React, { useState, useEffect, useRef } from "react";
+import * as ExpoLocation from "expo-location";
 import {
   View,
   Text,
@@ -30,7 +31,6 @@ import {
   MapPin,
   Clock,
   CheckCircle,
-  AlertTriangle,
 } from "lucide-react-native";
 
 type PaymentMethod = "cash" | "mpesa" | "card";
@@ -65,6 +65,15 @@ export default function CheckoutScreen() {
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pollingCountRef = useRef(0);
 
+  // Delivery-specific state
+  const [deliveryLocation, setDeliveryLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState<string>("");
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [deliveryFee] = useState(150); // Standard fee, could be fetched from API
+
   // Load available pickup slots when delivery type is pickup
   useEffect(() => {
     if (selectedDelivery === "pickup") {
@@ -80,6 +89,42 @@ export default function CheckoutScreen() {
       }
     };
   }, []);
+
+  const fetchLocation = async () => {
+    try {
+      setIsFetchingLocation(true);
+      const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        ToastService.showError(
+          "Permission Denied",
+          "Permission to access location was denied",
+        );
+        return;
+      }
+
+      const location = await ExpoLocation.getCurrentPositionAsync({});
+      setDeliveryLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      // Simple reverse geocoding to get a string address
+      const [address] = await ExpoLocation.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (address) {
+        const formattedAddress = `${address.name || ""}, ${address.street || ""}, ${address.city || ""}`;
+        setDeliveryAddress(formattedAddress.replace(/^, /, ""));
+      }
+    } catch (error) {
+      console.error("Failed to fetch location:", error);
+      ToastService.showError("Error", "Failed to get current location");
+    } finally {
+      setIsFetchingLocation(false);
+    }
+  };
 
   const loadPickupSlots = async () => {
     try {
@@ -206,12 +251,29 @@ export default function CheckoutScreen() {
         return;
       }
 
+      // Validate delivery location for delivery orders
+      if (selectedDelivery === "delivery" && (!deliveryLocation || !deliveryAddress)) {
+        ToastService.showError(
+          "Location Required",
+          "Please set your delivery location",
+        );
+        setIsProcessing(false);
+        return;
+      }
+
       // Create the order
       const order = await ordersApi.createOrder(
         orderItems,
         `Payment method: ${selectedPayment === "cash" ? "Cash" : selectedPayment === "mpesa" ? "M-Pesa" : "Card"}`,
         selectedPayment,
         selectedDelivery === "pickup" ? selectedPickupTime : undefined,
+        selectedDelivery === "delivery" && deliveryLocation
+          ? {
+              latitude: deliveryLocation.latitude,
+              longitude: deliveryLocation.longitude,
+              address: deliveryAddress,
+            }
+          : undefined,
       );
 
       // Trigger STK Push if M-Pesa
@@ -411,6 +473,15 @@ export default function CheckoutScreen() {
             </Text>
           </View>
 
+          {selectedDelivery === "delivery" && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Delivery Fee</Text>
+              <Text style={styles.summaryValue}>
+                Ksh {deliveryFee.toLocaleString()}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.summaryDivider} />
 
           {/* Show wallet credit if user has positive balance */}
@@ -434,7 +505,7 @@ export default function CheckoutScreen() {
                   Ksh{" "}
                   {Math.max(
                     0,
-                    state.totalAmount - user.wallet_balance,
+                    state.totalAmount + (selectedDelivery === "delivery" ? deliveryFee : 0) - user.wallet_balance,
                   ).toLocaleString()}
                 </Text>
               </View>
@@ -445,7 +516,7 @@ export default function CheckoutScreen() {
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total</Text>
               <Text style={styles.totalValue}>
-                Ksh {state.totalAmount.toLocaleString()}
+                Ksh {(state.totalAmount + (selectedDelivery === "delivery" ? deliveryFee : 0)).toLocaleString()}
               </Text>
             </View>
           )}
@@ -524,6 +595,66 @@ export default function CheckoutScreen() {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Delivery Address (only show if delivery is selected) */}
+        {selectedDelivery === "delivery" && (
+          <View style={styles.deliveryCard}>
+            <Text style={styles.sectionTitle}>Delivery Address</Text>
+            <Text style={styles.paymentSubtitle}>
+              Where should we deliver your order?
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.paymentOption,
+                deliveryLocation && styles.selectedPaymentOption,
+              ]}
+              onPress={fetchLocation}
+              disabled={isFetchingLocation}
+            >
+              <View style={styles.paymentIcon}>
+                {isFetchingLocation ? (
+                  <ActivityIndicator size="small" color={currentTheme.primary} />
+                ) : (
+                  <MapPin
+                    size={24}
+                    color={deliveryLocation ? "#22C55E" : "#64748B"}
+                  />
+                )}
+              </View>
+              <View style={styles.paymentContent}>
+                <Text
+                  style={[
+                    styles.paymentTitle,
+                    deliveryLocation && styles.selectedPaymentTitle,
+                  ]}
+                >
+                  {deliveryLocation ? "Location Set" : "Detect My Location"}
+                </Text>
+                <Text style={styles.paymentDescription} numberOfLines={1}>
+                  {deliveryAddress || "Tap to use your current GPS location"}
+                </Text>
+              </View>
+              {!isFetchingLocation && (
+                <View
+                  style={[
+                    styles.radioButton,
+                    deliveryLocation && styles.selectedRadioButton,
+                  ]}
+                />
+              )}
+            </TouchableOpacity>
+
+            {deliveryLocation && (
+              <View style={styles.locationCoordinates}>
+                <Text style={styles.coordinatesText}>
+                  Lat: {deliveryLocation.latitude.toFixed(6)}, Lng:{" "}
+                  {deliveryLocation.longitude.toFixed(6)}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Pickup Time Selection (only show if pickup is selected) */}
         {selectedDelivery === "pickup" && (
@@ -1251,5 +1382,18 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       color: "#FFFFFF",
       fontSize: 16,
       fontWeight: "700",
+    },
+    locationCoordinates: {
+      marginTop: 8,
+      padding: 12,
+      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    coordinatesText: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      fontFamily: "SpaceMono_400Regular", // If available, or just monospace
     },
   });

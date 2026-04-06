@@ -265,7 +265,7 @@ const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet
   },
 });
 
-export default function OrderDetailScreen(): React.ReactElement {
+export default function OrderDetailScreen(): React.ReactNode {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentTheme, themeName } = useTheme();
   const { markOrderNotificationsAsRead } = useNotifications();
@@ -338,6 +338,16 @@ export default function OrderDetailScreen(): React.ReactElement {
         color: currentTheme.warning,
       };
     } else if (status === 'confirmed') {
+      return {
+        backgroundColor: currentTheme.success + '20',
+        color: currentTheme.success,
+      };
+    } else if (status === 'assigned' || status === 'accepted' || status === 'picked_up') {
+      return {
+        backgroundColor: currentTheme.primary + '20',
+        color: currentTheme.primary,
+      };
+    } else if (status === 'delivered') {
       return {
         backgroundColor: currentTheme.success + '20',
         color: currentTheme.success,
@@ -580,10 +590,19 @@ export default function OrderDetailScreen(): React.ReactElement {
             </Text>
           </View>
 
+          {order.type === 'delivery' && (
+            <View style={dynamicStyles.summaryRow}>
+              <Text style={dynamicStyles.summaryLabel}>Delivery Fee</Text>
+              <Text style={dynamicStyles.summaryValue}>
+                Ksh {order.delivery_fee?.toLocaleString() || '150'}
+              </Text>
+            </View>
+          )}
+
           <View style={dynamicStyles.totalRow}>
             <Text style={dynamicStyles.totalLabel}>Total</Text>
             <Text style={dynamicStyles.totalValue}>
-              Ksh {orderTotal.toLocaleString()}
+              Ksh {(orderTotal + (order.type === 'delivery' ? (order.delivery_fee || 150) : 0)).toLocaleString()}
             </Text>
           </View>
         </View>
@@ -656,22 +675,47 @@ export default function OrderDetailScreen(): React.ReactElement {
 
         {/* Delivery/Pickup Information */}
         <View style={dynamicStyles.section}>
-          <Text style={dynamicStyles.sectionTitle}>Delivery Information</Text>
+          <Text style={dynamicStyles.sectionTitle}>
+            {order.type === 'delivery' ? 'Delivery Information' : 'Pickup Information'}
+          </Text>
           
           <View style={dynamicStyles.infoRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
               <MapPin size={16} color={currentTheme.textSecondary} />
               <Text style={[dynamicStyles.infoLabel, { marginLeft: 8 }]}>Type</Text>
             </View>
-            <Text style={dynamicStyles.infoValue}>Pickup at Shop</Text>
+            <Text style={dynamicStyles.infoValue}>
+              {order.type === 'delivery' ? 'Home Delivery' : 'Pickup at Shop'}
+            </Text>
           </View>
+
+          {order.type === 'delivery' && order.delivery_address && (
+            <View style={[dynamicStyles.infoRow, { marginTop: 4, alignItems: 'flex-start' }]}>
+              <Text style={[dynamicStyles.infoLabel, { flex: 0, width: 80 }]}>Address</Text>
+              <Text style={[dynamicStyles.infoValue, { textAlign: 'left', flex: 1 }]}>
+                {order.delivery_address}
+              </Text>
+            </View>
+          )}
 
           <View style={[dynamicStyles.infoRow, { marginTop: 8 }]}>
             <Text style={dynamicStyles.infoLabel}>Status</Text>
-            <Text style={dynamicStyles.infoValue}>
-              {order.order_status === 'confirmed' ? 'Ready for Pickup' : 'Pending Confirmation'}
+            <Text style={[dynamicStyles.infoValue, { textTransform: 'capitalize' }]}>
+              {order.order_status.replace('_', ' ')}
             </Text>
           </View>
+
+          {order.type === 'delivery' && order.order_status !== 'pending' && order.order_status !== 'cancelled' && order.order_status !== 'delivered' && (
+            <TouchableOpacity
+              style={[dynamicStyles.actionButton, { marginTop: 16, backgroundColor: currentTheme.primary }]}
+              onPress={() => router.push(`/order/track?id=${order.id}` as any)}
+            >
+              <MapPin size={20} color="#FFFFFF" />
+              <Text style={[dynamicStyles.actionButtonText, { color: '#FFFFFF' }]}>
+                Track Live Delivery
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Contact Support */}

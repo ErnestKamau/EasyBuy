@@ -36,6 +36,8 @@ import {
   notificationsApi,
   adminApi,
   DashboardStats,
+  deliveryApi,
+  User,
 } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
 import {
@@ -64,6 +66,7 @@ import {
   Search,
   Filter,
   Bell,
+  User as UserIcon,
 } from "lucide-react-native";
 
 export default function AdminScreen() {
@@ -84,6 +87,10 @@ export default function AdminScreen() {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedOrderForAssign, setSelectedOrderForAssign] = useState<Order | null>(null);
+  const [availableDrivers, setAvailableDrivers] = useState<User[]>([]);
+  const [isAssigning, setIsAssigning] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -557,9 +564,7 @@ export default function AdminScreen() {
           ? "Paid"
           : paymentStatus === "debt"
             ? "Debt"
-            : paymentStatus === "failed"
-              ? "Failed"
-              : "Pending"
+            : "Pending"
       }\nAmount: KES ${order.total_amount?.toLocaleString() || 0}\n\n${
         isDebt
           ? "This will mark the order as debt with 7 days payment deadline."
@@ -1035,6 +1040,32 @@ export default function AdminScreen() {
     );
   };
 
+  const openAssignDriverModal = async (order: Order) => {
+    setSelectedOrderForAssign(order);
+    setShowAssignModal(true);
+    try {
+      const drivers = await deliveryApi.getAvailableDrivers();
+      setAvailableDrivers(drivers);
+    } catch (error) {
+      ToastService.showError("Error", "Failed to fetch available drivers");
+    }
+  };
+
+  const handleAssignDriver = async (driverId: number) => {
+    if (!selectedOrderForAssign) return;
+    try {
+      setIsAssigning(true);
+      await deliveryApi.assignDriver(selectedOrderForAssign.id, driverId);
+      ToastService.showSuccess("Success", "Driver assigned successfully");
+      setShowAssignModal(false);
+      loadAdminData(); // Refresh orders
+    } catch (error) {
+      ToastService.showError("Error", "Failed to assign driver");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   const renderOrderItem = ({ item }: { item: Order }) => {
     const customerName = item.user
       ? `${item.user.first_name || ""} ${item.user.last_name || ""}`.trim() ||
@@ -1047,13 +1078,9 @@ export default function AdminScreen() {
         ? "Fully Paid"
         : item.payment_status === "partially-paid"
           ? "Partially Paid"
-          : item.payment_status === "debt"
-            ? "Debt"
-            : item.payment_status === "failed"
-              ? "Failed"
-              : item.payment_status === "pending"
-                ? "Pending"
-                : "Pending";
+          : item.payment_status === "failed"
+            ? "Failed"
+            : "Pending";
 
     return (
       <View style={styles.orderCard}>
@@ -1193,22 +1220,38 @@ export default function AdminScreen() {
           </View>
         )}
 
-        {item.order_status === "pending" && (
+        {(item.order_status === "pending" || (item.type === 'delivery' && (item.order_status === 'confirmed' || item.order_status === 'assigned'))) && (
           <View style={styles.orderActions}>
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={() => confirmOrder(item)}
-            >
-              <CheckCircle size={16} color="#22C55E" />
-              <Text style={styles.confirmButtonText}>Confirm</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => cancelOrder(item)}
-            >
-              <XCircle size={16} color="#EF4444" />
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            {item.order_status === "pending" && (
+              <>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={() => confirmOrder(item)}
+                >
+                  <CheckCircle size={16} color="#22C55E" />
+                  <Text style={styles.confirmButtonText}>Confirm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => cancelOrder(item)}
+                >
+                  <XCircle size={16} color="#EF4444" />
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            
+            {item.type === 'delivery' && (item.order_status === 'confirmed' || item.order_status === 'assigned') && (
+              <TouchableOpacity
+                style={[styles.confirmButton, { borderColor: '#8B5CF6' }]}
+                onPress={() => openAssignDriverModal(item)}
+              >
+                <Truck size={16} color="#8B5CF6" />
+                <Text style={[styles.confirmButtonText, { color: '#8B5CF6' }]}>
+                  {item.driver_id ? 'Reassign' : 'Assign Driver'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -3307,6 +3350,47 @@ export default function AdminScreen() {
                 <CreditCard size={16} color="#FFFFFF" />
                 <Text style={styles.saveButtonText}>Add Payment</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Assign Driver Modal */}
+      <Modal visible={showAssignModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '70%', backgroundColor: currentTheme.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: currentTheme.text }]}>Assign Driver</Text>
+              <TouchableOpacity onPress={() => setShowAssignModal(false)} style={styles.closeButton}>
+                <X size={24} color={currentTheme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formContainer}>
+               <Text style={[styles.fieldLabel, { color: currentTheme.textSecondary }]}>Available Drivers Near Shop</Text>
+               <ScrollView>
+               {availableDrivers.length === 0 ? (
+                 <Text style={{ paddingVertical: 20, textAlign: 'center', color: currentTheme.textSecondary }}>No available drivers found</Text>
+               ) : (
+                 availableDrivers.map(driver => (
+                   <TouchableOpacity 
+                    key={driver.id} 
+                    style={[styles.itemCard, { marginBottom: 10, padding: 15, borderRadius: 12, backgroundColor: currentTheme.background, flexDirection: 'row', alignItems: 'center' }]}
+                    onPress={() => handleAssignDriver(driver.id)}
+                    disabled={isAssigning}
+                   >
+                     <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: currentTheme.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: 15 }}>
+                        <UserIcon size={20} color={currentTheme.primary} />
+                     </View>
+                     <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: currentTheme.text }}>{driver.first_name} {driver.last_name}</Text>
+                        <Text style={{ fontSize: 13, color: currentTheme.textSecondary }}>{driver.vehicle_type || 'Rider'} • {driver.vehicle_registration || 'Available'}</Text>
+                     </View>
+                     {isAssigning ? <ActivityIndicator size="small" color={currentTheme.primary} /> : <Truck size={20} color={currentTheme.primary} />}
+                   </TouchableOpacity>
+                 ))
+               )}
+               </ScrollView>
             </View>
           </View>
         </View>

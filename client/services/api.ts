@@ -62,7 +62,11 @@ export interface User {
   email: string;
   phone_number?: string;
   gender?: 'male' | 'female' | 'other' | 'Male' | 'Female';
-  role?: 'admin' | 'customer';
+  role?: 'admin' | 'customer' | 'rider';
+  online_status?: 'online' | 'offline' | 'busy';
+  vehicle_type?: string;
+  vehicle_registration?: string;
+  fcm_token?: string;
   email_verified_at?: string | null;
   wallet_balance: number; // Current balance (positive = credit, negative = debt)
   max_debt_limit: number; // Maximum debt allowed (e.g., -5000)
@@ -450,16 +454,28 @@ export interface Order {
   order_number: string;
   user_id?: number;
   user?: User;
-  order_status: 'pending' | 'confirmed' | 'cancelled';
-  payment_status: 'pending' | 'fully-paid' | 'partially-paid' | 'debt' | 'failed';
+  pickup_time?: string;
+  type: 'delivery' | 'pickup';
+  order_status: 'pending' | 'confirmed' | 'cancelled' | 'assigned' | 'accepted' | 'picked_up' | 'delivered';
+  payment_status: 'pending' | 'fully-paid' | 'partially-paid' | 'failed' | 'debt';
   order_date: string;
   order_time: string;
-  notes?: string;
-  updated_at: string;
   total_amount: number;
+  notes?: string;
   items?: OrderItem[];
   sale?: Sale;
-  pickup_time?: string;
+  driver_id?: number | null;
+  driver?: User;
+  delivery_lat?: number;
+  delivery_lng?: number;
+  delivery_address?: string;
+  delivery_fee?: number;
+  assigned_at?: string;
+  accepted_at?: string;
+  picked_up_at?: string;
+  delivered_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CartItemForOrder {
@@ -474,13 +490,22 @@ export const ordersApi = {
     items: CartItemForOrder[],
     notes?: string,
     paymentMethod?: 'cash' | 'mpesa' | 'card',
-    pickupTime?: string | null
+    pickupTime?: string | null,
+    deliveryData?: {
+      latitude: number;
+      longitude: number;
+      address: string;
+    }
   ): Promise<Order> {
     const { data } = await api.post<{ success: boolean; data: Order }>('/orders', {
       items,
       notes: notes || '',
       payment_status: paymentMethod === 'cash' ? 'pending' : paymentMethod === 'mpesa' ? 'pending' : 'pending',
       pickup_time: pickupTime || undefined,
+      delivery_lat: deliveryData?.latitude,
+      delivery_lng: deliveryData?.longitude,
+      delivery_address: deliveryData?.address,
+      type: deliveryData ? 'delivery' : 'pickup',
     });
     return data.data;
   },
@@ -672,6 +697,58 @@ export const salesApi = {
   async getDebts(): Promise<{ data: Sale[]; count: number }> {
     const { data } = await api.get<{ success: boolean; data: Sale[]; count: number }>('/sales/debts');
     return { data: data.data, count: data.count };
+  },
+};
+
+// Delivery/Driver API
+export const deliveryApi = {
+  // Rider endpoints
+  async updateLocation(lat: number, lng: number): Promise<void> {
+    await api.post('/rider/location', { latitude: lat, longitude: lng });
+  },
+
+  async setOnlineStatus(isOnline: boolean): Promise<void> {
+    await api.post('/rider/status', { online: isOnline });
+  },
+
+  async acceptDelivery(orderId: number): Promise<any> {
+    const { data } = await api.post(`/rider/delivery/${orderId}/accept`);
+    return data;
+  },
+
+  async startDelivery(orderId: number): Promise<any> {
+    const { data } = await api.post(`/rider/delivery/${orderId}/start`);
+    return data;
+  },
+
+  async confirmDelivery(orderId: number): Promise<any> {
+    const { data } = await api.post(`/rider/delivery/${orderId}/confirm`);
+    return data;
+  },
+
+  // Admin endpoints
+  async getAvailableDrivers(): Promise<User[]> {
+    const { data } = await api.get<{ success: boolean; data: User[] }>('/admin/drivers/available');
+    return data.data;
+  },
+
+  async assignDriver(orderId: number, driverId: number): Promise<any> {
+    const { data } = await api.post(`/admin/delivery/${orderId}/assign`, { driver_id: driverId });
+    return data;
+  },
+
+  // Common tracking
+  async getOrderTracking(orderId: number): Promise<any> {
+    const { data } = await api.get(`/order/${orderId}/track`);
+    return data.data;
+  },
+
+  async getDriverLocation(driverId: number): Promise<{
+    latitude: number;
+    longitude: number;
+  }> {
+    const response = await api.get(`/rider/location/${driverId}`);
+    return response.data;
   },
 };
 

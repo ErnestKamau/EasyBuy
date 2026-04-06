@@ -19,12 +19,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import {
   ArrowLeft,
   Heart,
-  Share,
   Plus,
   Minus,
-  ShoppingCart,
-  Shield,
-  Truck,
+  ShoppingBag,
   Star,
 } from "lucide-react-native";
 
@@ -46,104 +43,122 @@ const createProductDynamicStyles = (currentTheme: any, themeName: string) =>
       color: currentTheme.error,
       marginBottom: 16,
     },
+    headerContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: StatusBar.currentHeight ? StatusBar.currentHeight + 10 : 60,
+      paddingBottom: 10,
+      backgroundColor: currentTheme.background,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: currentTheme.text,
+    },
     floatingButton: {
-      width: 40,
-      height: 40,
-      backgroundColor:
-        themeName === "dark"
-          ? currentTheme.surface + "E6"
-          : "rgba(255, 255, 255, 0.9)",
-      borderRadius: 20,
+      width: 44,
+      height: 44,
+      backgroundColor: currentTheme.surface,
+      borderRadius: 22,
       justifyContent: "center",
       alignItems: "center",
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: themeName === "dark" ? 0.3 : 0.1,
-      shadowRadius: 8,
-      elevation: themeName === "dark" ? 6 : 3,
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
       borderWidth: themeName === "dark" ? 1 : 0,
       borderColor: themeName === "dark" ? currentTheme.border : "transparent",
     },
     heroSection: {
-      backgroundColor: themeName === "dark" ? currentTheme.surface : "#F8FAFC",
-      paddingBottom: 20,
+      backgroundColor: currentTheme.background,
+      paddingBottom: 10,
+      alignItems: "center",
     },
     imageContainer: {
-      position: "relative",
+      width: screenWidth * 0.85,
+      height: screenWidth * 0.85,
       backgroundColor: currentTheme.surface,
-      marginHorizontal: 20,
-      marginTop: 80,
-      borderRadius: 20,
-      overflow: "hidden",
+      borderRadius: 24,
+      justifyContent: "center",
+      alignItems: "center",
       shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: themeName === "dark" ? 0.4 : 0.1,
-      shadowRadius: 12,
-      elevation: themeName === "dark" ? 10 : 5,
-      borderWidth: themeName === "dark" ? 1 : 0,
-      borderColor: themeName === "dark" ? currentTheme.border : "transparent",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.1,
+      shadowRadius: 20,
+      elevation: 8,
+      marginTop: 20,
+      marginBottom: 20,
+    },
+    productImage: {
+      width: "85%",
+      height: "85%",
+    },
+    thumbnailList: {
+      paddingHorizontal: 20,
+      gap: 12,
+      marginBottom: 20,
+    },
+    thumbnailContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 12,
+      backgroundColor: currentTheme.surface,
+      padding: 4,
+      borderWidth: 1,
+      borderColor: currentTheme.border,
+    },
+    activeThumbnail: {
+      borderColor: currentTheme.primary,
+      borderWidth: 2,
+    },
+    thumbnailImage: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 8,
     },
     productCard: {
       backgroundColor: currentTheme.surface,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
       paddingHorizontal: 24,
-      paddingTop: 24,
-      paddingBottom: 100,
-      marginTop: -20,
-      borderWidth: themeName === "dark" ? 1 : 0,
-      borderColor: themeName === "dark" ? currentTheme.border : "transparent",
+      paddingTop: 32,
+      paddingBottom: 120,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -10 },
+      shadowOpacity: 0.05,
+      shadowRadius: 15,
+      elevation: 10,
     },
-    productName: {
-      fontSize: 26,
-      fontWeight: "800",
-      color: currentTheme.text,
-      marginBottom: 12,
-      lineHeight: 32,
+    categoryRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
     },
-    ratingText: {
+    categoryText: {
       fontSize: 14,
       color: currentTheme.textSecondary,
       fontWeight: "500",
     },
-    modernCurrentPrice: {
-      fontSize: 32,
-      fontWeight: "800",
-      color: currentTheme.text,
-      marginRight: 12,
-    },
-    modernOriginalPrice: {
-      fontSize: 20,
-      color: currentTheme.textSecondary,
-      textDecorationLine: "line-through",
-      fontWeight: "500",
-    },
-    savingsContainer: {
-      backgroundColor: currentTheme.error + "20",
-      borderRadius: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      alignSelf: "flex-start",
-    },
-    savingsText: {
-      fontSize: 12,
-      color: currentTheme.error,
-      fontWeight: "600",
-    },
-    featureItem: {
-      flex: 1,
+    ratingBadge: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: currentTheme.background,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 8,
-      gap: 6,
+      gap: 4,
     },
-    featureText: {
-      fontSize: 12,
+    ratingText: {
+      fontSize: 14,
       color: currentTheme.textSecondary,
-      fontWeight: "500",
+      fontWeight: "600",
+    },
+    productName: {
+      fontSize: 28,
+      fontWeight: "800",
+      color: currentTheme.text,
+      marginBottom: 20,
+      lineHeight: 34,
     },
     sectionTitle: {
       fontSize: 18,
@@ -151,132 +166,108 @@ const createProductDynamicStyles = (currentTheme: any, themeName: string) =>
       color: currentTheme.text,
       marginBottom: 12,
     },
-    modernDescription: {
+    descriptionText: {
       fontSize: 15,
       color: currentTheme.textSecondary,
-      lineHeight: 22,
+      lineHeight: 24,
     },
-    stockBadge: {
-      backgroundColor: currentTheme.warning + "20",
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+    readMore: {
+      color: currentTheme.primary,
+      fontWeight: "700",
+      textDecorationLine: "underline",
     },
-    stockBadgeText: {
-      color: currentTheme.warning,
-      fontSize: 12,
-      fontWeight: "600",
-    },
-    modernStockSection: {
+    selectionSection: {
+      marginTop: 24,
       marginBottom: 24,
     },
-    stockIndicator: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderRadius: 12,
-      gap: 8,
-    },
-    stockDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-    },
-    stockText: {
-      fontSize: 14,
-      fontWeight: "600",
-    },
-    descriptionCard: {
-      marginBottom: 24,
-    },
-    bottomBar: {
-      backgroundColor: currentTheme.surface,
-      paddingHorizontal: 24,
-      paddingVertical: 20,
-      paddingBottom: 34,
-      borderTopWidth: 1,
-      borderTopColor: currentTheme.border,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: themeName === "dark" ? 0.3 : 0.1,
-      shadowRadius: 8,
-      elevation: themeName === "dark" ? 15 : 10,
-    },
-    quantityLabel: {
+    selectionTitle: {
       fontSize: 16,
-      color: currentTheme.textSecondary,
-      fontWeight: "600",
-      marginRight: 16,
+      fontWeight: "700",
+      color: currentTheme.text,
+      marginBottom: 16,
     },
-    modernQuantityControls: {
+    quantityContainer: {
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: currentTheme.background,
-      borderRadius: 12,
-      padding: 2,
+      alignSelf: "flex-start",
+      borderRadius: 30,
+      padding: 4,
     },
-    modernQuantityButton: {
-      width: 32,
-      height: 32,
-      borderRadius: 10,
+    quantityButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       backgroundColor: currentTheme.surface,
       justifyContent: "center",
       alignItems: "center",
       shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: themeName === "dark" ? 0.2 : 0.05,
-      shadowRadius: 2,
-      elevation: themeName === "dark" ? 3 : 1,
-      borderWidth: themeName === "dark" ? 1 : 0,
-      borderColor: themeName === "dark" ? currentTheme.border : "transparent",
-    },
-    disabledQuantityButton: {
-      backgroundColor: currentTheme.background,
-      shadowOpacity: 0,
-      elevation: 0,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
     },
     quantityValue: {
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: "700",
       color: currentTheme.text,
-      marginHorizontal: 16,
-      minWidth: 20,
+      marginHorizontal: 20,
+      minWidth: 24,
       textAlign: "center",
     },
+    bottomBar: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: currentTheme.surface,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      paddingBottom: 34,
+      borderTopLeftRadius: 30,
+      borderTopRightRadius: 30,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -5 },
+      shadowOpacity: 0.1,
+      shadowRadius: 10,
+      elevation: 20,
+    },
+    priceContainer: {
+      flex: 1,
+    },
     totalLabel: {
-      fontSize: 14,
+      fontSize: 13,
       color: currentTheme.textSecondary,
       fontWeight: "500",
+      marginBottom: 4,
     },
     totalAmount: {
-      fontSize: 22,
+      fontSize: 24,
       fontWeight: "800",
       color: currentTheme.text,
     },
-    modernAddToCartButton: {
+    addToCartButton: {
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: currentTheme.primary,
+      paddingHorizontal: 24,
       paddingVertical: 16,
-      paddingHorizontal: 28,
-      borderRadius: 16,
-      gap: 8,
-      shadowColor: currentTheme.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 6,
+      borderRadius: 30,
+      gap: 10,
     },
-    disabledCartButton: {
-      backgroundColor: currentTheme.textSecondary,
-      shadowOpacity: 0,
-      elevation: 0,
-    },
-    modernAddToCartText: {
+    addToCartText: {
       color: "#FFFFFF",
       fontSize: 16,
       fontWeight: "700",
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
+    descriptionCard: {
+      marginBottom: 24,
     },
   });
 
@@ -408,6 +399,7 @@ export default function ProductDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedWeight, setSelectedWeight] = useState<number>(0);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const { addItem } = useCart();
   const { currentTheme, themeName } = useTheme();
 
@@ -423,7 +415,6 @@ export default function ProductDetailScreen() {
     handleQuantityChange,
     addToCart,
     toggleFavorite,
-    shareProduct,
   } = productActions;
 
   useEffect(() => {
@@ -495,14 +486,6 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const hasDiscount =
-    product.cost_price && product.sale_price < product.cost_price;
-  const discountPercent = hasDiscount
-    ? Math.round(
-        ((product.cost_price - product.sale_price) / product.cost_price) * 100,
-      )
-    : 0;
-
   const totalPrice = product.kilograms_in_stock
     ? product.sale_price * selectedWeight // sale_price is price per kg
     : product.sale_price * quantity;
@@ -514,31 +497,24 @@ export default function ProductDetailScreen() {
         backgroundColor={currentTheme.background}
       />
 
-      <View style={styles.floatingHeader}>
+      <View style={dynamicStyles.headerContainer}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={dynamicStyles.floatingButton}
         >
           <ArrowLeft size={20} color={currentTheme.text} />
         </TouchableOpacity>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={shareProduct}
-            style={dynamicStyles.floatingButton}
-          >
-            <Share size={18} color={currentTheme.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={toggleFavorite}
-            style={dynamicStyles.floatingButton}
-          >
-            <Heart
-              size={18}
-              color={isFavorite ? currentTheme.error : currentTheme.text}
-              fill={isFavorite ? currentTheme.error : "none"}
-            />
-          </TouchableOpacity>
-        </View>
+        <Text style={dynamicStyles.headerTitle}>Product Details</Text>
+        <TouchableOpacity
+          onPress={toggleFavorite}
+          style={dynamicStyles.floatingButton}
+        >
+          <Heart
+            size={20}
+            color={isFavorite ? currentTheme.error : currentTheme.text}
+            fill={isFavorite ? currentTheme.error : "none"}
+          />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -551,254 +527,147 @@ export default function ProductDetailScreen() {
               source={{
                 uri: product.image_url || "https://via.placeholder.com/400x400",
               }}
-              style={styles.productImage}
-              resizeMode="cover"
+              style={dynamicStyles.productImage}
+              resizeMode="contain"
             />
-            {hasDiscount && (
-              <View
+          </View>
+
+          {/* Mock Thumbnail List */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={dynamicStyles.thumbnailList}
+          >
+            {[1, 2, 3, 4, 5].map((i) => (
+              <TouchableOpacity
+                key={i}
                 style={[
-                  styles.discountBadge,
-                  { backgroundColor: currentTheme.error },
+                  dynamicStyles.thumbnailContainer,
+                  i === 1 && dynamicStyles.activeThumbnail,
                 ]}
               >
-                <Text style={styles.discountText}>-{discountPercent}%</Text>
-              </View>
-            )}
-          </View>
+                <Image
+                  source={{
+                    uri: product.image_url || "https://via.placeholder.com/400x400",
+                  }}
+                  style={dynamicStyles.thumbnailImage}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
         <View style={dynamicStyles.productCard}>
-          {product.is_low_stock && (
-            <View style={dynamicStyles.stockBadge}>
-              <Text style={dynamicStyles.stockBadgeText}>Limited Stock</Text>
+          <View style={dynamicStyles.categoryRow}>
+            <Text style={dynamicStyles.categoryText}>
+              {product.category_name || "General"}
+            </Text>
+            <View style={dynamicStyles.ratingBadge}>
+              <Star size={16} color="#FFB800" fill="#FFB800" />
+              <Text style={dynamicStyles.ratingText}>4.5</Text>
             </View>
-          )}
+          </View>
 
           <Text style={dynamicStyles.productName}>{product.name}</Text>
 
-          <View style={styles.ratingSection}>
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  size={16}
-                  color={currentTheme.warning}
-                  fill={currentTheme.warning}
-                />
-              ))}
-            </View>
-            <Text style={dynamicStyles.ratingText}>(4.8 • 124 reviews)</Text>
-          </View>
-
-          <View style={styles.modernPriceSection}>
-            <View style={styles.priceRow}>
-              <Text style={dynamicStyles.modernCurrentPrice}>
-                Ksh {product.sale_price.toLocaleString()}
-              </Text>
-              {hasDiscount && (
-                <Text style={dynamicStyles.modernOriginalPrice}>
-                  Ksh {product.cost_price?.toLocaleString()}
-                </Text>
-              )}
-            </View>
-            {hasDiscount && (
-              <View style={dynamicStyles.savingsContainer}>
-                <Text style={dynamicStyles.savingsText}>
-                  Save Ksh{" "}
-                  {(
-                    (product.cost_price || 0) - product.sale_price
-                  ).toLocaleString()}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.featuresSection}>
-            <View style={dynamicStyles.featureItem}>
-              <Shield size={16} color={currentTheme.success} />
-              <Text style={dynamicStyles.featureText}>Quality Guaranteed</Text>
-            </View>
-            <View style={dynamicStyles.featureItem}>
-              <Truck size={16} color={currentTheme.success} />
-              <Text style={dynamicStyles.featureText}>Fast Delivery</Text>
-            </View>
-            {product.kilograms_in_stock && (
-              <View style={dynamicStyles.featureItem}>
-                <ShoppingCart size={16} color={currentTheme.success} />
-                <Text style={dynamicStyles.featureText}>Weight-based</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.modernStockSection}>
-            <View
-              style={[
-                styles.stockIndicator,
-                {
-                  backgroundColor:
-                    product.in_stock === 0
-                      ? currentTheme.error + "20"
-                      : product.is_low_stock
-                        ? currentTheme.warning + "20"
-                        : currentTheme.success + "20",
-                },
-              ]}
+          <View style={dynamicStyles.descriptionCard}>
+            <Text style={dynamicStyles.sectionTitle}>Product Details</Text>
+            <Text
+              style={dynamicStyles.descriptionText}
+              numberOfLines={isDescriptionExpanded ? undefined : 3}
             >
-              <View
-                style={[
-                  styles.stockDot,
-                  {
-                    backgroundColor: (() => {
-                      if (product.in_stock === 0) return currentTheme.error;
-                      if (product.is_low_stock) return currentTheme.warning;
-                      return currentTheme.success;
-                    })(),
-                  },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.stockText,
-                  {
-                    color: (() => {
-                      if (product.in_stock === 0) return currentTheme.error;
-                      if (product.is_low_stock) return currentTheme.warning;
-                      return currentTheme.success;
-                    })(),
-                  },
-                ]}
+              {product.description || "No description available for this product."}
+            </Text>
+            {product.description && product.description.length > 100 && (
+              <TouchableOpacity
+                onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
               >
-                {(() => {
-                  if (product.in_stock === 0) return "Out of Stock";
-                  if (product.is_low_stock)
-                    return `Only ${product.in_stock} left`;
-                  return `${product.in_stock} in stock`;
-                })()}
-              </Text>
-            </View>
+                <Text style={dynamicStyles.readMore}>
+                  {isDescriptionExpanded ? " Read less" : " Read more"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {product.description && (
-            <View style={styles.descriptionCard}>
-              <Text style={dynamicStyles.sectionTitle}>About this product</Text>
-              <Text style={dynamicStyles.modernDescription}>
-                {product.description}
+          <View style={dynamicStyles.selectionSection}>
+            <Text style={dynamicStyles.selectionTitle}>
+              {product.kilograms_in_stock ? "Select Weight" : "Quantity"}
+            </Text>
+            <View style={dynamicStyles.quantityContainer}>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.quantityButton,
+                  (product.kilograms_in_stock ? selectedWeight <= 0 : quantity <= 1) &&
+                    dynamicStyles.disabledButton,
+                ]}
+                onPress={() =>
+                  product.kilograms_in_stock
+                    ? handleWeightChange(false)
+                    : updateQuantity(-1)
+                }
+                disabled={
+                  product.kilograms_in_stock ? selectedWeight <= 0 : quantity <= 1
+                }
+              >
+                <Minus
+                  size={18}
+                  color={currentTheme.text}
+                />
+              </TouchableOpacity>
+              <Text style={dynamicStyles.quantityValue}>
+                {product.kilograms_in_stock
+                  ? formatWeightAsFraction(selectedWeight)
+                  : quantity}
               </Text>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.quantityButton,
+                  (product.kilograms_in_stock
+                    ? selectedWeight >= product.in_stock
+                    : quantity >= product.in_stock) && dynamicStyles.disabledButton,
+                ]}
+                onPress={() =>
+                  product.kilograms_in_stock
+                    ? handleWeightChange(true)
+                    : updateQuantity(1)
+                }
+                disabled={
+                  product.kilograms_in_stock
+                    ? selectedWeight >= product.in_stock
+                    : quantity >= product.in_stock
+                }
+              >
+                <Plus
+                  size={18}
+                  color={currentTheme.text}
+                />
+              </TouchableOpacity>
             </View>
-          )}
+          </View>
         </View>
       </ScrollView>
 
       <View style={dynamicStyles.bottomBar}>
-        {product.kilograms_in_stock ? (
-          <View style={styles.weightContainer}>
-            <Text style={dynamicStyles.quantityLabel}>Weight</Text>
-            <View style={dynamicStyles.modernQuantityControls}>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.modernQuantityButton,
-                  selectedWeight <= 0 && dynamicStyles.disabledQuantityButton,
-                ]}
-                onPress={() => handleWeightChange(false)}
-                disabled={selectedWeight <= 0}
-              >
-                <Minus
-                  size={14}
-                  color={
-                    selectedWeight <= 0
-                      ? currentTheme.textSecondary
-                      : currentTheme.text
-                  }
-                />
-              </TouchableOpacity>
-              <Text style={dynamicStyles.quantityValue}>
-                {formatWeightAsFraction(selectedWeight)}
-              </Text>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.modernQuantityButton,
-                  selectedWeight >= product.in_stock &&
-                    dynamicStyles.disabledQuantityButton,
-                ]}
-                onPress={() => handleWeightChange(true)}
-                disabled={selectedWeight >= product.in_stock}
-              >
-                <Plus
-                  size={14}
-                  color={
-                    selectedWeight >= product.in_stock
-                      ? currentTheme.textSecondary
-                      : currentTheme.text
-                  }
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.quantityContainer}>
-            <Text style={dynamicStyles.quantityLabel}>Qty</Text>
-            <View style={dynamicStyles.modernQuantityControls}>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.modernQuantityButton,
-                  quantity <= 1 && dynamicStyles.disabledQuantityButton,
-                ]}
-                onPress={() => updateQuantity(-1)}
-                disabled={quantity <= 1}
-              >
-                <Minus
-                  size={14}
-                  color={
-                    quantity <= 1
-                      ? currentTheme.textSecondary
-                      : currentTheme.text
-                  }
-                />
-              </TouchableOpacity>
-              <Text style={dynamicStyles.quantityValue}>{quantity}</Text>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.modernQuantityButton,
-                  quantity >= product.in_stock &&
-                    dynamicStyles.disabledQuantityButton,
-                ]}
-                onPress={() => updateQuantity(1)}
-                disabled={quantity >= product.in_stock}
-              >
-                <Plus
-                  size={14}
-                  color={
-                    quantity >= product.in_stock
-                      ? currentTheme.textSecondary
-                      : currentTheme.text
-                  }
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.actionContainer}>
-          <View style={styles.priceContainer}>
-            <Text style={dynamicStyles.totalLabel}>Total</Text>
-            <Text style={dynamicStyles.totalAmount}>
-              Ksh {totalPrice.toLocaleString()}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              dynamicStyles.modernAddToCartButton,
-              product.in_stock === 0 && dynamicStyles.disabledCartButton,
-            ]}
-            onPress={addToCart}
-            disabled={product.in_stock === 0}
-          >
-            <ShoppingCart size={18} color="#FFFFFF" />
-            <Text style={dynamicStyles.modernAddToCartText}>
-              {product.in_stock === 0 ? "Unavailable" : "Add to Cart"}
-            </Text>
-          </TouchableOpacity>
+        <View style={dynamicStyles.priceContainer}>
+          <Text style={dynamicStyles.totalLabel}>Total Price</Text>
+          <Text style={dynamicStyles.totalAmount}>
+            Ksh {totalPrice.toLocaleString()}
+          </Text>
         </View>
+        <TouchableOpacity
+          style={[
+            dynamicStyles.addToCartButton,
+            product.in_stock === 0 && dynamicStyles.disabledButton,
+          ]}
+          onPress={addToCart}
+          disabled={product.in_stock === 0}
+        >
+          <ShoppingBag size={20} color="#FFFFFF" />
+          <Text style={dynamicStyles.addToCartText}>
+            {product.in_stock === 0 ? "Out of Stock" : "Add to Cart"}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -817,81 +686,9 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
     fontWeight: "600",
   },
-  floatingHeader: {
-    position: "absolute",
-    top: 50,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    zIndex: 10,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
   scrollContainer: {
-    flex: 1,
-  },
-  productImage: {
-    width: screenWidth - 40,
-    height: screenWidth - 40,
-  },
-  discountBadge: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  discountText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  ratingSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  starsContainer: {
-    flexDirection: "row",
-    marginRight: 8,
-  },
-  modernPriceSection: {
-    marginBottom: 24,
-  },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    marginBottom: 8,
-  },
-  featuresSection: {
-    flexDirection: "row",
-    marginBottom: 24,
-    gap: 16,
-  },
-  quantityContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  weightContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  actionContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  priceContainer: {
     flex: 1,
   },
 });
