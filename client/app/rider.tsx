@@ -18,7 +18,8 @@ import {
   Phone, 
   Package,
   Power,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from "lucide-react-native";
 import * as Location from "expo-location";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,12 +29,23 @@ import { websocketService } from "@/services/websocket";
 import { ToastService } from "@/utils/toastService";
 
 export default function RiderDashboard() {
-  const { user } = useAuth();
-  const { currentTheme, isDark } = useTheme();
+  const { user, logout } = useAuth();
+  const { currentTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [isOnline, setIsOnline] = useState(false);
   const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Logout", style: "destructive", onPress: () => logout() }
+      ]
+    );
+  };
 
   const fetchActiveAssignments = useCallback(async () => {
     try {
@@ -211,20 +223,28 @@ export default function RiderDashboard() {
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
       <View style={[styles.header, { backgroundColor: currentTheme.surface }]}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: currentTheme.text }]}>Rider Dashboard</Text>
           <Text style={[styles.headerSubtitle, { color: currentTheme.textSecondary }]}>Welcome back, {user?.first_name}</Text>
         </View>
-        <View style={styles.onlineToggle}>
-          <Text style={[styles.toggleLabel, { color: isOnline ? '#22C55E' : currentTheme.textSecondary }]}>
-            {isOnline ? 'Online' : 'Offline'}
-          </Text>
-          <Switch 
-            value={isOnline} 
-            onValueChange={toggleOnline}
-            trackColor={{ false: "#CBD5E1", true: "#86EFAC" }}
-            thumbColor={isOnline ? "#22C55E" : "#94A3B8"}
-          />
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            onPress={handleLogout}
+            style={[styles.logoutButton, { backgroundColor: currentTheme.primary + '10' }]}
+          >
+            <LogOut size={20} color={currentTheme.primary} />
+          </TouchableOpacity>
+          <View style={styles.onlineToggle}>
+            <Text style={[styles.toggleLabel, { color: isOnline ? '#22C55E' : currentTheme.textSecondary }]}>
+              {isOnline ? 'On' : 'Off'}
+            </Text>
+            <Switch 
+              value={isOnline} 
+              onValueChange={toggleOnline}
+              trackColor={{ false: "#CBD5E1", true: "#86EFAC" }}
+              thumbColor={isOnline ? "#22C55E" : "#94A3B8"}
+            />
+          </View>
         </View>
       </View>
 
@@ -298,6 +318,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginRight: 8,
     textTransform: 'uppercase',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoutButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   content: {
     flex: 1,

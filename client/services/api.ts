@@ -704,20 +704,20 @@ export const salesApi = {
 export const deliveryApi = {
   // Rider endpoints
   async updateLocation(lat: number, lng: number): Promise<void> {
-    await api.post('/rider/location', { latitude: lat, longitude: lng });
+    await api.post('/rider/location', { lat, lng });
   },
 
   async setOnlineStatus(isOnline: boolean): Promise<void> {
-    await api.post('/rider/status', { online: isOnline });
+    await api.post('/rider/status', { status: isOnline ? 'online' : 'offline' });
   },
 
   async acceptDelivery(orderId: number): Promise<any> {
-    const { data } = await api.post(`/rider/delivery/${orderId}/accept`);
+    const { data } = await api.post(`/rider/deliveries/${orderId}/accept`);
     return data;
   },
 
   async startDelivery(orderId: number): Promise<any> {
-    const { data } = await api.post(`/rider/delivery/${orderId}/start`);
+    const { data } = await api.post(`/rider/deliveries/${orderId}/start`);
     return data;
   },
 

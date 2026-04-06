@@ -242,6 +242,14 @@ function RootLayoutNav() {
             />
 
             <Stack.Screen
+              name="rider"
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+
+            <Stack.Screen
               name="(tabs)"
               options={{
                 headerShown: false,

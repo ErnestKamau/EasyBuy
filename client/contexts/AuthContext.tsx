@@ -197,7 +197,8 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
         }
         setTimeout(() => setInitialNavigationComplete(true), 100);
       } else if (currentSegment === "onboarding" || currentSegment === "auth") {
-        router.replace("/(tabs)");
+        const target = user?.role === 'rider' ? '/rider' : '/(tabs)';
+        router.replace(target as any);
         setTimeout(() => setInitialNavigationComplete(true), 100);
       } else {
         setInitialNavigationComplete(true);
@@ -233,9 +234,10 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
         }
         return;
       }
-      // Verified users: push away from auth/onboarding to tabs
+      // Verified users: push away from auth/onboarding to target
       if (inAuthGroup) {
-        router.replace("/(tabs)");
+        const target = user?.role === 'rider' ? '/rider' : '/(tabs)';
+        router.replace(target as any);
       }
       return;
     }

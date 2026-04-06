@@ -176,6 +176,8 @@ Route::middleware('auth:sanctum')->prefix('rider')->group(function () {
     Route::post('/deliveries/{order}/accept', [\App\Http\Controllers\Api\DeliveryController::class, 'accept']);
     // Mark trip as started (en_route)
     Route::post('/deliveries/{order}/start', [\App\Http\Controllers\Api\DeliveryController::class, 'start']);
+    // Rider confirms delivery (backup for when customer can't tap)
+    Route::post('/deliveries/{order}/confirm', [\App\Http\Controllers\Api\DeliveryController::class, 'riderConfirm']);
 });
 
 // -------------------------------------------------------------------------

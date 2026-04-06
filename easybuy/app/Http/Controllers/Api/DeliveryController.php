@@ -130,4 +130,32 @@ class DeliveryController extends Controller
 
         return response()->json(['message' => 'Delivery confirmed. Thank you!']);
     }
+
+    /**
+     * Rider confirms they delivered the order.
+     */
+    public function riderConfirm(Request $request, Order $order): JsonResponse
+    {
+        $driver = $request->user();
+
+        if ($order->driver_id !== $driver->id) {
+            throw ValidationException::withMessages(['order' => 'You are not the assigned driver.']);
+        }
+
+        if ($order->fulfillment_status !== 'en_route') {
+            throw ValidationException::withMessages(['order' => 'Order is not currently en route.']);
+        }
+
+        $order->update([
+            'fulfillment_status' => 'delivered',
+            'delivered_at'       => now(),
+        ]);
+
+        // Clear Redis keys for this delivery
+        Redis::del("order:{$order->id}:driver");
+
+        broadcast(new OrderStatusUpdated($order->fresh(['driver', 'user'])))->toOthers();
+
+        return response()->json(['message' => 'Delivery marked as completed.', 'order' => $order]);
+    }
 }
