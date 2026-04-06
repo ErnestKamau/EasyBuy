@@ -51,17 +51,18 @@ class DeliveryTestDataSeeder extends Seeder
                     'phone_number' => "072200000{$i}",
                     'password' => Hash::make('password'),
                     'role' => 'rider',
+                    'online_status' => 'online', // Tracks if rider is available
                 ]
             );
             $rider->assignRole('rider');
             $riders[] = $rider;
 
-            // Create initial location for riders near a "shop" point (e.g., -1.2833, 36.8167 - Nairobi)
+            // Create initial location for riders near a "shop" point
             DriverLocation::create([
                 'driver_id' => $rider->id,
                 'latitude' => -1.2833 + (rand(-10, 10) / 1000),
                 'longitude' => 36.8167 + (rand(-10, 10) / 1000),
-                'is_online' => true,
+                'recorded_at' => Carbon::now(),
             ]);
         }
 
