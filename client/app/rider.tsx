@@ -35,6 +35,12 @@ export default function RiderDashboard() {
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [isOnline, setIsOnline] = useState(false);
   const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [locationAddress, setLocationAddress] = useState<string>("");
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -83,6 +89,41 @@ export default function RiderDashboard() {
     };
   }, [user, fetchActiveAssignments]);
 
+  const fetchCurrentLocation = async () => {
+    try {
+      setIsFetchingLocation(true);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        ToastService.showError("Permission Denied", "Location access is required");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      
+      const { latitude, longitude } = location.coords;
+      setCurrentLocation({ latitude, longitude });
+
+      // Update backend
+      await deliveryApi.updateLocation(latitude, longitude);
+
+      // Reverse geocode
+      const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (address) {
+        const formattedAddress = `${address.name || ""}, ${address.street || ""}, ${address.city || ""}`;
+        setLocationAddress(formattedAddress.replace(/^, /, ""));
+      }
+
+      ToastService.showSuccess("Location Updated", "Your current position has been recorded");
+    } catch (error) {
+      console.error("Failed to fetch location:", error);
+      ToastService.showError("Error", "Failed to update location");
+    } finally {
+      setIsFetchingLocation(false);
+    }
+  };
+
   const startTracking = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -91,15 +132,26 @@ export default function RiderDashboard() {
     }
 
     try {
+      // Get initial location
+      await fetchCurrentLocation();
+
       const sub = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          timeInterval: 10000, // Update every 10 seconds
-          distanceInterval: 10, // Or every 10 meters
+          timeInterval: 30000, // Update every 30 seconds for battery efficiency
+          distanceInterval: 50, // Or every 50 meters
         },
-        (location) => {
+        async (location) => {
           const { latitude, longitude } = location.coords;
+          setCurrentLocation({ latitude, longitude });
           deliveryApi.updateLocation(latitude, longitude).catch(console.error);
+          
+          // Occasionally update address string (e.g. if moved significantly)
+          const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+          if (address) {
+            const formattedAddress = `${address.name || ""}, ${address.street || ""}, ${address.city || ""}`;
+            setLocationAddress(formattedAddress.replace(/^, /, ""));
+          }
         }
       );
       setLocationSubscription(sub);
@@ -256,6 +308,60 @@ export default function RiderDashboard() {
           </TouchableOpacity>
         </View>
 
+        {/* Location Card */}
+        <View style={[styles.locationCard, { backgroundColor: currentTheme.surface }]}>
+          <View style={styles.locationHeader}>
+            <View style={[styles.locationIconContainer, { backgroundColor: currentTheme.primary + '15' }]}>
+              <MapPin size={24} color={currentTheme.primary} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.locationTitle, { color: currentTheme.textSecondary }]}>Your Current Location</Text>
+              <Text style={[styles.locationValue, { color: currentTheme.text }]} numberOfLines={1}>
+                {locationAddress || (isFetchingLocation ? "Detecting..." : "Not Set")}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              onPress={fetchCurrentLocation}
+              disabled={isFetchingLocation}
+              style={[
+                styles.refreshButton, 
+                { opacity: isFetchingLocation ? 0.5 : 1 }
+              ]}
+            >
+              {isFetchingLocation ? (
+                <ActivityIndicator size="small" color={currentTheme.primary} />
+              ) : (
+                <RefreshCw size={20} color={currentTheme.primary} />
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          {currentLocation && (
+            <View style={styles.coordinatesRow}>
+              <Text style={[styles.coordinateText, { color: currentTheme.textSecondary }]}>
+                LAT: {currentLocation.latitude.toFixed(6)}
+              </Text>
+              <View style={[styles.coordinateDivider, { backgroundColor: currentTheme.border }]} />
+              <Text style={[styles.coordinateText, { color: currentTheme.textSecondary }]}>
+                LNG: {currentLocation.longitude.toFixed(6)}
+              </Text>
+            </View>
+          )}
+          
+          {!isOnline && (
+            <Text style={[styles.locationHint, { color: currentTheme.textSecondary }]}>
+              Go online to enable automatic background tracking
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>Active Assignments ({activeOrders.length})</Text>
+          <TouchableOpacity onPress={fetchActiveAssignments}>
+            <RefreshCw size={18} color={currentTheme.primary} />
+          </TouchableOpacity>
+        </View>
+
         {loading ? (
           <ActivityIndicator size="large" color={currentTheme.primary} style={{ marginTop: 50 }} />
         ) : activeOrders.length === 0 ? (
@@ -343,6 +449,68 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  locationCard: {
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  locationTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  locationValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coordinatesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  coordinateText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+  },
+  coordinateDivider: {
+    width: 1,
+    height: 12,
+    marginHorizontal: 12,
+  },
+  locationHint: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'center',
   },
   orderCard: {
     padding: 20,
