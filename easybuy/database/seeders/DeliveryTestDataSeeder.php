@@ -51,7 +51,7 @@ class DeliveryTestDataSeeder extends Seeder
                     'phone_number' => "072200000{$i}",
                     'password' => Hash::make('password'),
                     'role' => 'rider',
-                    'online_status' => 'online', // Tracks if rider is available
+                    'online_status' => 'online',
                 ]
             );
             $rider->assignRole('rider');
@@ -86,13 +86,13 @@ class DeliveryTestDataSeeder extends Seeder
 
         // 3. Create Categories and Products
         $categories = [
-            ['name' => 'Electronics', 'slug' => 'electronics'],
-            ['name' => 'Groceries', 'slug' => 'groceries'],
-            ['name' => 'Fashion', 'slug' => 'fashion'],
+            ['name' => 'Electronics'],
+            ['name' => 'Groceries'],
+            ['name' => 'Fashion'],
         ];
 
         foreach ($categories as $catData) {
-            $category = Category::firstOrCreate(['slug' => $catData['slug']], ['name' => $catData['name']]);
+            $category = Category::firstOrCreate(['name' => $catData['name']], ['is_active' => true]);
             
             // Create 3 products per category
             for ($j = 1; $j <= 3; $j++) {
@@ -103,8 +103,9 @@ class DeliveryTestDataSeeder extends Seeder
                     'sale_price' => rand(100, 5000),
                     'cost_price' => rand(50, 4000),
                     'in_stock' => rand(10, 100),
-                    'measurementType' => 'quantity',
-                    'slug' => Str::slug("{$catData['name']} Product {$j}"),
+                    'kilograms_in_stock' => 0,
+                    'minimum_stock' => 5,
+                    'is_active' => true,
                 ]);
             }
         }
@@ -114,10 +115,12 @@ class DeliveryTestDataSeeder extends Seeder
         // 4. Create Orders
         // Order 1: Pending Delivery (Needs Assignment)
         $order1 = Order::create([
+            'order_number' => 'ORD-' . strtoupper(Str::random(8)),
             'user_id' => $customers[0]->id,
             'order_status' => 'pending',
             'payment_status' => 'pending',
             'type' => 'delivery',
+            'order_date' => Carbon::now(),
             'delivery_address' => 'Nairobi CBD, Kenya',
             'delivery_lat' => -1.2858,
             'delivery_lng' => 36.8219,
@@ -127,11 +130,13 @@ class DeliveryTestDataSeeder extends Seeder
 
         // Order 2: Assigned Delivery (Waiting for Rider Acceptance)
         $order2 = Order::create([
+            'order_number' => 'ORD-' . strtoupper(Str::random(8)),
             'user_id' => $customers[1]->id,
             'order_status' => 'confirmed',
             'fulfillment_status' => 'assigned',
             'payment_status' => 'fully-paid',
             'type' => 'delivery',
+            'order_date' => Carbon::now(),
             'driver_id' => $riders[0]->id,
             'driver_assigned_at' => Carbon::now()->subMinutes(1),
             'delivery_address' => 'Westlands, Nairobi',
@@ -143,11 +148,13 @@ class DeliveryTestDataSeeder extends Seeder
 
         // Order 3: In Transit Delivery
         $order3 = Order::create([
+            'order_number' => 'ORD-' . strtoupper(Str::random(8)),
             'user_id' => $customers[2]->id,
             'order_status' => 'confirmed',
             'fulfillment_status' => 'picked_up',
             'payment_status' => 'fully-paid',
             'type' => 'delivery',
+            'order_date' => Carbon::now(),
             'driver_id' => $riders[1]->id,
             'driver_assigned_at' => Carbon::now()->subHours(1),
             'driver_accepted_at' => Carbon::now()->subMinutes(50),
@@ -161,6 +168,7 @@ class DeliveryTestDataSeeder extends Seeder
 
         // 5. Create a Sale for a completed order
         $order4 = Order::create([
+            'order_number' => 'ORD-' . strtoupper(Str::random(8)),
             'user_id' => $customers[0]->id,
             'order_status' => 'delivered',
             'fulfillment_status' => 'delivered',
@@ -173,12 +181,14 @@ class DeliveryTestDataSeeder extends Seeder
         
         $totalAmount = $order4->total_amount;
         $sale = Sale::create([
+            'sale_number' => 'SAL-' . strtoupper(Str::random(8)),
             'order_id' => $order4->id,
             'total_amount' => $totalAmount,
             'total_paid' => $totalAmount,
             'payment_status' => 'fully-paid',
             'fulfillment_status' => 'fulfilled',
             'fulfilled_at' => Carbon::yesterday()->addHours(2),
+            'made_on' => Carbon::now(),
         ]);
 
         Payment::create([
