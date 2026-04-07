@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
   Switch,
   Alert,
+  Modal,
 } from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { router } from "expo-router";
 import { 
   Truck, 
@@ -41,6 +43,9 @@ export default function RiderDashboard() {
   } | null>(null);
   const [locationAddress, setLocationAddress] = useState<string>("");
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [selectedMapOrder, setSelectedMapOrder] = useState<Order | null>(null);
 
   const handleLogout = () => {
     Alert.alert(
@@ -252,7 +257,14 @@ export default function RiderDashboard() {
 
         <TouchableOpacity 
           style={[styles.circleButton, { backgroundColor: currentTheme.border }]}
-          onPress={() => {/* Open Maps Protocol */}}
+          onPress={() => {
+            if (order.delivery_lat && order.delivery_lng) {
+              setSelectedMapOrder(order);
+              setShowMapModal(true);
+            } else {
+              ToastService.showWarning("No Location", "This order does not have precise map coordinates.");
+            }
+          }}
         >
           <MapPin size={20} color={currentTheme.text} />
         </TouchableOpacity>
@@ -389,6 +401,54 @@ export default function RiderDashboard() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Map Viewer Modal */}
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowMapModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: currentTheme.background }}>
+          <View style={[styles.header, { backgroundColor: currentTheme.surface, paddingTop: 40, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 }]}>
+            <Text style={[styles.headerTitle, { color: currentTheme.text }]}>
+              Delivery Destination
+            </Text>
+            <TouchableOpacity onPress={() => setShowMapModal(false)}>
+              <Text style={{ color: currentTheme.primary, fontWeight: "600", fontSize: 16 }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={{ flex: 1 }}>
+            {selectedMapOrder?.delivery_lat && selectedMapOrder?.delivery_lng && (
+              <MapView
+                provider={PROVIDER_GOOGLE}
+                style={StyleSheet.absoluteFillObject}
+                initialRegion={{
+                  latitude: selectedMapOrder.delivery_lat,
+                  longitude: selectedMapOrder.delivery_lng,
+                  latitudeDelta: 0.005,
+                  longitudeDelta: 0.005,
+                }}
+              >
+                <Marker 
+                  coordinate={{
+                    latitude: selectedMapOrder.delivery_lat,
+                    longitude: selectedMapOrder.delivery_lng,
+                  }}
+                  title="Deliver Here"
+                  description={selectedMapOrder.delivery_address || `Order #${selectedMapOrder.order_number}`}
+                />
+              </MapView>
+            )}
+          </View>
+          
+          <View style={{ padding: 20, backgroundColor: currentTheme.surface, borderTopWidth: 1, borderTopColor: currentTheme.border }}>
+             <Text style={{ color: currentTheme.text, fontSize: 16, fontWeight: '600', marginBottom: 6 }}>Destination Address</Text>
+             <Text style={{ color: currentTheme.textSecondary, fontSize: 14 }}>{selectedMapOrder?.delivery_address || "Address details unavailable"}</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

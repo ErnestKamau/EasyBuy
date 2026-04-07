@@ -14,6 +14,7 @@ import {
   Animated,
   Dimensions,
 } from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { router } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -61,6 +62,7 @@ import {
   Menu,
   Home,
   Truck,
+  MapPin,
   ChevronLeft,
   ChevronRight,
   Search,
@@ -82,6 +84,11 @@ export default function AdminScreen() {
   const [salesAnalytics, setSalesAnalytics] = useState<SalesAnalytics | null>(
     null,
   );
+  
+  // Map Modal State
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [selectedMapOrder, setSelectedMapOrder] = useState<Order | null>(null);
+
   const [unpaidSales, setUnpaidSales] = useState<Sale[]>([]);
   const [debts, setDebts] = useState<Sale[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
@@ -1262,6 +1269,21 @@ export default function AdminScreen() {
                       </Text>
                     </TouchableOpacity>
 
+                    {/* View Delivery Map */}
+                    <TouchableOpacity
+                      style={[styles.assignRiderButton, { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1', marginLeft: 8 }]}
+                      onPress={() => {
+                        if (item.delivery_lat && item.delivery_lng) {
+                          setSelectedMapOrder(item);
+                          setShowMapModal(true);
+                        } else {
+                          ToastService.showWarning("No Location", "This order lacks precise coordinates.");
+                        }
+                      }}
+                    >
+                      <MapPin size={16} color="#64748B" />
+                    </TouchableOpacity>
+
                     {/* Only allow confirmation of delivery orders if they are delivered */}
                     {item.fulfillment_status === "delivered" && (
                       <TouchableOpacity
@@ -2009,6 +2031,54 @@ export default function AdminScreen() {
           </TouchableOpacity>
         </View>
       </Animated.View>
+
+      {/* Map Viewer Modal */}
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowMapModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: currentTheme.background }}>
+          <View style={[styles.header, { backgroundColor: currentTheme.surface, paddingTop: 60, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.1, elevation: 4 }]}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: currentTheme.text }}>
+              Delivery Destination
+            </Text>
+            <TouchableOpacity onPress={() => setShowMapModal(false)}>
+              <Text style={{ color: currentTheme.primary, fontWeight: "600", fontSize: 16 }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={{ flex: 1 }}>
+            {selectedMapOrder?.delivery_lat && selectedMapOrder?.delivery_lng && (
+              <MapView
+                provider={PROVIDER_GOOGLE}
+                style={StyleSheet.absoluteFillObject}
+                initialRegion={{
+                  latitude: selectedMapOrder.delivery_lat,
+                  longitude: selectedMapOrder.delivery_lng,
+                  latitudeDelta: 0.005,
+                  longitudeDelta: 0.005,
+                }}
+              >
+                <Marker 
+                  coordinate={{
+                    latitude: selectedMapOrder.delivery_lat,
+                    longitude: selectedMapOrder.delivery_lng,
+                  }}
+                  title={`Order #${selectedMapOrder.order_number}`}
+                  description={selectedMapOrder.delivery_address}
+                />
+              </MapView>
+            )}
+          </View>
+          
+          <View style={{ padding: 20, backgroundColor: currentTheme.surface, borderTopWidth: 1, borderTopColor: currentTheme.border }}>
+             <Text style={{ color: currentTheme.text, fontSize: 16, fontWeight: '600', marginBottom: 6 }}>Destination Details</Text>
+             <Text style={{ color: currentTheme.textSecondary, fontSize: 14 }}>{selectedMapOrder?.delivery_address || "Address not provided"}</Text>
+          </View>
+        </View>
+      </Modal>
 
       {/* Sidebar Overlay */}
       {sidebarOpen && (
