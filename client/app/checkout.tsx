@@ -10,7 +10,9 @@ import {
   StatusBar,
   ActivityIndicator,
   Modal,
+  Dimensions,
 } from "react-native";
+import MapView, { Marker } from "react-native-maps";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCart } from "@/contexts/CartContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -73,6 +75,19 @@ export default function CheckoutScreen() {
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [deliveryFee] = useState(150); // Standard fee, could be fetched from API
+  
+  // Map Picker State
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [tempMapLocation, setTempMapLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  
+  // Default Map Region (e.g. initial coords before GPS)
+  const defaultRegion = {
+    latitude: -1.2921, // Defaulting loosely to Nairobi if unavailable
+    longitude: 36.8219,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  };
 
   // Load available pickup slots when delivery type is pickup
   useEffect(() => {
@@ -115,14 +130,66 @@ export default function CheckoutScreen() {
       });
 
       if (address) {
-        const formattedAddress = `${address.name || ""}, ${address.street || ""}, ${address.city || ""}`;
-        setDeliveryAddress(formattedAddress.replace(/^, /, ""));
+        const formattedAddress = `${address.name ? address.name + ", " : ""}${address.street ? address.street + ", " : ""}${address.city || ""}`;
+        setDeliveryAddress(formattedAddress.trim().replace(/,$/, ""));
       }
     } catch (error) {
       console.error("Failed to fetch location:", error);
       ToastService.showError("Error", "Failed to get current location");
     } finally {
       setIsFetchingLocation(false);
+    }
+  };
+
+  const openMapPicker = async () => {
+    // If we don't have a starting location, try to get one
+    if (!deliveryLocation) {
+      try {
+        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+        if (status === "granted") {
+          const loc = await ExpoLocation.getCurrentPositionAsync({});
+          setTempMapLocation({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          });
+        } else {
+          setTempMapLocation({ latitude: defaultRegion.latitude, longitude: defaultRegion.longitude });
+        }
+      } catch (e) {
+        setTempMapLocation({ latitude: defaultRegion.latitude, longitude: defaultRegion.longitude });
+      }
+    } else {
+      setTempMapLocation({ ...deliveryLocation });
+    }
+    setShowMapModal(true);
+  };
+
+  const handleConfirmMapLocation = async () => {
+    if (!tempMapLocation) {
+      setShowMapModal(false);
+      return;
+    }
+    
+    setDeliveryLocation(tempMapLocation);
+    setIsReverseGeocoding(true);
+    try {
+      const [address] = await ExpoLocation.reverseGeocodeAsync({
+        latitude: tempMapLocation.latitude,
+        longitude: tempMapLocation.longitude,
+      });
+
+      if (address) {
+        const formattedAddress = `${address.name ? address.name + ", " : ""}${address.street ? address.street + ", " : ""}${address.city || ""}`;
+        setDeliveryAddress(formattedAddress.trim().replace(/,$/, ""));
+      } else {
+        setDeliveryAddress("Selected on map");
+      }
+    } catch (e) {
+      console.error("Geocoding failed:", e);
+      setDeliveryAddress("Selected on map");
+    } finally {
+      setIsReverseGeocoding(false);
+      setShowMapModal(false);
     }
   };
 
@@ -645,6 +712,23 @@ export default function CheckoutScreen() {
               )}
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.paymentOption}
+              onPress={openMapPicker}
+            >
+              <View style={styles.paymentIcon}>
+                <MapPin size={24} color={currentTheme.primary} />
+              </View>
+              <View style={styles.paymentContent}>
+                <Text style={[styles.paymentTitle, { color: currentTheme.text }]}>
+                  Choose Location on Map
+                </Text>
+                <Text style={styles.paymentDescription}>
+                  Pinpoint your exact delivery address
+                </Text>
+              </View>
+            </TouchableOpacity>
+
             {deliveryLocation && (
               <View style={styles.locationCoordinates}>
                 <Text style={styles.coordinatesText}>
@@ -654,6 +738,7 @@ export default function CheckoutScreen() {
               </View>
             )}
           </View>
+
         )}
 
         {/* Pickup Time Selection (only show if pickup is selected) */}
@@ -906,6 +991,65 @@ export default function CheckoutScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Map Picker Modal */}
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowMapModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: currentTheme.background }}>
+          <View style={[styles.mapModalHeader, { backgroundColor: currentTheme.surface }]}>
+            <Text style={[styles.mapModalTitle, { color: currentTheme.text }]}>
+              Select Location
+            </Text>
+            <TouchableOpacity onPress={() => setShowMapModal(false)}>
+              <Text style={{ color: currentTheme.primary, fontWeight: "600" }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.mapContainer}>
+            {tempMapLocation && (
+              <MapView
+                style={styles.map}
+                initialRegion={{
+                  latitude: tempMapLocation.latitude,
+                  longitude: tempMapLocation.longitude,
+                  latitudeDelta: defaultRegion.latitudeDelta,
+                  longitudeDelta: defaultRegion.longitudeDelta,
+                }}
+                onRegionChangeComplete={(region) => {
+                  setTempMapLocation({
+                    latitude: region.latitude,
+                    longitude: region.longitude,
+                  });
+                }}
+              />
+            )}
+            
+            {/* Center Marker */}
+            <View style={styles.mapMarkerContainer} pointerEvents="none">
+              <MapPin size={32} color="#EF4444" fill="#EF4444" />
+            </View>
+          </View>
+          
+          <View style={[styles.mapFooter, { backgroundColor: currentTheme.surface }]}>
+            {isReverseGeocoding ? (
+              <View style={[styles.modalConfirmButton, { backgroundColor: currentTheme.primary, opacity: 0.7 }]}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.modalConfirmButton, { backgroundColor: currentTheme.primary }]}
+                onPress={handleConfirmMapLocation}
+              >
+                <Text style={styles.modalConfirmText}>Confirm Location</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Pickup Time Modal */}
       <Modal
         visible={showPickupModal}
@@ -924,6 +1068,7 @@ export default function CheckoutScreen() {
                   Cancel
                 </Text>
               </TouchableOpacity>
+
             </View>
 
             <ScrollView style={styles.modalScrollView}>
@@ -1395,5 +1540,42 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontSize: 12,
       color: theme.textSecondary,
       fontFamily: "SpaceMono_400Regular", // If available, or just monospace
+    },
+    mapModalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 20,
+      paddingTop: 50, // accommodate safe area roughly
+      borderBottomWidth: 1,
+    },
+    mapModalTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    mapContainer: {
+      flex: 1,
+      position: 'relative',
+    },
+    map: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    mapMarkerContainer: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      marginTop: -32,
+      marginLeft: -16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 5,
+    },
+    mapFooter: {
+      padding: 20,
+      paddingBottom: 40, // safe area bottom
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
     },
   });
