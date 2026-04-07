@@ -1,4 +1,6 @@
-{
+import 'dotenv/config';
+
+export default {
   "expo": {
     "name": "EasyBuy",
     "slug": "easybuy-client",
@@ -27,7 +29,7 @@
       "package": "com.easybuy.app",
       "config": {
         "googleMaps": {
-          "apiKey": "$GOOGLE_MAPS_API_KEY"
+          "apiKey": process.env.GOOGLE_MAPS_API_KEY || ""
         }
       },
       "adaptiveIcon": {
