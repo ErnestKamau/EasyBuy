@@ -1086,9 +1086,30 @@ export default function AdminScreen() {
       <View style={styles.orderCard}>
         <View style={styles.orderHeader}>
           <View style={styles.orderInfo}>
-            <Text style={styles.orderNumber}>
-              Order {item.order_number || `#${item.id}`}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.orderNumber}>
+                Order {item.order_number || `#${item.id}`}
+              </Text>
+              <View
+                style={[
+                  styles.deliveryTypeBadge,
+                  {
+                    backgroundColor: item.type === 'delivery' ? '#F5F3FF' : '#F1F5F9',
+                    borderColor: item.type === 'delivery' ? '#8B5CF6' : '#94A3B8',
+                    borderWidth: 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.deliveryTypeText,
+                    { color: item.type === 'delivery' ? '#8B5CF6' : '#64748B' },
+                  ]}
+                >
+                  {item.type || 'Pickup'}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.orderCustomer}>{customerName}</Text>
             <Text style={styles.orderDate}>
               {(() => {
@@ -1220,17 +1241,49 @@ export default function AdminScreen() {
           </View>
         )}
 
-        {(item.order_status === "pending" || (item.type === 'delivery' && (item.order_status === 'confirmed' || item.order_status === 'assigned'))) && (
+        {(item.order_status === "pending" ||
+          (item.type === "delivery" &&
+            (item.order_status === "confirmed" ||
+              item.fulfillment_status === "assigned"))) && (
           <View style={styles.orderActions}>
+            {/* Pending State Actions */}
             {item.order_status === "pending" && (
               <>
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={() => confirmOrder(item)}
-                >
-                  <CheckCircle size={16} color="#22C55E" />
-                  <Text style={styles.confirmButtonText}>Confirm</Text>
-                </TouchableOpacity>
+                {/* For delivery, show Assign Rider unless it's already assigned */}
+                {item.type === "delivery" ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.assignRiderButton}
+                      onPress={() => openAssignDriverModal(item)}
+                    >
+                      <Truck size={16} color="#8B5CF6" />
+                      <Text style={styles.assignRiderButtonText}>
+                        {item.driver_id ? "Reassign Rider" : "Assign Rider"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Only allow confirmation of delivery orders if they are delivered */}
+                    {item.fulfillment_status === "delivered" && (
+                      <TouchableOpacity
+                        style={styles.confirmButton}
+                        onPress={() => confirmOrder(item)}
+                      >
+                        <CheckCircle size={16} color="#22C55E" />
+                        <Text style={styles.confirmButtonText}>Confirm</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : (
+                  /* Standard Confirmation for Pickup */
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={() => confirmOrder(item)}
+                  >
+                    <CheckCircle size={16} color="#22C55E" />
+                    <Text style={styles.confirmButtonText}>Confirm</Text>
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity
                   style={styles.cancelButton}
                   onPress={() => cancelOrder(item)}
@@ -1240,18 +1293,22 @@ export default function AdminScreen() {
                 </TouchableOpacity>
               </>
             )}
-            
-            {item.type === 'delivery' && (item.order_status === 'confirmed' || item.order_status === 'assigned') && (
-              <TouchableOpacity
-                style={[styles.confirmButton, { borderColor: '#8B5CF6' }]}
-                onPress={() => openAssignDriverModal(item)}
-              >
-                <Truck size={16} color="#8B5CF6" />
-                <Text style={[styles.confirmButtonText, { color: '#8B5CF6' }]}>
-                  {item.driver_id ? 'Reassign' : 'Assign Driver'}
-                </Text>
-              </TouchableOpacity>
-            )}
+
+            {/* Post-Pending Delivery Actions (Already Confirmed/Assigned but still needs driver management) */}
+            {item.order_status !== "pending" &&
+              item.type === "delivery" &&
+              (item.order_status === "confirmed" ||
+                item.fulfillment_status === "assigned") && (
+                <TouchableOpacity
+                  style={[styles.confirmButton, { borderColor: "#8B5CF6" }]}
+                  onPress={() => openAssignDriverModal(item)}
+                >
+                  <Truck size={16} color="#8B5CF6" />
+                  <Text style={[styles.confirmButtonText, { color: "#8B5CF6" }]}>
+                    {item.driver_id ? "Reassign" : "Assign Driver"}
+                  </Text>
+                </TouchableOpacity>
+              )}
           </View>
         )}
       </View>
@@ -4114,6 +4171,36 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     orderActions: {
       flexDirection: "row",
       gap: 12,
+      marginTop: 12,
+    },
+    deliveryTypeBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 6,
+      marginLeft: 8,
+      alignSelf: 'flex-start',
+    },
+    deliveryTypeText: {
+      fontSize: 10,
+      fontWeight: "700",
+      textTransform: 'uppercase',
+    },
+    assignRiderButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: isDark ? "#2D2159" : "#F5F3FF",
+      paddingVertical: 12,
+      borderRadius: 8,
+      gap: 6,
+      borderWidth: 1,
+      borderColor: "#8B5CF6",
+    },
+    assignRiderButtonText: {
+      fontSize: 14,
+      color: "#8B5CF6",
+      fontWeight: "600",
     },
     confirmButton: {
       flex: 1,

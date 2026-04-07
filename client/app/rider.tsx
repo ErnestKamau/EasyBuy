@@ -178,9 +178,9 @@ export default function RiderDashboard() {
   const handleStatusUpdate = async (orderId: number, nextStatus: string) => {
     try {
       setLoading(true);
-      if (nextStatus === 'accepted') {
+      if (nextStatus === 'driver_accepted') {
         await deliveryApi.acceptDelivery(orderId);
-      } else if (nextStatus === 'picked_up') {
+      } else if (nextStatus === 'en_route') {
         await deliveryApi.startDelivery(orderId);
       } else if (nextStatus === 'delivered') {
         await deliveryApi.confirmDelivery(orderId);
@@ -209,8 +209,8 @@ export default function RiderDashboard() {
           <Text style={[styles.orderNumber, { color: currentTheme.text }]}>#{order.order_number}</Text>
           <Text style={[styles.customerName, { color: currentTheme.textSecondary }]}>{order.user?.first_name} {order.user?.last_name}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.order_status) + '20' }]}>
-          <Text style={[styles.statusText, { color: getStatusColor(order.order_status) }]}>{order.order_status.toUpperCase()}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.fulfillment_status) + '20' }]}>
+          <Text style={[styles.statusText, { color: getStatusColor(order.fulfillment_status) }]}>{order.fulfillment_status.toUpperCase()}</Text>
         </View>
       </View>
 
@@ -220,27 +220,27 @@ export default function RiderDashboard() {
       </View>
 
       <View style={styles.actionRow}>
-        {order.order_status === 'assigned' && (
+        {order.fulfillment_status === 'assigned' && (
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: currentTheme.primary }]}
-            onPress={() => handleStatusUpdate(order.id, 'accepted')}
+            onPress={() => handleStatusUpdate(order.id, 'driver_accepted')}
           >
             <CheckCircle2 size={18} color="#FFFFFF" />
             <Text style={styles.actionButtonText}>Accept Assignment</Text>
           </TouchableOpacity>
         )}
         
-        {order.order_status === 'accepted' && (
+        {order.fulfillment_status === 'driver_accepted' && (
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: '#8B5CF6' }]}
-            onPress={() => handleStatusUpdate(order.id, 'picked_up')}
+            onPress={() => handleStatusUpdate(order.id, 'en_route')}
           >
             <Package size={18} color="#FFFFFF" />
             <Text style={styles.actionButtonText}>Mark as Picked Up</Text>
           </TouchableOpacity>
         )}
 
-        {order.order_status === 'picked_up' && (
+        {order.fulfillment_status === 'en_route' && (
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: '#22C55E' }]}
             onPress={() => handleStatusUpdate(order.id, 'delivered')}

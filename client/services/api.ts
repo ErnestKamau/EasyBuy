@@ -456,7 +456,8 @@ export interface Order {
   user?: User;
   pickup_time?: string;
   type: 'delivery' | 'pickup';
-  order_status: 'pending' | 'confirmed' | 'cancelled' | 'assigned' | 'accepted' | 'picked_up' | 'delivered';
+  order_status: 'pending' | 'confirmed' | 'cancelled'; // Note: removed delivery statuses from order_status as they belong to fulfillment_status
+  fulfillment_status: 'pending' | 'preparing' | 'ready' | 'assigned' | 'driver_accepted' | 'en_route' | 'delivered' | 'picked_up';
   payment_status: 'pending' | 'fully-paid' | 'partially-paid' | 'failed' | 'debt';
   order_date: string;
   order_time: string;
@@ -722,7 +723,7 @@ export const deliveryApi = {
   },
 
   async confirmDelivery(orderId: number): Promise<any> {
-    const { data } = await api.post(`/rider/delivery/${orderId}/confirm`);
+    const { data } = await api.post(`/rider/deliveries/${orderId}/confirm`);
     return data;
   },
 
@@ -733,7 +734,7 @@ export const deliveryApi = {
   },
 
   async assignDriver(orderId: number, driverId: number): Promise<any> {
-    const { data } = await api.post(`/admin/delivery/${orderId}/assign`, { driver_id: driverId });
+    const { data } = await api.post(`/admin/orders/${orderId}/assign-driver`, { driver_id: driverId });
     return data;
   },
 
