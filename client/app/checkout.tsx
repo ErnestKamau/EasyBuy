@@ -59,11 +59,15 @@ export default function CheckoutScreen() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [tempSelectedTime, setTempSelectedTime] = useState<string | null>(null);
-  
+
   // M-Pesa payment polling state
   const [paymentPolling, setPaymentPolling] = useState(false);
-  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
+  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(
+    null,
+  );
+  const [paymentStatus, setPaymentStatus] = useState<
+    "pending" | "success" | "failed" | null
+  >(null);
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pollingCountRef = useRef(0);
 
@@ -75,12 +79,15 @@ export default function CheckoutScreen() {
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [deliveryFee] = useState(150); // Standard fee, could be fetched from API
-  
+
   // Map Picker State
   const [showMapModal, setShowMapModal] = useState(false);
-  const [tempMapLocation, setTempMapLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [tempMapLocation, setTempMapLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
-  
+
   // Default Map Region (e.g. initial coords before GPS)
   const defaultRegion = {
     latitude: -1.2921, // Defaulting loosely to Nairobi if unavailable
@@ -145,7 +152,8 @@ export default function CheckoutScreen() {
     // If we don't have a starting location, try to get one
     if (!deliveryLocation) {
       try {
-        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+        const { status } =
+          await ExpoLocation.requestForegroundPermissionsAsync();
         if (status === "granted") {
           const loc = await ExpoLocation.getCurrentPositionAsync({});
           setTempMapLocation({
@@ -153,10 +161,16 @@ export default function CheckoutScreen() {
             longitude: loc.coords.longitude,
           });
         } else {
-          setTempMapLocation({ latitude: defaultRegion.latitude, longitude: defaultRegion.longitude });
+          setTempMapLocation({
+            latitude: defaultRegion.latitude,
+            longitude: defaultRegion.longitude,
+          });
         }
       } catch (e) {
-        setTempMapLocation({ latitude: defaultRegion.latitude, longitude: defaultRegion.longitude });
+        setTempMapLocation({
+          latitude: defaultRegion.latitude,
+          longitude: defaultRegion.longitude,
+        });
       }
     } else {
       setTempMapLocation({ ...deliveryLocation });
@@ -169,7 +183,7 @@ export default function CheckoutScreen() {
       setShowMapModal(false);
       return;
     }
-    
+
     setDeliveryLocation(tempMapLocation);
     setIsReverseGeocoding(true);
     try {
@@ -242,8 +256,8 @@ export default function CheckoutScreen() {
       if (result.success && result.data) {
         const status = result.data.status;
 
-        if (status === 'success') {
-          setPaymentStatus('success');
+        if (status === "success") {
+          setPaymentStatus("success");
           setPaymentPolling(false);
           pollingCountRef.current = 0;
           ToastService.showSuccess(
@@ -255,13 +269,13 @@ export default function CheckoutScreen() {
             router.replace("/(tabs)");
           }, 2000);
           return;
-        } else if (status === 'failed') {
-          setPaymentStatus('failed');
+        } else if (status === "failed") {
+          setPaymentStatus("failed");
           setPaymentPolling(false);
           pollingCountRef.current = 0;
           ToastService.showError(
             "Payment Failed",
-            result.data.result_desc || 'Payment was not successful',
+            result.data.result_desc || "Payment was not successful",
           );
           return;
         }
@@ -273,7 +287,7 @@ export default function CheckoutScreen() {
         pollPaymentStatus(requestId);
       }, 2000) as any;
     } catch (error) {
-      console.error('Polling error:', error);
+      console.error("Polling error:", error);
       // Continue polling even on error
       pollingTimeoutRef.current = setTimeout(() => {
         pollPaymentStatus(requestId);
@@ -319,7 +333,10 @@ export default function CheckoutScreen() {
       }
 
       // Validate delivery location for delivery orders
-      if (selectedDelivery === "delivery" && (!deliveryLocation || !deliveryAddress)) {
+      if (
+        selectedDelivery === "delivery" &&
+        (!deliveryLocation || !deliveryAddress)
+      ) {
         ToastService.showError(
           "Location Required",
           "Please set your delivery location",
@@ -380,12 +397,12 @@ export default function CheckoutScreen() {
               setCheckoutRequestId(reqId);
               setPaymentPolling(true);
               pollingCountRef.current = 0;
-              
+
               ToastService.showSuccess(
                 "Prompt Sent",
                 "Please enter your PIN on your phone to complete payment.",
               );
-              
+
               // Start polling immediately
               pollPaymentStatus(reqId);
             }
@@ -446,7 +463,8 @@ export default function CheckoutScreen() {
               </View>
               <Text style={styles.successTitle}>Processing Payment...</Text>
               <Text style={styles.successMessage}>
-                Please complete the payment on your phone. This may take a few moments.
+                Please complete the payment on your phone. This may take a few
+                moments.
               </Text>
             </>
           ) : (
@@ -454,7 +472,9 @@ export default function CheckoutScreen() {
               <View style={styles.successIcon}>
                 <CheckCircle size={80} color={currentTheme.success} />
               </View>
-              <Text style={styles.successTitle}>Order Placed Successfully!</Text>
+              <Text style={styles.successTitle}>
+                Order Placed Successfully!
+              </Text>
               <Text style={styles.successMessage}>
                 Your order has been received and will be prepared for pickup.
               </Text>
@@ -534,9 +554,7 @@ export default function CheckoutScreen() {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Delivery</Text>
             <Text style={styles.summaryValue}>
-              {selectedDelivery === "pickup"
-                ? "Pickup at shop"
-                : "Delivery"}
+              {selectedDelivery === "pickup" ? "Pickup at shop" : "Delivery"}
             </Text>
           </View>
 
@@ -572,7 +590,9 @@ export default function CheckoutScreen() {
                   Ksh{" "}
                   {Math.max(
                     0,
-                    state.totalAmount + (selectedDelivery === "delivery" ? deliveryFee : 0) - user.wallet_balance,
+                    state.totalAmount +
+                      (selectedDelivery === "delivery" ? deliveryFee : 0) -
+                      user.wallet_balance,
                   ).toLocaleString()}
                 </Text>
               </View>
@@ -583,7 +603,11 @@ export default function CheckoutScreen() {
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total</Text>
               <Text style={styles.totalValue}>
-                Ksh {(state.totalAmount + (selectedDelivery === "delivery" ? deliveryFee : 0)).toLocaleString()}
+                Ksh{" "}
+                {(
+                  state.totalAmount +
+                  (selectedDelivery === "delivery" ? deliveryFee : 0)
+                ).toLocaleString()}
               </Text>
             </View>
           )}
@@ -681,7 +705,10 @@ export default function CheckoutScreen() {
             >
               <View style={styles.paymentIcon}>
                 {isFetchingLocation ? (
-                  <ActivityIndicator size="small" color={currentTheme.primary} />
+                  <ActivityIndicator
+                    size="small"
+                    color={currentTheme.primary}
+                  />
                 ) : (
                   <MapPin
                     size={24}
@@ -720,7 +747,9 @@ export default function CheckoutScreen() {
                 <MapPin size={24} color={currentTheme.primary} />
               </View>
               <View style={styles.paymentContent}>
-                <Text style={[styles.paymentTitle, { color: currentTheme.text }]}>
+                <Text
+                  style={[styles.paymentTitle, { color: currentTheme.text }]}
+                >
                   Choose Location on Map
                 </Text>
                 <Text style={styles.paymentDescription}>
@@ -738,7 +767,6 @@ export default function CheckoutScreen() {
               </View>
             )}
           </View>
-
         )}
 
         {/* Pickup Time Selection (only show if pickup is selected) */}
@@ -792,8 +820,9 @@ export default function CheckoutScreen() {
                     ]}
                   >
                     {selectedPickupTime
-                      ? availableSlots.find(s => s.datetime === selectedPickupTime)?.label ||
-                        "Time Selected"
+                      ? availableSlots.find(
+                          (s) => s.datetime === selectedPickupTime,
+                        )?.label || "Time Selected"
                       : "Select Pickup Time"}
                   </Text>
                   <Text style={styles.paymentDescription}>
@@ -999,15 +1028,22 @@ export default function CheckoutScreen() {
         onRequestClose={() => setShowMapModal(false)}
       >
         <View style={{ flex: 1, backgroundColor: currentTheme.background }}>
-          <View style={[styles.mapModalHeader, { backgroundColor: currentTheme.surface }]}>
+          <View
+            style={[
+              styles.mapModalHeader,
+              { backgroundColor: currentTheme.surface },
+            ]}
+          >
             <Text style={[styles.mapModalTitle, { color: currentTheme.text }]}>
               Select Location
             </Text>
             <TouchableOpacity onPress={() => setShowMapModal(false)}>
-              <Text style={{ color: currentTheme.primary, fontWeight: "600" }}>Cancel</Text>
+              <Text style={{ color: currentTheme.primary, fontWeight: "600" }}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.mapContainer}>
             {tempMapLocation && (
               <MapView
@@ -1026,21 +1062,34 @@ export default function CheckoutScreen() {
                 }}
               />
             )}
-            
+
             {/* Center Marker */}
             <View style={styles.mapMarkerContainer} pointerEvents="none">
               <MapPin size={32} color="#EF4444" fill="#EF4444" />
             </View>
           </View>
-          
-          <View style={[styles.mapFooter, { backgroundColor: currentTheme.surface }]}>
+
+          <View
+            style={[
+              styles.mapFooter,
+              { backgroundColor: currentTheme.surface },
+            ]}
+          >
             {isReverseGeocoding ? (
-              <View style={[styles.modalConfirmButton, { backgroundColor: currentTheme.primary, opacity: 0.7 }]}>
+              <View
+                style={[
+                  styles.modalConfirmButton,
+                  { backgroundColor: currentTheme.primary, opacity: 0.7 },
+                ]}
+              >
                 <ActivityIndicator size="small" color="#FFFFFF" />
               </View>
             ) : (
               <TouchableOpacity
-                style={[styles.modalConfirmButton, { backgroundColor: currentTheme.primary }]}
+                style={[
+                  styles.modalConfirmButton,
+                  { backgroundColor: currentTheme.primary },
+                ]}
                 onPress={handleConfirmMapLocation}
               >
                 <Text style={styles.modalConfirmText}>Confirm Location</Text>
@@ -1058,17 +1107,23 @@ export default function CheckoutScreen() {
         onRequestClose={() => setShowPickupModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentTheme.surface }]}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: currentTheme.surface },
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: currentTheme.text }]}>
                 Select Pickup Time
               </Text>
               <TouchableOpacity onPress={() => setShowPickupModal(false)}>
-                <Text style={[styles.modalClose, { color: currentTheme.primary }]}>
+                <Text
+                  style={[styles.modalClose, { color: currentTheme.primary }]}
+                >
                   Cancel
                 </Text>
               </TouchableOpacity>
-
             </View>
 
             <ScrollView style={styles.modalScrollView}>
@@ -1089,16 +1144,26 @@ export default function CheckoutScreen() {
                     if (slot.available) {
                       setTempSelectedTime(slot.datetime);
                     } else {
-                      ToastService.showWarning("Slot Full", "This time slot is fully booked");
+                      ToastService.showWarning(
+                        "Slot Full",
+                        "This time slot is fully booked",
+                      );
                     }
                   }}
                   disabled={!slot.available}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.slotLabel, { color: currentTheme.text }]}>
+                    <Text
+                      style={[styles.slotLabel, { color: currentTheme.text }]}
+                    >
                       {slot.label}
                     </Text>
-                    <Text style={[styles.slotAvailability, { color: currentTheme.textSecondary }]}>
+                    <Text
+                      style={[
+                        styles.slotAvailability,
+                        { color: currentTheme.textSecondary },
+                      ]}
+                    >
                       {slot.available
                         ? `${slot.remaining} slots available`
                         : "Fully booked"}
@@ -1113,13 +1178,19 @@ export default function CheckoutScreen() {
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
-                style={[styles.modalConfirmButton, { backgroundColor: currentTheme.primary }]}
+                style={[
+                  styles.modalConfirmButton,
+                  { backgroundColor: currentTheme.primary },
+                ]}
                 onPress={() => {
                   if (tempSelectedTime) {
                     setSelectedPickupTime(tempSelectedTime);
                     setShowPickupModal(false);
                   } else {
-                    ToastService.showError("No Selection", "Please select a time slot");
+                    ToastService.showError(
+                      "No Selection",
+                      "Please select a time slot",
+                    );
                   }
                 }}
               >
@@ -1555,15 +1626,15 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     mapContainer: {
       flex: 1,
-      position: 'relative',
+      position: "relative",
     },
     map: {
       ...StyleSheet.absoluteFillObject,
     },
     mapMarkerContainer: {
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
+      position: "absolute",
+      top: "50%",
+      left: "50%",
       marginTop: -32,
       marginLeft: -16,
       shadowColor: "#000",
