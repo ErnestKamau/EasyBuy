@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PickupSlotController;
 use App\Http\Controllers\Api\AwaitingPickupController;
 use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\Api\StripeController;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -50,6 +51,9 @@ Route::prefix('mpesa')->group(function () {
     Route::post('/register-c2b', [MpesaController::class, 'registerC2bUrls']);
     Route::post('/simulate-c2b', [MpesaController::class, 'simulateC2b']);
 });
+
+// Stripe webhook (public — verified via Stripe-Signature)
+Route::post('/stripe/webhook', [StripeController::class, 'webhook']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -109,11 +113,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // M-Pesa
     Route::prefix('mpesa')->group(function () {
         // Protected M-Pesa endpoints (requires authentication)
-        Route::post('/stkpush', [MpesaController::class, 'stkPush']);
+        Route::post('/stkpush', [MpesaController::class, 'initiateStkPush']);
         Route::post('/query', [MpesaController::class, 'queryStkStatus']);
         Route::post('/initiate', [MpesaController::class, 'initiateStkPush']);
         Route::get('/transactions', [MpesaController::class, 'transactions']);
         Route::get('/transactions/{mpesaTransaction}/verify', [MpesaController::class, 'verify']);
+    });
+
+    // Stripe
+    Route::prefix('stripe')->group(function () {
+        Route::post('/intent', [StripeController::class, 'createIntent']);
+        Route::post('/confirm', [StripeController::class, 'confirm']);
     });
 
     // Wallet
@@ -163,9 +173,9 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // -------------------------------------------------------------------------
-// Delivery System — Rider-only Routes (role check is inside the controller)
+// Delivery System — Rider-only Routes
 // -------------------------------------------------------------------------
-Route::middleware('auth:sanctum')->prefix('rider')->group(function () {
+Route::middleware(['auth:sanctum', 'role:rider'])->prefix('rider')->group(function () {
     // GPS ping — called every 3 seconds while on active delivery
     Route::post('/location', [\App\Http\Controllers\Api\DriverLocationController::class, 'update']);
     // Toggle online/offline status
@@ -181,9 +191,9 @@ Route::middleware('auth:sanctum')->prefix('rider')->group(function () {
 });
 
 // -------------------------------------------------------------------------
-// Delivery System — Admin-only Routes (role check is inside the controller)
+// Delivery System — Admin-only Routes
 // -------------------------------------------------------------------------
-Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
     // List riders who are online and available for assignment
     Route::get('/drivers/available', [\App\Http\Controllers\Api\AdminDeliveryController::class, 'availableDrivers']);
     // Assign a driver to a delivery order

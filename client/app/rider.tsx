@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Switch,
   Alert,
   Modal,
+  Linking,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { router } from "expo-router";
@@ -26,7 +27,7 @@ import {
 import * as Location from "expo-location";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { ordersApi, Order, deliveryApi } from "@/services/api";
+import { Order, deliveryApi } from "@/services/api";
 import { websocketService } from "@/services/websocket";
 import { ToastService } from "@/utils/toastService";
 
@@ -43,6 +44,7 @@ export default function RiderDashboard() {
   } | null>(null);
   const [locationAddress, setLocationAddress] = useState<string>("");
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const activeOrderIdRef = useRef<number | null>(null);
 
   const [showMapModal, setShowMapModal] = useState(false);
   const [selectedMapOrder, setSelectedMapOrder] = useState<Order | null>(null);
@@ -61,23 +63,19 @@ export default function RiderDashboard() {
   const fetchActiveAssignments = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch orders assigned to this rider
-      const orders = await ordersApi.getPendingOrders();
-      // Filter for orders where this user is the driver and status is assigned, accepted, or picked_up
-      const riderOrders = orders.filter(o => 
-        o.driver_id === user?.id && 
-        ['assigned', 'accepted', 'picked_up'].includes(o.order_status)
-      );
-      setActiveOrders(riderOrders);
+      const active = await deliveryApi.getActiveDelivery();
+      const list = active ? [active] : [];
+      setActiveOrders(list);
+      activeOrderIdRef.current = active?.id ?? null;
     } catch (error) {
       ToastService.showError("Error", "Failed to fetch assignments");
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, []);
 
   useEffect(() => {
-    if (!user) return; // Wait for AuthContext or let it handle redirection
+    if (!user) return;
     
     if (user.role !== 'rider') {
       ToastService.showError("Access Denied", "Rider account required");
@@ -87,14 +85,28 @@ export default function RiderDashboard() {
 
     fetchActiveAssignments();
 
-    // Subscribe to assignments
-    websocketService.on('order.assigned', fetchActiveAssignments);
+    const refresh = () => fetchActiveAssignments();
+    websocketService.on('order.status.updated', refresh);
+    websocketService.on('order.assigned', refresh);
 
     return () => {
       stopTracking();
-      websocketService.off('order.assigned', fetchActiveAssignments);
+      websocketService.off('order.status.updated', refresh);
+      websocketService.off('order.assigned', refresh);
     };
   }, [user, fetchActiveAssignments]);
+
+  const pushLocation = async (
+    latitude: number,
+    longitude: number,
+    extras?: { heading?: number; speed?: number }
+  ) => {
+    await deliveryApi.updateLocation(latitude, longitude, {
+      heading: extras?.heading,
+      speed: extras?.speed,
+      orderId: activeOrderIdRef.current,
+    });
+  };
 
   const fetchCurrentLocation = async () => {
     try {
@@ -106,16 +118,17 @@ export default function RiderDashboard() {
       }
 
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
       });
       
-      const { latitude, longitude } = location.coords;
+      const { latitude, longitude, heading, speed } = location.coords;
       setCurrentLocation({ latitude, longitude });
 
-      // Update backend
-      await deliveryApi.updateLocation(latitude, longitude);
+      await pushLocation(latitude, longitude, {
+        heading: heading ?? 0,
+        speed: speed ?? 0,
+      });
 
-      // Reverse geocode
       const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (address) {
         const formattedAddress = `${address.name || ""}, ${address.street || ""}, ${address.city || ""}`;
@@ -139,26 +152,21 @@ export default function RiderDashboard() {
     }
 
     try {
-      // Get initial location
       await fetchCurrentLocation();
 
       const sub = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.Balanced,
-          timeInterval: 30000, // Update every 30 seconds for battery efficiency
-          distanceInterval: 50, // Or every 50 meters
+          accuracy: Location.Accuracy.High,
+          timeInterval: 3000,
+          distanceInterval: 10,
         },
         async (location) => {
-          const { latitude, longitude } = location.coords;
+          const { latitude, longitude, heading, speed } = location.coords;
           setCurrentLocation({ latitude, longitude });
-          deliveryApi.updateLocation(latitude, longitude).catch(console.error);
-          
-          // Occasionally update address string (e.g. if moved significantly)
-          const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
-          if (address) {
-            const formattedAddress = `${address.name || ""}, ${address.street || ""}, ${address.city || ""}`;
-            setLocationAddress(formattedAddress.replace(/^, /, ""));
-          }
+          pushLocation(latitude, longitude, {
+            heading: heading ?? 0,
+            speed: speed ?? 0,
+          }).catch(console.error);
         }
       );
       setLocationSubscription(sub);
@@ -241,7 +249,7 @@ export default function RiderDashboard() {
             onPress={() => handleStatusUpdate(order.id, 'en_route')}
           >
             <Package size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Mark as Picked Up</Text>
+            <Text style={styles.actionButtonText}>Start Trip</Text>
           </TouchableOpacity>
         )}
 
@@ -269,7 +277,17 @@ export default function RiderDashboard() {
           <MapPin size={20} color={currentTheme.text} />
         </TouchableOpacity>
         
-        <TouchableOpacity style={[styles.circleButton, { backgroundColor: currentTheme.border }]}>
+        <TouchableOpacity
+          style={[styles.circleButton, { backgroundColor: currentTheme.border }]}
+          onPress={() => {
+            const phone = order.user?.phone_number;
+            if (phone) {
+              Linking.openURL(`tel:${phone}`);
+            } else {
+              ToastService.showWarning("No Phone", "Customer phone number is unavailable.");
+            }
+          }}
+        >
           <Phone size={20} color={currentTheme.text} />
         </TouchableOpacity>
       </View>
@@ -279,8 +297,8 @@ export default function RiderDashboard() {
   const getStatusColor = (status: string) => {
     switch(status) {
       case 'assigned': return '#F59E0B';
-      case 'accepted': return '#8B5CF6';
-      case 'picked_up': return '#3B82F6';
+      case 'driver_accepted': return '#8B5CF6';
+      case 'en_route': return '#3B82F6';
       case 'delivered': return '#22C55E';
       default: return '#64748B';
     }
@@ -315,13 +333,6 @@ export default function RiderDashboard() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ padding: 20 }}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>Active Assignments ({activeOrders.length})</Text>
-          <TouchableOpacity onPress={fetchActiveAssignments}>
-            <RefreshCw size={18} color={currentTheme.primary} />
-          </TouchableOpacity>
-        </View>
-
         {/* Location Card */}
         <View style={[styles.locationCard, { backgroundColor: currentTheme.surface }]}>
           <View style={styles.locationHeader}>

@@ -496,6 +496,7 @@ export const ordersApi = {
       latitude: number;
       longitude: number;
       address: string;
+      delivery_fee?: number;
     }
   ): Promise<Order> {
     const { data } = await api.post<{ success: boolean; data: Order }>('/orders', {
@@ -506,6 +507,7 @@ export const ordersApi = {
       delivery_lat: deliveryData?.latitude,
       delivery_lng: deliveryData?.longitude,
       delivery_address: deliveryData?.address,
+      delivery_fee: deliveryData?.delivery_fee,
       type: deliveryData ? 'delivery' : 'pickup',
     });
     return data.data;
@@ -701,15 +703,59 @@ export const salesApi = {
   },
 };
 
+export interface OrderTracking {
+  order_id: number;
+  fulfillment_status: Order['fulfillment_status'];
+  driver: {
+    id: number;
+    name: string;
+    vehicle_type?: string;
+    vehicle_registration?: string;
+  } | null;
+  driver_location: {
+    lat: number;
+    lng: number;
+    heading?: number;
+    speed?: number;
+    updated_at?: string;
+  } | null;
+  destination: {
+    lat: number | null;
+    lng: number | null;
+    address?: string | null;
+  };
+  route: {
+    polyline: string;
+    duration: string;
+    distance: string;
+    eta_seconds: number;
+  } | null;
+}
+
 // Delivery/Driver API
 export const deliveryApi = {
   // Rider endpoints
-  async updateLocation(lat: number, lng: number): Promise<void> {
-    await api.post('/rider/location', { lat, lng });
+  async updateLocation(
+    lat: number,
+    lng: number,
+    options?: { heading?: number; speed?: number; orderId?: number | null }
+  ): Promise<void> {
+    await api.post('/rider/location', {
+      lat,
+      lng,
+      heading: options?.heading ?? 0,
+      speed: options?.speed ?? 0,
+      order_id: options?.orderId ?? undefined,
+    });
   },
 
   async setOnlineStatus(isOnline: boolean): Promise<void> {
     await api.post('/rider/status', { status: isOnline ? 'online' : 'offline' });
+  },
+
+  async getActiveDelivery(): Promise<Order | null> {
+    const { data } = await api.get<{ order: Order | null }>('/rider/deliveries/active');
+    return data.order ?? null;
   },
 
   async acceptDelivery(orderId: number): Promise<any> {
@@ -727,10 +773,16 @@ export const deliveryApi = {
     return data;
   },
 
+  // Customer confirms they received the delivery
+  async customerConfirmDelivery(orderId: number): Promise<any> {
+    const { data } = await api.post(`/orders/${orderId}/confirm-delivery`);
+    return data;
+  },
+
   // Admin endpoints
   async getAvailableDrivers(): Promise<User[]> {
-    const { data } = await api.get<{ success: boolean; data: User[] }>('/admin/drivers/available');
-    return data.data;
+    const { data } = await api.get<{ drivers: User[] }>('/admin/drivers/available');
+    return data.drivers ?? [];
   },
 
   async assignDriver(orderId: number, driverId: number): Promise<any> {
@@ -738,18 +790,10 @@ export const deliveryApi = {
     return data;
   },
 
-  // Common tracking
-  async getOrderTracking(orderId: number): Promise<any> {
-    const { data } = await api.get(`/order/${orderId}/track`);
-    return data.data;
-  },
-
-  async getDriverLocation(driverId: number): Promise<{
-    latitude: number;
-    longitude: number;
-  }> {
-    const response = await api.get(`/rider/location/${driverId}`);
-    return response.data;
+  // Live tracking snapshot (driver GPS + route polyline + ETA)
+  async getOrderTracking(orderId: number): Promise<OrderTracking> {
+    const { data } = await api.get<OrderTracking>(`/orders/${orderId}/tracking`);
+    return data;
   },
 };
 
@@ -910,6 +954,69 @@ export const mpesaApi = {
   async verifyTransaction(transactionId: number): Promise<any> {
     const { data } = await api.get<{ success: boolean; data: any }>(`/mpesa/transactions/${transactionId}/verify`);
     return data.data;
+  },
+};
+
+// Stripe API
+export const stripeApi = {
+  async createIntent(params: {
+    saleId?: number;
+    orderId?: number;
+    amount: number;
+  }): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      client_secret: string;
+      payment_intent_id: string;
+      payment_id: number;
+    };
+  }> {
+    try {
+      const payload: Record<string, unknown> = {
+        amount: params.amount,
+      };
+      if (params.saleId) payload.sale_id = params.saleId;
+      if (params.orderId) payload.order_id = params.orderId;
+
+      const { data } = await api.post<{
+        success: boolean;
+        message?: string;
+        data: {
+          client_secret: string;
+          payment_intent_id: string;
+          payment_id: number;
+        };
+      }>('/stripe/intent', payload);
+      return data;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to create Stripe payment intent',
+      };
+    }
+  },
+
+  async confirmPayment(paymentIntentId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: Payment;
+  }> {
+    try {
+      const { data } = await api.post<{
+        success: boolean;
+        message?: string;
+        data: Payment;
+      }>('/stripe/confirm', {
+        payment_intent_id: paymentIntentId,
+      });
+      return data;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to confirm Stripe payment',
+      };
+    }
   },
 };
 

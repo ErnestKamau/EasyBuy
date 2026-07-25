@@ -72,6 +72,17 @@ class DeliveryController extends Controller
      */
     public function tracking(Request $request, Order $order, DirectionsService $maps): JsonResponse
     {
+        $user = $request->user();
+        $isOwner = $user && (int) $user->id === (int) $order->user_id;
+        $isAdmin = $user && $user->role === 'admin';
+        $isAssignedDriver = $user && $order->driver_id && (int) $user->id === (int) $order->driver_id;
+
+        if (!$isOwner && !$isAdmin && !$isAssignedDriver) {
+            abort(403, 'You are not authorized to track this order.');
+        }
+
+        $order->loadMissing('driver');
+
         // Fetch live driver location from Redis — instant O(1) lookup
         $locationJson = Redis::get("driver:{$order->driver_id}:location");
         $driverLocation = $locationJson ? json_decode($locationJson, true) : null;

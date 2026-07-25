@@ -28,7 +28,8 @@ class DirectionsService
                 'origin'      => "{$fromLat},{$fromLng}",
                 'destination' => "{$toLat},{$toLng}",
                 'mode'        => 'driving',
-                'key'         => config('services.google_maps.key'),
+                'key'         => config('services.google_maps.backend_key')
+                    ?: config('services.google_maps.key'),
             ]);
 
             if ($response->failed() || empty($response->json('routes'))) {

@@ -7,10 +7,12 @@ use App\Models\Payment;
 use App\Models\Sale;
 use App\Events\PaymentReceived;
 use App\Events\PaymentRefunded;
+use App\Services\StripeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use App\Exceptions\PaymentAmountExceedsBalanceException;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -79,6 +81,20 @@ class PaymentController extends Controller
             'notes' => 'nullable|string',
         ]);
 
+        if ($validated['payment_method'] === 'card') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Use POST /api/stripe/intent for card payments',
+            ], 422);
+        }
+
+        if ($validated['payment_method'] === 'mpesa') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Use POST /api/mpesa/initiate for M-Pesa payments',
+            ], 422);
+        }
+
         DB::beginTransaction();
         try {
             // Validate amount doesn't exceed balance
@@ -94,14 +110,13 @@ class PaymentController extends Controller
                 'status' => 'pending',
             ]);
 
-            // If cash payment, mark as completed immediately (this will update total_paid)
+            // Cash payment — mark completed immediately
             if ($validated['payment_method'] === 'cash') {
                 $payment->markAsCompleted();
                 // Refresh payment and sale to get updated data
                 $payment->refresh();
                 $payment->sale->refresh();
             }
-            // For M-Pesa, the MpesaController will handle the STK push and update status
 
             DB::commit();
 
@@ -173,6 +188,26 @@ class PaymentController extends Controller
 
         DB::beginTransaction();
         try {
+            // Card payments: refund via Stripe first
+            if (
+                $payment->payment_method === 'card'
+                && $payment->stripe_payment_intent_id
+            ) {
+                try {
+                    app(StripeService::class)->createRefund($payment->stripe_payment_intent_id);
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    Log::error('Stripe refund failed', [
+                        'payment_id' => $payment->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Stripe refund failed: ' . $e->getMessage(),
+                    ], 422);
+                }
+            }
+
             $payment->processRefund();
 
             DB::commit();

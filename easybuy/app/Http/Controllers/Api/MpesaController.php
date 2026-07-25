@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Actions\Payments\CompleteOrderPaymentAction;
 use App\Models\Payment;
 use App\Models\Sale;
 use App\Models\MpesaTransaction;
-use App\Events\PaymentReceived;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -73,8 +74,34 @@ class MpesaController extends Controller
                 Payment::validateAmount($sale, (float) $validated['amount']);
                 $accountReference = $sale->sale_number;
                 $transactionDesc = "Payment for Sale {$sale->sale_number}";
+
+                // Avoid double-create: reuse pending STK for same sale+amount if still open
+                $existingPending = Payment::where('sale_id', $sale->id)
+                    ->where('payment_method', 'mpesa')
+                    ->where('status', 'pending')
+                    ->where('amount', $validated['amount'])
+                    ->whereHas('mpesaTransaction', function ($q) {
+                        $q->where('status', 'pending');
+                    })
+                    ->with('mpesaTransaction')
+                    ->latest()
+                    ->first();
+
+                if ($existingPending && $existingPending->mpesaTransaction) {
+                    DB::commit();
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'STK Push already pending for this payment',
+                        'data' => [
+                            'merchant_request_id' => $existingPending->mpesaTransaction->merchant_request_id,
+                            'checkout_request_id' => $existingPending->mpesaTransaction->checkout_request_id,
+                            'response_description' => 'Existing pending STK',
+                            'payment_id' => $existingPending->id,
+                        ]
+                    ]);
+                }
             } elseif (!empty($validated['order_id'])) {
-                $order = \App\Models\Order::findOrFail($validated['order_id']);
+                $order = Order::with(['items', 'user'])->findOrFail($validated['order_id']);
                 // Check if order already has a sale
                 if ($order->sale) {
                     $sale = $order->sale;
@@ -82,10 +109,27 @@ class MpesaController extends Controller
                     $accountReference = $sale->sale_number;
                     $transactionDesc = "Payment for Sale {$sale->sale_number}";
                 } else {
-                    // Pre-sale payment for Order
+                    // Pre-sale payment for Order — validate against order total + delivery fee - wallet credit
+                    $orderTotal = (float) $order->total_amount + (float) ($order->delivery_fee ?? 0);
+                    $walletCredit = 0.0;
+                    if ($order->user) {
+                        $walletCredit = max(0, (float) $order->user->wallet_balance);
+                    }
+                    $amountDue = max(0, $orderTotal - $walletCredit);
+                    $alreadyPaid = (float) Payment::where('order_id', $order->id)
+                        ->where('status', 'completed')
+                        ->sum('amount');
+                    $remaining = max(0, $amountDue - $alreadyPaid);
+
+                    if ((float) $validated['amount'] > $remaining + 0.01) {
+                        throw new \InvalidArgumentException(
+                            'Payment amount KES ' . number_format((float) $validated['amount'], 2) .
+                            ' exceeds remaining order balance KES ' . number_format($remaining, 2)
+                        );
+                    }
+
                     $accountReference = $order->order_number;
                     $transactionDesc = "Payment for Order {$order->order_number}";
-                    // TODO: Validate order payment amount if needed (e.g. against order total)
                 }
             }
 
@@ -270,21 +314,14 @@ class MpesaController extends Controller
             $mpesaTransaction->transaction_id = $metadata['MpesaReceiptNumber'] ?? $mpesaTransaction->transaction_id;
             $mpesaTransaction->save();
 
-            // Update payment
+            // Update payment + ensure order confirm / sale linkage
             $payment = $mpesaTransaction->payment;
             $payment->mpesa_transaction_id = $mpesaTransaction->mpesa_receipt_number;
-            $payment->status = 'completed';
-            $payment->markAsCompleted();
+            $payment->saveQuietly();
 
-            // Update sale payment status if sale exists
-            if ($payment->sale) {
-                $payment->sale->updatePaymentStatus();
-            }
+            app(CompleteOrderPaymentAction::class)->execute($payment);
 
             DB::commit();
-
-            // Dispatch event for email notification
-            event(new PaymentReceived($payment));
 
             return response()->json([
                 'success' => true,
@@ -363,20 +400,13 @@ class MpesaController extends Controller
             $mpesaTransaction->callback_data = $data;
             $mpesaTransaction->save();
 
-            // Update payment
+            // Update payment + ensure order confirm / sale linkage
             $payment->mpesa_transaction_id = $transId;
-            $payment->status = 'completed';
-            $payment->markAsCompleted();
+            $payment->saveQuietly();
 
-            // Update sale payment status if exists
-            if ($payment->sale) {
-                $payment->sale->updatePaymentStatus();
-            }
+            app(CompleteOrderPaymentAction::class)->execute($payment);
 
             DB::commit();
-
-            // Dispatch event for notification
-            event(new PaymentReceived($payment));
 
             Log::info('C2B Payment Processed Successfully', ['payment_id' => $payment->id]);
 

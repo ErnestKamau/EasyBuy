@@ -4,7 +4,6 @@ namespace App\Actions\Delivery;
 
 use App\Events\DriverLocationUpdated;
 use App\Jobs\PersistDriverLocationJob;
-use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\Redis;
 
@@ -18,12 +17,13 @@ class UpdateDriverLocationAction
      * It MUST be fast — target < 20ms response time.
      *
      * What happens here (in order of speed):
-     *  1. Write latest position to Redis (instant, ~1ms).
-     *  2. Refresh the driver's heartbeat in the online sorted set.
-     *  3. Check if driver has moved > 10 meters before broadcasting.
+     *  1. Read previous Redis position (for movement gate).
+     *  2. Write latest position to Redis (instant, ~1ms).
+     *  3. Refresh the driver's heartbeat in the online sorted set.
+     *  4. Check if driver has moved > 10 meters before broadcasting.
      *     (Prevents flooding the WebSocket server with micro-movements.)
-     *  4. If moved significantly, broadcast to order channel.
-     *  5. Dispatch async job to persist to MySQL. (Does NOT block the response.)
+     *  5. If moved significantly, broadcast to order channel.
+     *  6. Dispatch async job to persist to MySQL. (Does NOT block the response.)
      */
     public function execute(
         User   $driver,
@@ -41,6 +41,9 @@ class UpdateDriverLocationAction
             'updated_at' => now()->toISOString(),
         ];
 
+        // Read previous position BEFORE overwriting Redis — used for movement gate.
+        $previous = Redis::get("driver:{$driver->id}:location");
+
         // 1. Update live position in Redis — TTL 5 minutes
         // If phone dies, key expires and admin knows driver went offline
         Redis::setex("driver:{$driver->id}:location", 300, json_encode($payload));
@@ -51,7 +54,7 @@ class UpdateDriverLocationAction
 
         // 3. Only push WebSocket event if driver has moved significantly
         // Reduces bandwidth. 10 meters is imperceptible on a map but avoids event spam.
-        if ($orderId && $this->hasMovedSignificantly($driver->id, $lat, $lng)) {
+        if ($orderId && $this->hasMovedSignificantly($previous, $lat, $lng)) {
             broadcast(new DriverLocationUpdated($orderId, $driver->id, $payload));
         }
 
@@ -63,14 +66,16 @@ class UpdateDriverLocationAction
      * Returns true if the driver has moved more than 10 meters since last recorded position.
      * Uses the Haversine formula approximation for short distances.
      */
-    private function hasMovedSignificantly(int $driverId, float $newLat, float $newLng): bool
+    private function hasMovedSignificantly(?string $previousJson, float $newLat, float $newLng): bool
     {
-        $cached = Redis::get("driver:{$driverId}:location");
-        if (!$cached) {
+        if (!$previousJson) {
             return true;
         }
 
-        $last = json_decode($cached);
+        $last = json_decode($previousJson);
+        if (!$last || !isset($last->lat, $last->lng)) {
+            return true;
+        }
 
         // Haversine approximation (accurate for small distances ~< 1km)
         $earthRadius = 6371000; // Earth radius in meters

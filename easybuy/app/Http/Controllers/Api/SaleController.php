@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Actions\Payments\CreateSaleFromOrderAction;
 use App\Models\Sale;
 use App\Models\Order;
-use App\Events\SaleCreated;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
 {
@@ -79,99 +79,27 @@ class SaleController extends Controller
      */
     public function createFromOrder(Order $order): JsonResponse
     {
-        // Check if order is confirmed
-        if ($order->order_status !== 'confirmed') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Order must be confirmed before creating a sale'
-            ], 422);
-        }
-
-        // Check if sale already exists
-        if ($order->sale) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Sale already exists for this order'
-            ], 422);
-        }
-
-        DB::beginTransaction();
         try {
-            // Calculate totals from order items
-            $totalAmount = 0;
-            $costAmount = 0;
-
-            foreach ($order->items as $orderItem) {
-                $subtotal = $orderItem->subtotal;
-                $totalAmount += $subtotal;
-
-                // Calculate cost (assuming cost_price is stored in product)
-                $product = $orderItem->product;
-                if ($orderItem->kilogram) {
-                    $costAmount += (float) ($product->cost_price * $orderItem->kilogram);
-                } else {
-                    $costAmount += (float) ($product->cost_price * $orderItem->quantity);
-                }
+            if ($order->sale) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sale already exists for this order'
+                ], 422);
             }
 
-            $profitAmount = $totalAmount - $costAmount;
-
-            // Determine initial payment status based on order payment status
-            $paymentStatus = 'no-payment';
-            $dueDate = null;
-
-            if ($order->payment_status === 'fully-paid') {
-                $paymentStatus = 'fully-paid';
-            } elseif ($order->payment_status === 'partially-paid') {
-                $paymentStatus = 'partial-payment';
-            } elseif ($order->payment_status === 'debt') {
-                $paymentStatus = 'no-payment';
-                // Set due date for debt orders (default 7 days)
-                $dueDate = Carbon::now()->addDays(7);
-            } elseif ($order->payment_status === 'pending') {
-                $paymentStatus = 'no-payment';
-            }
-
-            // Create sale
-            $sale = Sale::create([
-                'order_id' => $order->id,
-                'total_amount' => $totalAmount,
-                'cost_amount' => $costAmount,
-                'profit_amount' => $profitAmount,
-                'payment_status' => $paymentStatus,
-                'due_date' => $dueDate,
-            ]);
-
-            // Create sale items from order items
-            foreach ($order->items as $orderItem) {
-                $product = $orderItem->product;
-                $sale->items()->create([
-                    'product_id' => $product->id,
-                    'quantity' => $orderItem->quantity,
-                    'kilogram' => $orderItem->kilogram,
-                    'unit_price' => $orderItem->unit_price,
-                    'cost_price' => $product->cost_price,
-                ]);
-            }
-
-            DB::commit();
-
-            // Sync payment status to order
-            $sale->syncOrderPaymentStatus();
-
-            // Dispatch event for receipt generation and email
-            event(new SaleCreated($sale));
-
-            $sale->load(['order.user', 'items.product']);
+            $sale = app(CreateSaleFromOrderAction::class)->execute($order);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Sale created successfully',
                 'data' => $sale
             ], 201);
-
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first() ?? $e->getMessage(),
+            ], 422);
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()

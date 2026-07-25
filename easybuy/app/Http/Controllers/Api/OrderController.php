@@ -187,8 +187,7 @@ class OrderController extends Controller
                 
                 // Create sale from confirmed order
                 if (!$order->sale) {
-                    $saleController = new \App\Http\Controllers\Api\SaleController();
-                    $saleController->createFromOrder($order);
+                    app(\App\Actions\Payments\CreateSaleFromOrderAction::class)->execute($order);
                 }
             } else {
                 $order->update($validated);

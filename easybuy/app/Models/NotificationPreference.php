@@ -46,6 +46,11 @@ class NotificationPreference extends Model
             'low_stock_alert' => ['enabled' => $role === 'admin', 'push_enabled' => $role === 'admin'],
             'refund_processed' => ['enabled' => true, 'push_enabled' => true],
             'new_product_available' => ['enabled' => false, 'push_enabled' => false], // Disabled by default
+            // Delivery lifecycle
+            'delivery_assigned' => ['enabled' => $role === 'rider', 'push_enabled' => $role === 'rider'],
+            'delivery_accepted' => ['enabled' => true, 'push_enabled' => true],
+            'delivery_assignment_timeout' => ['enabled' => $role === 'rider', 'push_enabled' => $role === 'rider'],
+            'delivery_needs_reassign' => ['enabled' => $role === 'admin', 'push_enabled' => $role === 'admin'],
         ];
 
         return $defaults;

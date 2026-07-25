@@ -43,7 +43,40 @@ Schedule::call(function () {
     \App\Models\Order::where('fulfillment_status', 'assigned')
         ->where('driver_assigned_at', '<', now()->subMinutes(3))
         ->each(function ($order) {
+            $driverId = $order->driver_id;
+            $orderNumber = $order->order_number;
+            $orderId = $order->id;
+
             $order->resetTimedOutAssignment();
+
+            if ($driverId) {
+                NotificationService::create(
+                    $driverId,
+                    'delivery_assignment_timeout',
+                    'Assignment Timed Out',
+                    "You missed order #{$orderNumber}. It has been returned to the dispatch pool.",
+                    [
+                        'type'         => 'delivery_assignment_timeout',
+                        'order_id'     => $orderId,
+                        'order_number' => $orderNumber,
+                    ],
+                    'high'
+                );
+            }
+
+            NotificationService::createForAdmins(
+                'delivery_needs_reassign',
+                'Delivery Needs Reassignment',
+                "Order #{$orderNumber} timed out waiting for rider acceptance. Please reassign.",
+                [
+                    'type'         => 'delivery_needs_reassign',
+                    'order_id'     => $orderId,
+                    'order_number' => $orderNumber,
+                    'previous_driver_id' => $driverId,
+                ],
+                'high'
+            );
+
             broadcast(new \App\Events\OrderStatusUpdated($order->fresh(['user'])));
         });
 })->everyMinute()->name('delivery:timeout-check')->withoutOverlapping();

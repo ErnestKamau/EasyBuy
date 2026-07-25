@@ -23,9 +23,11 @@ import {
   pickupSlotsApi,
   PickupSlotResponse,
   mpesaApi,
+  stripeApi,
 } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ToastService } from "@/utils/toastService";
+import { useStripe } from "@stripe/stripe-react-native";
 import {
   ArrowLeft,
   CreditCard,
@@ -43,6 +45,7 @@ export default function CheckoutScreen() {
   const { user } = useAuth();
   const { currentTheme, themeName } = useTheme();
   const isDark = themeName === "dark";
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const params = useLocalSearchParams();
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>("cash");
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryType>(
@@ -356,6 +359,7 @@ export default function CheckoutScreen() {
               latitude: deliveryLocation.latitude,
               longitude: deliveryLocation.longitude,
               address: deliveryAddress,
+              delivery_fee: deliveryFee,
             }
           : undefined,
       );
@@ -410,6 +414,72 @@ export default function CheckoutScreen() {
         }
       }
 
+      // Card: Stripe Payment Sheet
+      if (selectedPayment === "card") {
+        const amountDue = Math.max(
+          0,
+          state.totalAmount - (user?.wallet_balance || 0),
+        );
+
+        if (amountDue > 0) {
+          ToastService.showInfo(
+            "Card Payment",
+            "Opening secure payment sheet...",
+          );
+
+          const intentResponse = await stripeApi.createIntent({
+            orderId: order.id,
+            amount: amountDue,
+          });
+
+          if (!intentResponse.success || !intentResponse.data?.client_secret) {
+            ToastService.showError(
+              "Payment Failed",
+              intentResponse.message || "Could not start card payment",
+            );
+            setIsProcessing(false);
+            return;
+          }
+
+          const { error: initError } = await initPaymentSheet({
+            merchantDisplayName: "EasyBuy",
+            paymentIntentClientSecret: intentResponse.data.client_secret,
+            allowsDelayedPaymentMethods: false,
+            returnURL: "easybuy://stripe-redirect",
+          });
+
+          if (initError) {
+            ToastService.showError(
+              "Payment Failed",
+              initError.message || "Could not initialize payment sheet",
+            );
+            setIsProcessing(false);
+            return;
+          }
+
+          const { error: presentError } = await presentPaymentSheet();
+
+          if (presentError) {
+            if (presentError.code !== "Canceled") {
+              ToastService.showError(
+                "Payment Failed",
+                presentError.message || "Card payment was not completed",
+              );
+            }
+            setIsProcessing(false);
+            return;
+          }
+
+          // Optimistic confirm — webhook remains source of truth
+          await stripeApi.confirmPayment(intentResponse.data.payment_intent_id);
+
+          ToastService.showSuccess(
+            "Payment Successful",
+            "Your card payment has been processed",
+          );
+        }
+      }
+
       // Clear the cart after successful order creation
       clearCart();
       setOrderPlaced(true);
@@ -418,11 +488,15 @@ export default function CheckoutScreen() {
       const successTitle =
         selectedPayment === "mpesa"
           ? "Order Placed - Check Phone"
-          : "Order Placed!";
+          : selectedPayment === "card"
+            ? "Order Paid!"
+            : "Order Placed!";
       const successMsg =
         selectedPayment === "mpesa"
           ? `Order ${order.order_number} created. Please complete payment on your phone.`
-          : `Your order ${order.order_number || `#${order.id}`} has been placed successfully`;
+          : selectedPayment === "card"
+            ? `Order ${order.order_number || `#${order.id}`} paid successfully`
+            : `Your order ${order.order_number || `#${order.id}`} has been placed successfully`;
 
       ToastService.showSuccess(successTitle, successMsg);
 

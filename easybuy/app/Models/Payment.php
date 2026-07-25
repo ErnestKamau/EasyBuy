@@ -230,33 +230,25 @@ class Payment extends Model
     }
 
     /**
-     * Sync order status after payment update
+     * Sync order payment_status after payment update.
+     * Order confirmation and sale creation are owned by CompleteOrderPaymentAction.
      */
     public function syncOrderStatus(): void
     {
         $this->load('order');
-        
+
         if ($this->order && !$this->sale && ($this->status === 'completed' || $this->wasChanged('status'))) {
             $order = $this->order;
             $order->refresh();
 
-            $paidAmount = Payment::where('order_id', $order->id)
+            $paidAmount = (float) Payment::where('order_id', $order->id)
                 ->where('status', 'completed')
                 ->sum('amount');
 
-            if ($paidAmount >= $order->total_amount) {
-                $order->payment_status = 'fully-paid';
+            $orderTotal = (float) $order->total_amount + (float) ($order->delivery_fee ?? 0);
 
-                if ($order->order_status === 'pending') {
-                    try {
-                        $order->confirm();
-                    } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error("Failed to auto-confirm order", [
-                            'order_id' => $order->id,
-                            'error' => $e->getMessage()
-                        ]);
-                    }
-                }
+            if ($orderTotal > 0 && $paidAmount >= $orderTotal) {
+                $order->payment_status = 'fully-paid';
             } elseif ($paidAmount > 0) {
                 $order->payment_status = 'partially-paid';
             }

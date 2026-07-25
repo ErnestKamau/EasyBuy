@@ -196,11 +196,16 @@ class WebSocketService {
         'debt.overdue',
         'payment.received',
         'notification',
+        // Delivery lifecycle (backend broadcastAs names)
+        'order.status.updated',
+        'driver.location.updated',
+        // Legacy aliases kept for older listeners
         'order.assigned',
         'order.accepted',
         'order.picked_up',
         'order.delivered',
         'location.updated',
+        'order.status_updated',
       ];
 
       // Set up listeners for each event type on user channel
@@ -210,14 +215,34 @@ class WebSocketService {
           console.log(`Event ${eventType} on user channel:`, data);
           this.handleChannelEvent({ event: eventType, data });
         });
+        // Laravel Echo often prefixes broadcastAs events with a leading dot
+        this.socket?.on(`${userChannel}:.${eventType}`, (data: any) => {
+          this.handleChannelEvent({ event: eventType, data });
+        });
       });
 
       // Set up listeners for admin channel events
       if (userRole === 'admin') {
+        const adminOrdersChannel = 'private-admin.orders';
+        this.socket.emit('subscribe', {
+          channel: adminOrdersChannel,
+          socket_id: this.socket.id,
+          token: token,
+        });
+
         eventTypes.forEach(eventType => {
           const eventName = `${adminChannel}:${eventType}`;
           this.socket?.on(eventName, (data: any) => {
             console.log(`Event ${eventType} on admin channel:`, data);
+            this.handleChannelEvent({ event: eventType, data });
+          });
+          this.socket?.on(`${adminChannel}:.${eventType}`, (data: any) => {
+            this.handleChannelEvent({ event: eventType, data });
+          });
+          this.socket?.on(`${adminOrdersChannel}:${eventType}`, (data: any) => {
+            this.handleChannelEvent({ event: eventType, data });
+          });
+          this.socket?.on(`${adminOrdersChannel}:.${eventType}`, (data: any) => {
             this.handleChannelEvent({ event: eventType, data });
           });
         });
@@ -236,7 +261,23 @@ class WebSocketService {
   private handleChannelEvent(data: any): void {
     // Laravel Echo sends events in format: { event: 'event.name', data: {...} }
     if (data.event) {
-      this.emit(data.event, data.data || data);
+      const eventName = String(data.event).replace(/^\./, '');
+      const payload = data.data || data;
+      this.emit(eventName, payload);
+
+      // Compatibility aliases so older screens still receive updates
+      if (eventName === 'driver.location.updated') {
+        const location = payload?.location ?? payload;
+        this.emit('location.updated', location);
+      }
+      if (eventName === 'order.status.updated') {
+        this.emit('order.status_updated', payload);
+        const status = payload?.fulfillment_status;
+        if (status === 'assigned') this.emit('order.assigned', payload);
+        if (status === 'driver_accepted') this.emit('order.accepted', payload);
+        if (status === 'en_route') this.emit('order.picked_up', payload);
+        if (status === 'delivered') this.emit('order.delivered', payload);
+      }
     } else {
       // Direct notification data
       this.emit('notification', data);
@@ -310,19 +351,26 @@ class WebSocketService {
         token: token,
       });
 
-      // Listen for events on this order channel
+      // Listen for events on this order channel (backend broadcastAs names)
       const orderEvents = [
+        'order.status.updated',
+        'driver.location.updated',
+        // Legacy aliases
         'order.assigned',
         'order.accepted',
         'order.picked_up',
         'order.delivered',
         'location.updated',
+        'order.status_updated',
       ];
 
       orderEvents.forEach(eventType => {
         const eventName = `${orderChannel}:${eventType}`;
         this.socket?.on(eventName, (data: any) => {
           console.log(`Event ${eventType} on order channel ${orderId}:`, data);
+          this.handleChannelEvent({ event: eventType, data });
+        });
+        this.socket?.on(`${orderChannel}:.${eventType}`, (data: any) => {
           this.handleChannelEvent({ event: eventType, data });
         });
       });

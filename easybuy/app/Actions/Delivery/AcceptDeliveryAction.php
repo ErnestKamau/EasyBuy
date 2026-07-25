@@ -5,11 +5,7 @@ namespace App\Actions\Delivery;
 use App\Models\Order;
 use App\Models\User;
 use App\Events\OrderStatusUpdated;
-use App\Jobs\PersistDriverLocationJob;
-use App\Events\DriverLocationUpdated;
-use App\Notifications\DriverAcceptedNotification;
-use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Redis;
+use App\Services\NotificationService;
 use Illuminate\Validation\ValidationException;
 
 class AcceptDeliveryAction
@@ -44,8 +40,21 @@ class AcceptDeliveryAction
         ]);
 
         // Notify the customer: "Your rider has accepted the delivery"
-        if ($order->user?->fcm_token) {
-            Notification::send($order->user, new DriverAcceptedNotification($order));
+        if ($order->user_id) {
+            $driverName = trim("{$driver->first_name} {$driver->last_name}");
+            NotificationService::create(
+                $order->user_id,
+                'delivery_accepted',
+                'Rider Confirmed',
+                "{$driverName} accepted your delivery for order #{$order->order_number}.",
+                [
+                    'type'         => 'delivery_accepted',
+                    'order_id'     => $order->id,
+                    'order_number' => $order->order_number,
+                    'driver_id'    => $driver->id,
+                ],
+                'high'
+            );
         }
 
         broadcast(new OrderStatusUpdated($order->fresh(['driver', 'user'])))->toOthers();

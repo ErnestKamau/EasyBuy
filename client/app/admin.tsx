@@ -32,6 +32,7 @@ import {
   SalesAnalytics,
   Payment,
   paymentsApi,
+  stripeApi,
   api,
   Notification,
   notificationsApi,
@@ -41,6 +42,7 @@ import {
   User,
 } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
+import { useStripe } from "@stripe/stripe-react-native";
 import {
   ArrowLeft,
   Plus,
@@ -75,6 +77,7 @@ export default function AdminScreen() {
   const { user } = useAuth();
   const { currentTheme, themeName } = useTheme();
   const isDark = themeName === "dark";
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -666,55 +669,85 @@ export default function AdminScreen() {
     }
 
     try {
-      const paymentData: {
-        payment_method: "mpesa" | "cash" | "card";
-        amount: number;
-        phone_number?: string;
-        reference?: string;
-        notes?: string;
-      } = {
-        payment_method: paymentForm.method as "mpesa" | "cash" | "card",
-        amount: parseFloat(paymentForm.amount),
-        reference: paymentForm.reference || undefined,
-        notes: paymentForm.notes || undefined,
-      };
-
+      // M-Pesa: initiate STK only (creates Payment + MpesaTransaction once)
       if (paymentForm.method === "mpesa") {
-        paymentData.phone_number = paymentForm.phone_number;
-      }
-
-      const response = await paymentsApi.addPayment(
-        selectedSale.id,
-        paymentData,
-      );
-
-      // If M-Pesa payment, initiate STK push
-      if (paymentForm.method === "mpesa" && response.data) {
         const { mpesaApi } = await import("@/services/api");
-        try {
-          const stkResponse = await mpesaApi.initiateStkPush({
-            saleId: selectedSale.id,
-            phoneNumber: paymentForm.phone_number,
-            amount: Number.parseFloat(paymentForm.amount),
-          });
-          if (stkResponse.success) {
-            ToastService.showSuccess(
-              "Success",
-              "M-Pesa payment request sent to customer's phone",
-            );
-          } else {
+        const stkResponse = await mpesaApi.initiateStkPush({
+          saleId: selectedSale.id,
+          phoneNumber: paymentForm.phone_number,
+          amount: Number.parseFloat(paymentForm.amount),
+        });
+        if (stkResponse.success) {
+          ToastService.showSuccess(
+            "Success",
+            "M-Pesa payment request sent to customer's phone",
+          );
+        } else {
+          ToastService.showError(
+            "M-Pesa Error",
+            stkResponse.message || "Failed to initiate M-Pesa payment",
+          );
+          return;
+        }
+      } else if (paymentForm.method === "card") {
+        const amount = Number.parseFloat(paymentForm.amount);
+        const intentResponse = await stripeApi.createIntent({
+          saleId: selectedSale.id,
+          amount,
+        });
+
+        if (!intentResponse.success || !intentResponse.data?.client_secret) {
+          ToastService.showError(
+            "Card Payment Failed",
+            intentResponse.message || "Could not start card payment",
+          );
+          return;
+        }
+
+        const { error: initError } = await initPaymentSheet({
+          merchantDisplayName: "EasyBuy",
+          paymentIntentClientSecret: intentResponse.data.client_secret,
+          allowsDelayedPaymentMethods: false,
+          returnURL: "easybuy://stripe-redirect",
+        });
+
+        if (initError) {
+          ToastService.showError(
+            "Card Payment Failed",
+            initError.message || "Could not initialize payment sheet",
+          );
+          return;
+        }
+
+        const { error: presentError } = await presentPaymentSheet();
+
+        if (presentError) {
+          if (presentError.code !== "Canceled") {
             ToastService.showError(
-              "M-Pesa Error",
-              stkResponse.message || "Failed to initiate M-Pesa payment",
+              "Card Payment Failed",
+              presentError.message || "Card payment was not completed",
             );
           }
-        } catch (mpesaError) {
-          ToastService.showApiError(
-            mpesaError,
-            "Payment created but M-Pesa request failed",
-          );
+          return;
         }
+
+        await stripeApi.confirmPayment(intentResponse.data.payment_intent_id);
+        ToastService.showSuccess("Success", "Card payment completed");
       } else {
+        const paymentData: {
+          payment_method: "mpesa" | "cash" | "card";
+          amount: number;
+          phone_number?: string;
+          reference?: string;
+          notes?: string;
+        } = {
+          payment_method: paymentForm.method as "mpesa" | "cash" | "card",
+          amount: parseFloat(paymentForm.amount),
+          reference: paymentForm.reference || undefined,
+          notes: paymentForm.notes || undefined,
+        };
+
+        await paymentsApi.addPayment(selectedSale.id, paymentData);
         ToastService.showSuccess("Success", "Payment added successfully");
       }
 
@@ -735,6 +768,7 @@ export default function AdminScreen() {
       }
     } catch (error) {
       ToastService.showApiError(error, "Failed to add payment");
+      return;
     }
   };
 

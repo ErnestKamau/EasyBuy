@@ -65,4 +65,10 @@ return [
         'mobile_key'  => env('GOOGLE_MAPS_MOBILE_KEY'),
     ],
 
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
 ];

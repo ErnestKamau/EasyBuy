@@ -370,5 +370,7 @@ class Order extends Model
             'driver_id'          => null,
             'driver_assigned_at' => null,
         ]);
+
+        \Illuminate\Support\Facades\Redis::del("order:{$this->id}:driver");
     }
 }

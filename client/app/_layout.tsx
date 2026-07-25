@@ -56,6 +56,7 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AppStripeProvider } from "@/components/AppStripeProvider";
 
 
 export default function RootLayout() {
@@ -91,12 +92,14 @@ export default function RootLayout() {
   return (
     <CustomThemeProvider>
       <AuthProvider>
-        <CartProvider>
-          <NotificationProvider>
-            <RootLayoutNav />
-            <Toast config={toastConfig} />
-          </NotificationProvider>
-        </CartProvider>
+        <AppStripeProvider>
+          <CartProvider>
+            <NotificationProvider>
+              <RootLayoutNav />
+              <Toast config={toastConfig} />
+            </NotificationProvider>
+          </CartProvider>
+        </AppStripeProvider>
       </AuthProvider>
     </CustomThemeProvider>
   );

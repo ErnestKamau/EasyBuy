@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,50 +7,90 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Linking,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
-import { ArrowLeft, Phone, Navigation, Package } from "lucide-react-native";
+import { ArrowLeft, Phone, Navigation, Package, CheckCircle2 } from "lucide-react-native";
 import { useTheme } from "@/contexts/ThemeContext";
-import { ordersApi, Order, deliveryApi } from "@/services/api";
+import { ordersApi, Order, deliveryApi, OrderTracking } from "@/services/api";
 import { websocketService } from "@/services/websocket";
 import { ToastService } from "@/utils/toastService";
+import { decodePolyline } from "@/utils/polyline";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
-// Shop location (Placeholder - should ideally come from backend config)
-const SHOP_LOCATION = {
-  latitude: -1.286389,
-  longitude: 36.817223,
-  address: "EasyBuy Shop, Nairobi Central",
-};
+const SHOP_FALLBACK_LAT = Number(process.env.EXPO_PUBLIC_SHOP_LAT) || -1.286389;
+const SHOP_FALLBACK_LNG = Number(process.env.EXPO_PUBLIC_SHOP_LNG) || 36.817223;
 
 export default function OrderTrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentTheme, themeName } = useTheme();
   const isDark = themeName === 'dark';
   const [order, setOrder] = useState<Order | null>(null);
+  const [tracking, setTracking] = useState<OrderTracking | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(false);
   const [driverLocation, setDriverLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
   
   const mapRef = useRef<MapView>(null);
+
+  const applyTracking = useCallback((data: OrderTracking) => {
+    setTracking(data);
+    if (data.driver_location?.lat != null && data.driver_location?.lng != null) {
+      setDriverLocation({
+        latitude: data.driver_location.lat,
+        longitude: data.driver_location.lng,
+      });
+    }
+    if (data.route?.polyline) {
+      setRouteCoords(decodePolyline(data.route.polyline));
+    }
+  }, []);
+
+  const loadTracking = useCallback(async (orderId: number) => {
+    try {
+      const data = await deliveryApi.getOrderTracking(orderId);
+      applyTracking(data);
+    } catch (e) {
+      console.warn("Could not fetch order tracking", e);
+    }
+  }, [applyTracking]);
+
+  const loadOrderDetails = useCallback(async () => {
+    if (!id) return;
+    const orderId = Number.parseInt(id, 10);
+    try {
+      setLoading(true);
+      const data = await ordersApi.getOrderDetails(orderId);
+      setOrder(data);
+      await loadTracking(orderId);
+    } catch (error) {
+      ToastService.showError("Error", "Failed to load order tracking info");
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  }, [id, loadTracking]);
 
   useEffect(() => {
     loadOrderDetails();
     
     if (id) {
       const orderId = Number.parseInt(id, 10);
-      // Subscribe to real-time updates
       websocketService.subscribeToOrder(orderId);
 
       const handleLocationUpdate = (data: any) => {
-        if (data.lat && data.lng) {
+        const lat = data?.lat ?? data?.location?.lat;
+        const lng = data?.lng ?? data?.location?.lng;
+        if (lat != null && lng != null) {
           setDriverLocation({
-            latitude: data.lat,
-            longitude: data.lng,
+            latitude: Number(lat),
+            longitude: Number(lng),
           });
         }
       };
@@ -59,48 +99,65 @@ export default function OrderTrackingScreen() {
         loadOrderDetails();
       };
 
+      websocketService.on('driver.location.updated', handleLocationUpdate);
       websocketService.on('location.updated', handleLocationUpdate);
+      websocketService.on('order.status.updated', handleStatusUpdate);
       websocketService.on('order.status_updated', handleStatusUpdate);
 
+      // REST polling fallback when WebSocket is down
+      const poll = setInterval(() => {
+        loadTracking(orderId);
+      }, 10000);
+
       return () => {
+        clearInterval(poll);
         websocketService.unsubscribeFromOrder(orderId);
+        websocketService.off('driver.location.updated', handleLocationUpdate);
         websocketService.off('location.updated', handleLocationUpdate);
+        websocketService.off('order.status.updated', handleStatusUpdate);
         websocketService.off('order.status_updated', handleStatusUpdate);
       };
     }
-  }, [id]);
+  }, [id, loadOrderDetails, loadTracking]);
 
-  const loadOrderDetails = async () => {
-    if (!id) return;
-    try {
-      setLoading(true);
-      const data = await ordersApi.getOrderDetails(Number.parseInt(id, 10));
-      setOrder(data);
-      
-      // If driver is already assigned/picked up, fetch initial location
-      if (data.driver_id && (data.order_status === 'assigned' || data.order_status === 'accepted' || data.order_status === 'picked_up')) {
-        try {
-          const loc = await deliveryApi.getDriverLocation(data.driver_id);
-          setDriverLocation(loc);
-        } catch (e) {
-          console.warn("Could not fetch initial driver location");
-        }
-      }
-    } catch (error) {
-      ToastService.showError("Error", "Failed to load order tracking info");
-      router.back();
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!mapRef.current || !driverLocation) return;
+    mapRef.current.animateCamera({
+      center: driverLocation,
+      zoom: 14,
+    });
+  }, [driverLocation?.latitude, driverLocation?.longitude]);
+
+  const getStatusText = () => {
+    const status = tracking?.fulfillment_status || order?.fulfillment_status;
+    switch (status) {
+      case 'pending':
+      case 'preparing':
+        return "Preparing your order";
+      case 'assigned':
+        return "Driver assigned — waiting for acceptance";
+      case 'driver_accepted':
+        return "Driver confirmed — heading to shop";
+      case 'en_route':
+        return "Driver is on the way to you";
+      case 'delivered':
+        return "Order delivered";
+      default:
+        return "Processing";
     }
   };
 
-  const getStatusText = () => {
-    switch (order?.order_status) {
-      case 'assigned': return "Driver Assigned";
-      case 'accepted': return "Driver is heading to shop";
-      case 'picked_up': return "Driver is on the way to you";
-      case 'delivered': return "Order Delivered";
-      default: return "Processing";
+  const handleConfirmDelivery = async () => {
+    if (!order) return;
+    try {
+      setConfirming(true);
+      await deliveryApi.customerConfirmDelivery(order.id);
+      ToastService.showSuccess("Delivered", "Thanks for confirming your delivery");
+      await loadOrderDetails();
+    } catch (error) {
+      ToastService.showApiError(error, "Failed to confirm delivery");
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -114,14 +171,45 @@ export default function OrderTrackingScreen() {
 
   if (!order) return null;
 
-  const customerLocation = order.delivery_lat && order.delivery_lng ? {
-    latitude: order.delivery_lat,
-    longitude: order.delivery_lng
-  } : null;
+  const customerLocation =
+    (tracking?.destination?.lat != null && tracking?.destination?.lng != null
+      ? {
+          latitude: Number(tracking.destination.lat),
+          longitude: Number(tracking.destination.lng),
+        }
+      : null) ||
+    (order.delivery_lat && order.delivery_lng
+      ? {
+          latitude: order.delivery_lat,
+          longitude: order.delivery_lng,
+        }
+      : null);
+
+  const fulfillmentStatus = tracking?.fulfillment_status || order.fulfillment_status;
+  const etaLabel = tracking?.route?.duration && tracking.route.duration !== 'N/A'
+    ? tracking.route.duration
+    : null;
+  const distanceLabel = tracking?.route?.distance && tracking.route.distance !== 'N/A'
+    ? tracking.route.distance
+    : null;
+
+  const driverName = tracking?.driver?.name
+    || (order.driver ? `${order.driver.first_name} ${order.driver.last_name}` : null);
+  const vehicleInfo = tracking?.driver
+    ? `${tracking.driver.vehicle_type || 'Rider'} • ${tracking.driver.vehicle_registration || 'No Plate'}`
+    : order.driver
+      ? `${order.driver.vehicle_type || 'Rider'} • ${order.driver.vehicle_registration || 'No Plate'}`
+      : null;
+
+  const polylinePoints =
+    routeCoords.length > 1
+      ? routeCoords
+      : driverLocation && customerLocation
+        ? [driverLocation, customerLocation]
+        : [];
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
-      {/* Header */}
       <View style={[styles.header, { backgroundColor: currentTheme.surface }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color={currentTheme.text} />
@@ -132,32 +220,19 @@ export default function OrderTrackingScreen() {
         </View>
       </View>
 
-      {/* Map View */}
       <View style={styles.mapContainer}>
         <MapView
           ref={mapRef}
           style={styles.map}
           provider={PROVIDER_GOOGLE}
           initialRegion={{
-            latitude: driverLocation?.latitude || customerLocation?.latitude || SHOP_LOCATION.latitude,
-            longitude: driverLocation?.longitude || customerLocation?.longitude || SHOP_LOCATION.longitude,
+            latitude: driverLocation?.latitude || customerLocation?.latitude || SHOP_FALLBACK_LAT,
+            longitude: driverLocation?.longitude || customerLocation?.longitude || SHOP_FALLBACK_LNG,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
           userInterfaceStyle={isDark ? 'dark' : 'light'}
         >
-          {/* Shop Marker */}
-          <Marker
-            coordinate={SHOP_LOCATION}
-            title="EasyBuy Shop"
-            description="Pickup Point"
-          >
-            <View style={[styles.markerBase, { backgroundColor: currentTheme.primary }]}>
-              <Package size={16} color="#FFFFFF" />
-            </View>
-          </Marker>
-
-          {/* Customer Marker */}
           {customerLocation && (
             <Marker
               coordinate={customerLocation}
@@ -170,48 +245,70 @@ export default function OrderTrackingScreen() {
             </Marker>
           )}
 
-          {/* Driver Marker */}
           {driverLocation && (
             <Marker
               coordinate={driverLocation}
-              title={order.driver?.first_name || "Driver"}
+              title={driverName || "Driver"}
               description="Live Location"
             >
               <View style={[styles.markerBase, { backgroundColor: '#22C55E' }]}>
-                <Navigation size={16} color="#FFFFFF" />
+                <Package size={16} color="#FFFFFF" />
               </View>
             </Marker>
           )}
 
-          {/* Simple Polyline (Route visualization placeholder) */}
-          {driverLocation && customerLocation && (
+          {polylinePoints.length > 1 && (
             <Polyline
-              coordinates={[driverLocation, customerLocation]}
+              coordinates={polylinePoints}
               strokeColor={currentTheme.primary}
-              strokeWidth={3}
-              lineDashPattern={[5, 5]}
+              strokeWidth={4}
+              lineDashPattern={routeCoords.length > 1 ? undefined : [5, 5]}
             />
           )}
         </MapView>
       </View>
 
-      {/* Info Card */}
       <View style={[styles.infoCard, { backgroundColor: currentTheme.surface }]}>
         <View style={styles.statusRow}>
           <View style={[styles.statusIndicator, { backgroundColor: currentTheme.primary }]} />
-          <Text style={[styles.statusText, { color: currentTheme.text }]}>{getStatusText()}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.statusText, { color: currentTheme.text }]}>{getStatusText()}</Text>
+            {(etaLabel || distanceLabel) && fulfillmentStatus === 'en_route' && (
+              <Text style={[styles.etaText, { color: currentTheme.textSecondary }]}>
+                {[etaLabel && `ETA ${etaLabel}`, distanceLabel].filter(Boolean).join(' • ')}
+              </Text>
+            )}
+          </View>
         </View>
 
-        {order.driver && (
+        {(driverName || order.driver) && (
           <View style={styles.driverInfo}>
             <View style={[styles.driverAvatar, { backgroundColor: currentTheme.border }]}>
-               <Text style={{ fontWeight: '700', color: currentTheme.text }}>{order.driver.first_name?.[0]}</Text>
+               <Text style={{ fontWeight: '700', color: currentTheme.text }}>
+                 {(driverName || order.driver?.first_name || 'D')[0]}
+               </Text>
             </View>
             <View style={styles.driverDetails}>
-              <Text style={[styles.driverName, { color: currentTheme.text }]}>{order.driver.first_name} {order.driver.last_name}</Text>
-              <Text style={[styles.vehicleInfo, { color: currentTheme.textSecondary }]}>{order.driver.vehicle_type || 'Rider'} • {order.driver.vehicle_registration || 'No Plate'}</Text>
+              <Text style={[styles.driverName, { color: currentTheme.text }]}>
+                {driverName || `${order.driver?.first_name} ${order.driver?.last_name}`}
+              </Text>
+              {vehicleInfo && (
+                <Text style={[styles.vehicleInfo, { color: currentTheme.textSecondary }]}>
+                  {vehicleInfo}
+                </Text>
+              )}
             </View>
-            <TouchableOpacity style={[styles.callButton, { backgroundColor: currentTheme.primary }]}>
+            <TouchableOpacity
+              style={[styles.callButton, { backgroundColor: currentTheme.primary }]}
+              onPress={() => {
+                const phone = order.driver?.phone_number;
+                if (phone) {
+                  Linking.openURL(`tel:${phone}`);
+                } else {
+                  ToastService.showWarning("No Phone", "Driver phone number is unavailable.");
+                }
+              }}
+            >
               <Phone size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -220,9 +317,26 @@ export default function OrderTrackingScreen() {
         <View style={[styles.addressBox, { backgroundColor: currentTheme.background }]}>
           <Text style={[styles.addressLabel, { color: currentTheme.textSecondary }]}>Delivery Address</Text>
           <Text style={[styles.addressText, { color: currentTheme.text }]} numberOfLines={2}>
-            {order.delivery_address || "No address provided"}
+            {order.delivery_address || tracking?.destination?.address || "No address provided"}
           </Text>
         </View>
+
+        {fulfillmentStatus === 'en_route' && (
+          <TouchableOpacity
+            style={[styles.confirmButton, { backgroundColor: '#22C55E', opacity: confirming ? 0.7 : 1 }]}
+            onPress={handleConfirmDelivery}
+            disabled={confirming}
+          >
+            {confirming ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <CheckCircle2 size={18} color="#FFFFFF" />
+                <Text style={styles.confirmButtonText}>Confirm Delivery Received</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -302,6 +416,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  etaText: {
+    fontSize: 13,
+    marginTop: 4,
+  },
   driverInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -345,5 +463,20 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  confirmButton: {
+    marginTop: 16,
+    height: 48,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  confirmButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+    marginLeft: 8,
   },
 });
