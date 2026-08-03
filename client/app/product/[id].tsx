@@ -24,6 +24,7 @@ import {
   ShoppingBag,
   Star,
 } from "lucide-react-native";
+import { GlassSurface } from "@/components/ui";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -648,7 +649,8 @@ export default function ProductDetailScreen() {
         </View>
       </ScrollView>
 
-      <View style={dynamicStyles.bottomBar}>
+      <GlassSurface level={3} borderRadius={0} style={{ borderLeftWidth: 0, borderRightWidth: 0, borderBottomWidth: 0 }}>
+      <View style={[dynamicStyles.bottomBar, { backgroundColor: 'transparent', borderTopWidth: 0, elevation: 0, shadowOpacity: 0 }]}>
         <View style={dynamicStyles.priceContainer}>
           <Text style={dynamicStyles.totalLabel}>Total Price</Text>
           <Text style={dynamicStyles.totalAmount}>
@@ -669,6 +671,7 @@ export default function ProductDetailScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+      </GlassSurface>
     </View>
   );
 }

@@ -17,6 +17,7 @@ import { ordersApi, Order, deliveryApi, OrderTracking } from "@/services/api";
 import { websocketService } from "@/services/websocket";
 import { ToastService } from "@/utils/toastService";
 import { decodePolyline } from "@/utils/polyline";
+import { TrackStepper, GlassSurface, Text as UIText, Button } from "@/components/ui";
 
 const { width } = Dimensions.get("window");
 
@@ -251,7 +252,7 @@ export default function OrderTrackingScreen() {
               title={driverName || "Driver"}
               description="Live Location"
             >
-              <View style={[styles.markerBase, { backgroundColor: '#22C55E' }]}>
+              <View style={[styles.markerBase, { backgroundColor: currentTheme.primary }]}>
                 <Package size={16} color="#FFFFFF" />
               </View>
             </Marker>
@@ -269,6 +270,17 @@ export default function OrderTrackingScreen() {
       </View>
 
       <View style={[styles.infoCard, { backgroundColor: currentTheme.surface }]}>
+        <TrackStepper
+          current={
+            fulfillmentStatus === 'delivered'
+              ? 3
+              : fulfillmentStatus === 'en_route'
+                ? 2
+                : fulfillmentStatus === 'preparing' || fulfillmentStatus === 'ready'
+                  ? 1
+                  : 0
+          }
+        />
         <View style={styles.statusRow}>
           <View style={[styles.statusIndicator, { backgroundColor: currentTheme.primary }]} />
           <View style={{ flex: 1 }}>
@@ -323,7 +335,7 @@ export default function OrderTrackingScreen() {
 
         {fulfillmentStatus === 'en_route' && (
           <TouchableOpacity
-            style={[styles.confirmButton, { backgroundColor: '#22C55E', opacity: confirming ? 0.7 : 1 }]}
+            style={[styles.confirmButton, { backgroundColor: currentTheme.primary, opacity: confirming ? 0.7 : 1 }]}
             onPress={handleConfirmDelivery}
             disabled={confirming}
           >

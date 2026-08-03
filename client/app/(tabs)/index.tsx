@@ -34,8 +34,19 @@ import {
   X,
   Plus,
 } from "lucide-react-native";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme, useAppTheme } from "@/contexts/ThemeContext";
 import { useCart } from "@/contexts/CartContext";
+import {
+  SearchBar,
+  Chip,
+  ProductCard,
+  SkeletonProductCard,
+  Text as UIText,
+  Screen,
+  HamburgerButton,
+  DrawerMenu,
+} from "@/components/ui";
+import { useAuth } from "@/contexts/AuthContext";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -45,15 +56,6 @@ const categoryIcons: Record<string, any> = {
   Snacks: Nut,
   Bags: ShoppingBag,
   Accessories: ShoppingBag,
-};
-
-const categoryColors: Record<string, { color: string; bgColor: string }> = {
-  Khat: { color: "#22C55E", bgColor: "#DCFCE7" },
-  Beverages: { color: "#3B82F6", bgColor: "#DBEAFE" },
-  Snacks: { color: "#F59E0B", bgColor: "#FEF3C7" },
-  Bags: { color: "#8B5CF6", bgColor: "#F3E8FF" },
-  Accessories: { color: "#8B5CF6", bgColor: "#F3E8FF" },
-  default: { color: "#64748B", bgColor: "#F1F5F9" },
 };
 
 export default function HomeScreen() {
@@ -67,7 +69,15 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const { currentTheme, themeName } = useTheme();
+  const theme = useAppTheme();
   const { addItem } = useCart();
+  const { logout } = useAuth();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const getColorsForCategory = (_categoryName: string) => ({
+    color: theme.colors.primary,
+    bgColor: theme.colors.primaryMuted,
+  });
 
   // Create dynamic styles based on theme
   const dynamicStyles = StyleSheet.create({
@@ -86,6 +96,7 @@ export default function HomeScreen() {
       fontWeight: "700",
       color: currentTheme.text,
       marginBottom: 4,
+      fontFamily: theme.fontFamily.display.bold,
     },
     welcomeSubtext: {
       fontSize: 16,
@@ -117,6 +128,7 @@ export default function HomeScreen() {
       fontWeight: "700",
       color: currentTheme.text,
       marginBottom: 12,
+      fontFamily: theme.fontFamily.display.semiBold,
     },
     categoryNameSmall: {
       fontSize: 12,
@@ -209,7 +221,7 @@ export default function HomeScreen() {
       borderRadius: 8,
     },
     clearSearchText: {
-      color: "#FFFFFF",
+      color: currentTheme.textOnPrimary ?? "#FFFFFF",
       fontSize: 14,
       fontWeight: "600",
     },
@@ -221,7 +233,7 @@ export default function HomeScreen() {
       alignItems: "center",
     },
     adminButtonText: {
-      color: "#FFFFFF",
+      color: currentTheme.textOnPrimary ?? "#FFFFFF",
       fontSize: 16,
       fontWeight: "600",
     },
@@ -387,10 +399,6 @@ export default function HomeScreen() {
     return categoryIcons[categoryName] || ShoppingBag;
   };
 
-  const getColorsForCategory = (categoryName: string) => {
-    return categoryColors[categoryName] || categoryColors.default;
-  };
-
   const renderCategoryItem = ({ item }: { item: Category }) => {
     const IconComponent = getIconForCategory(item.name);
     const colors = getColorsForCategory(item.name);
@@ -511,8 +519,8 @@ export default function HomeScreen() {
               <Text
                 style={[
                   dynamicStyles.stockText,
-                  item.minimum_stock &&
-                    item.in_stock <= item.minimum_stock && {
+                  Boolean(item.minimum_stock) &&
+                    item.in_stock <= (item.minimum_stock ?? 0) && {
                       color: currentTheme.error,
                     },
                 ]}
@@ -554,16 +562,21 @@ export default function HomeScreen() {
       <View
         style={[
           styles.centerContainer,
-          { backgroundColor: currentTheme.background },
+          { backgroundColor: currentTheme.background, padding: theme.spacing[5], gap: theme.spacing[4] },
         ]}
       >
-        <ActivityIndicator size="large" color={currentTheme.primary} />
-        <Text style={dynamicStyles.loadingText}>Loading...</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[3], width: '100%' }}>
+          <View style={{ width: '47%' }}><SkeletonProductCard /></View>
+          <View style={{ width: '47%' }}><SkeletonProductCard /></View>
+          <View style={{ width: '47%' }}><SkeletonProductCard /></View>
+          <View style={{ width: '47%' }}><SkeletonProductCard /></View>
+        </View>
       </View>
     );
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
       style={dynamicStyles.container}
       contentContainerStyle={styles.contentContainer}
@@ -577,13 +590,26 @@ export default function HomeScreen() {
         />
       }
     >
-      <View style={styles.welcomeSection}>
-        <Text style={dynamicStyles.welcomeSubtext}>
-          What would you like to buy today?
-        </Text>
+      <View style={[styles.welcomeSection, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+        <View style={{ flex: 1 }}>
+          <UIText variant="h3">Hello{user?.first_name ? `, ${user.first_name}` : ''}</UIText>
+          <Text style={dynamicStyles.welcomeSubtext}>
+            What would you like to buy today?
+          </Text>
+        </View>
+        <HamburgerButton open={drawerOpen} onPress={() => setDrawerOpen(true)} />
       </View>
 
       <View style={styles.searchContainer}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search products..."
+        />
+      </View>
+
+      {/* legacy search kept for structure — hidden */}
+      <View style={{ height: 0, overflow: 'hidden' }}>
         <View style={dynamicStyles.searchBar}>
           <Search
             size={20}
@@ -692,6 +718,14 @@ export default function HomeScreen() {
 
       <View style={styles.bottomSpacing} />
     </ScrollView>
+    <DrawerMenu
+      open={drawerOpen}
+      onClose={() => setDrawerOpen(false)}
+      userName={user ? `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() : undefined}
+      userEmail={user?.email}
+      onLogout={logout}
+    />
+    </View>
   );
 }
 
@@ -809,6 +843,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   bottomSpacing: {
-    height: 20,
+    height: 100,
   },
 });

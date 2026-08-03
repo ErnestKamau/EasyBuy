@@ -205,7 +205,7 @@ function RootLayoutNav() {
 
   // Create complete navigation theme with fonts
   const navigationTheme = {
-    dark: themeName === "dark" || themeName === "luxe",
+    dark: themeName === 'dark',
     colors: {
       primary: currentTheme.primary,
       background: currentTheme.background,
@@ -216,20 +216,20 @@ function RootLayoutNav() {
     },
     fonts: {
       regular: {
-        fontFamily: "System",
-        fontWeight: "normal" as const,
+        fontFamily: 'Inter_400Regular',
+        fontWeight: 'normal' as const,
       },
       medium: {
-        fontFamily: "System",
-        fontWeight: "500" as const,
+        fontFamily: 'Inter_500Medium',
+        fontWeight: '500' as const,
       },
       bold: {
-        fontFamily: "System",
-        fontWeight: "bold" as const,
+        fontFamily: 'Inter_700Bold',
+        fontWeight: 'bold' as const,
       },
       heavy: {
-        fontFamily: "System",
-        fontWeight: "800" as const,
+        fontFamily: 'Manrope_800ExtraBold',
+        fontWeight: '800' as const,
       },
     },
   };

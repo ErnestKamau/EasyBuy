@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Calendar,
 } from "lucide-react-native";
+import { StatusPill, OrderRow, SkeletonList, EmptyState } from "@/components/ui";
 
 // Helper function to create dynamic styles
 const createDynamicStyles = (currentTheme: any, themeName: string) =>
@@ -71,6 +72,7 @@ const createDynamicStyles = (currentTheme: any, themeName: string) =>
     },
     ordersList: {
       flex: 1,
+      paddingBottom: 100,
     },
     orderCard: {
       backgroundColor: currentTheme.surface,
@@ -343,21 +345,7 @@ export default function OrdersScreen(): React.ReactElement {
               </Text>
             </View>
           </View>
-          <View
-            style={[
-              dynamicStyles.statusBadge,
-              { backgroundColor: statusStyle.backgroundColor },
-            ]}
-          >
-            <Text
-              style={[
-                dynamicStyles.statusBadgeText,
-                { color: statusStyle.color },
-              ]}
-            >
-              {item.order_status}
-            </Text>
-          </View>
+          <StatusPill status={item.order_status} />
         </View>
 
         <View style={dynamicStyles.orderInfo}>
@@ -503,7 +491,7 @@ export default function OrdersScreen(): React.ReactElement {
           data={orders}
           renderItem={renderOrderCard}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ paddingVertical: 8 }}
+          contentContainerStyle={{ paddingVertical: 8, paddingBottom: 100 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

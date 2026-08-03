@@ -1,5 +1,5 @@
 import React from "react";
-import { StripeProvider } from "@stripe/stripe-react-native";
+import { StripeProvider, isStripeNativeAvailable } from "@/components/stripeNative";
 
 const publishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 
@@ -8,7 +8,7 @@ export function AppStripeProvider({
 }: {
   readonly children: React.ReactNode;
 }) {
-  if (!publishableKey) {
+  if (!publishableKey || !isStripeNativeAvailable) {
     return <>{children}</>;
   }
 

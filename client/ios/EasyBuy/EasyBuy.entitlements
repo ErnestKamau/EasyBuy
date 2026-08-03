@@ -8,5 +8,9 @@
     <array>
       <string>applinks:yourdomain.com</string>
     </array>
+    <key>com.apple.developer.in-app-payments</key>
+    <array>
+      <string>merchant.com.easybuy.app</string>
+    </array>
   </dict>
 </plist>

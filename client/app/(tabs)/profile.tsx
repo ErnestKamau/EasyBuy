@@ -28,7 +28,7 @@ import {
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
-  const { currentTheme, themeName } = useTheme(); // Use theme system
+  const { currentTheme, themeName, isSystemTheme } = useTheme(); // Use theme system
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -62,8 +62,10 @@ export default function ProfileScreen() {
   const menuItems = [
     {
       icon: Palette,
-      title: "Theme",
-      subtitle: `Current: ${themeName.charAt(0).toUpperCase() + themeName.slice(1)}`,
+      title: "Appearance",
+      subtitle: isSystemTheme
+        ? "System"
+        : `Current: ${themeName.charAt(0).toUpperCase() + themeName.slice(1)}`,
       onPress: navigateToThemeSelector,
       color: currentTheme.primary,
     },
@@ -110,11 +112,11 @@ export default function ProfileScreen() {
 
   return (
     <View
-      style={[styles.container, { backgroundColor: currentTheme.background }]}
+      style={[styles.container, { backgroundColor: currentTheme.background, paddingBottom: 88 }]}
     >
       <StatusBar
         barStyle={
-          themeName === "dark" || themeName === "luxe"
+          themeName === "dark"
             ? "light-content"
             : "dark-content"
         }

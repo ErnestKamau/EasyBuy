@@ -1,20 +1,26 @@
-// constants/Fonts.ts - Font configuration
+// constants/Fonts.ts — Jade Horizon (Manrope display + Inter body)
 export const Fonts = {
-  // Primary font - Inter (clean, professional)
   primary: {
     regular: 'Inter_400Regular',
     medium: 'Inter_500Medium',
     semiBold: 'Inter_600SemiBold',
     bold: 'Inter_700Bold',
   },
-  // Secondary font - Space Grotesk (modern, geometric)
-  secondary: {
-    regular: 'SpaceGrotesk_400Regular',
-    medium: 'SpaceGrotesk_500Medium',
-    semiBold: 'SpaceGrotesk_600SemiBold',
-    bold: 'SpaceGrotesk_700Bold',
+  display: {
+    regular: 'Manrope_400Regular',
+    medium: 'Manrope_500Medium',
+    semiBold: 'Manrope_600SemiBold',
+    bold: 'Manrope_700Bold',
+    extraBold: 'Manrope_800ExtraBold',
   },
-  // Accent font - Manrope (rounded, friendly)
+  /** @deprecated use display */
+  secondary: {
+    regular: 'Manrope_400Regular',
+    medium: 'Manrope_500Medium',
+    semiBold: 'Manrope_600SemiBold',
+    bold: 'Manrope_700Bold',
+  },
+  /** @deprecated use display */
   accent: {
     regular: 'Manrope_400Regular',
     medium: 'Manrope_500Medium',
@@ -24,8 +30,6 @@ export const Fonts = {
   },
 };
 
-// Default font family for the app
 export const defaultFontFamily = Fonts.primary.regular;
-export const headingFontFamily = Fonts.secondary.bold;
-export const accentFontFamily = Fonts.accent.semiBold;
-
+export const headingFontFamily = Fonts.display.bold;
+export const accentFontFamily = Fonts.display.semiBold;

@@ -1,19 +1,22 @@
-const tintColorLight = '#2f95dc';
-const tintColorDark = '#fff';
+/**
+ * @deprecated Use `@/design` or `useAppTheme()` instead.
+ * Kept so Expo template Themed.tsx still compiles.
+ */
+import { Themes } from '@/design';
 
 export default {
   light: {
-    text: '#000',
-    background: '#fff',
-    tint: tintColorLight,
-    tabIconDefault: '#ccc',
-    tabIconSelected: tintColorLight,
+    text: Themes.light.colors.text,
+    background: Themes.light.colors.background,
+    tint: Themes.light.colors.tint,
+    tabIconDefault: Themes.light.colors.tabIconDefault,
+    tabIconSelected: Themes.light.colors.tabIconSelected,
   },
   dark: {
-    text: '#fff',
-    background: '#000',
-    tint: tintColorDark,
-    tabIconDefault: '#ccc',
-    tabIconSelected: tintColorDark,
+    text: Themes.dark.colors.text,
+    background: Themes.dark.colors.background,
+    tint: Themes.dark.colors.tint,
+    tabIconDefault: Themes.dark.colors.tabIconDefault,
+    tabIconSelected: Themes.dark.colors.tabIconSelected,
   },
 };

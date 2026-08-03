@@ -1,11 +1,31 @@
-// contexts/ThemeContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+/**
+ * ThemeContext — Jade Horizon
+ * light | dark | system only. Exposes full AppTheme token object.
+ * currentTheme still returns flat colors for legacy screen compatibility.
+ */
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useMemo,
+  useCallback,
+} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance, ColorSchemeName } from 'react-native';
-import { Themes, ThemeName, Theme } from '@/constants/Themes';
+import {
+  Themes,
+  ThemeName,
+  AppTheme,
+  SemanticColors,
+} from '@/design';
 
 interface ThemeContextType {
-  currentTheme: Theme;
+  /** Full token object (preferred) */
+  theme: AppTheme;
+  /** Flat color aliases — legacy screens (admin/rider) */
+  currentTheme: SemanticColors;
   themeName: ThemeName;
   isSystemTheme: boolean;
   changeTheme: (theme: ThemeName) => Promise<void>;
@@ -18,6 +38,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 const THEME_STORAGE_KEY = '@app_theme_preference';
 const SYSTEM_THEME_KEY = '@app_use_system_theme';
 
+const VALID_THEMES: ThemeName[] = ['light', 'dark'];
+
 interface ThemeProviderProps {
   children: ReactNode;
 }
@@ -27,24 +49,19 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [isSystemTheme, setIsSystemTheme] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Get current theme object
-  const currentTheme = Themes[themeName];
+  const theme = Themes[themeName];
+  const currentTheme = theme.colors;
+  const availableThemes = VALID_THEMES;
 
-  // Available theme names
-  const availableThemes: ThemeName[] = Object.keys(Themes) as ThemeName[];
-
-  // Load saved theme preference on app start
   useEffect(() => {
     loadThemePreference();
   }, []);
 
-  // Listen to system theme changes when system theme is enabled
   useEffect(() => {
     if (!isSystemTheme) return;
 
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      const systemTheme = getSystemTheme(colorScheme);
-      setThemeName(systemTheme);
+      setThemeName(getSystemTheme(colorScheme));
     });
 
     return () => subscription?.remove();
@@ -52,6 +69,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   const getSystemTheme = (colorScheme: ColorSchemeName): ThemeName => {
     return colorScheme === 'dark' ? 'dark' : 'light';
+  };
+
+  const normalizeThemeName = (saved: string | null): ThemeName | null => {
+    if (!saved) return null;
+    // Migrate old multi-theme names → light/dark
+    if (saved === 'dark' || saved === 'luxe') return 'dark';
+    if (VALID_THEMES.includes(saved as ThemeName)) return saved as ThemeName;
+    // nature, ocean, sunset, light → light
+    return 'light';
   };
 
   const loadThemePreference = async () => {
@@ -65,16 +91,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setIsSystemTheme(useSystemTheme);
 
       if (useSystemTheme) {
-        // Use system theme
-        const systemColorScheme = Appearance.getColorScheme();
-        const systemTheme = getSystemTheme(systemColorScheme);
-        setThemeName(systemTheme);
-      } else if (savedTheme && availableThemes.includes(savedTheme as ThemeName)) {
-        // Use saved custom theme
-        setThemeName(savedTheme as ThemeName);
+        setThemeName(getSystemTheme(Appearance.getColorScheme()));
       } else {
-        // Fallback to light theme
-        setThemeName('light');
+        const normalized = normalizeThemeName(savedTheme);
+        setThemeName(normalized ?? 'light');
       }
     } catch (error) {
       console.warn('Failed to load theme preference:', error);
@@ -84,48 +104,46 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   };
 
-  const changeTheme = async (newTheme: ThemeName) => {
+  const changeTheme = useCallback(async (newTheme: ThemeName) => {
     try {
-      setThemeName(newTheme);
+      const resolved = VALID_THEMES.includes(newTheme) ? newTheme : 'light';
+      setThemeName(resolved);
       setIsSystemTheme(false);
-      
       await Promise.all([
-        AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme),
+        AsyncStorage.setItem(THEME_STORAGE_KEY, resolved),
         AsyncStorage.setItem(SYSTEM_THEME_KEY, 'false'),
       ]);
     } catch (error) {
       console.warn('Failed to save theme preference:', error);
     }
-  };
+  }, []);
 
-  const toggleSystemTheme = async () => {
+  const toggleSystemTheme = useCallback(async () => {
     try {
-      const newSystemThemeState = !isSystemTheme;
-      setIsSystemTheme(newSystemThemeState);
-
-      if (newSystemThemeState) {
-        // Switch to system theme
-        const systemColorScheme = Appearance.getColorScheme();
-        const systemTheme = getSystemTheme(systemColorScheme);
-        setThemeName(systemTheme);
+      const next = !isSystemTheme;
+      setIsSystemTheme(next);
+      if (next) {
+        setThemeName(getSystemTheme(Appearance.getColorScheme()));
       }
-
-      await AsyncStorage.setItem(SYSTEM_THEME_KEY, newSystemThemeState.toString());
+      await AsyncStorage.setItem(SYSTEM_THEME_KEY, next.toString());
     } catch (error) {
       console.warn('Failed to toggle system theme:', error);
     }
-  };
+  }, [isSystemTheme]);
 
-  const contextValue: ThemeContextType = useMemo(() => ({
-    currentTheme,
-    themeName,
-    isSystemTheme,
-    changeTheme,
-    toggleSystemTheme,
-    availableThemes,
-  }), [currentTheme, themeName, isSystemTheme, changeTheme, toggleSystemTheme, availableThemes]);
+  const contextValue: ThemeContextType = useMemo(
+    () => ({
+      theme,
+      currentTheme,
+      themeName,
+      isSystemTheme,
+      changeTheme,
+      toggleSystemTheme,
+      availableThemes,
+    }),
+    [theme, currentTheme, themeName, isSystemTheme, changeTheme, toggleSystemTheme, availableThemes],
+  );
 
-  // Don't render children until theme is loaded
   if (isLoading) {
     return null;
   }
@@ -144,3 +162,6 @@ export const useTheme = (): ThemeContextType => {
   }
   return context;
 };
+
+/** Convenience: full AppTheme tokens */
+export const useAppTheme = (): AppTheme => useTheme().theme;

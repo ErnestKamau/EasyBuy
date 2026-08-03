@@ -27,6 +27,7 @@ import {
   Clock,
   Truck,
 } from "lucide-react-native";
+import { EmptyState, CartItemRow, SegmentedControl, SummaryCard, Button } from "@/components/ui";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -663,21 +664,12 @@ export default function CartScreen(): React.ReactElement {
       </View>
 
       {state.items.length === 0 ? (
-        <View style={styles.emptyCart}>
-          <View style={dynamicStyles.emptyCartIcon}>
-            <ShoppingBag size={64} color={currentTheme.textSecondary} />
-          </View>
-          <Text style={dynamicStyles.emptyCartTitle}>Your cart is empty</Text>
-          <Text style={dynamicStyles.emptyCartSubtitle}>
-            Add some items to get started
-          </Text>
-          <TouchableOpacity
-            style={dynamicStyles.shopNowButton}
-            onPress={() => router.push("/(tabs)")}
-          >
-            <Text style={dynamicStyles.shopNowButtonText}>Start Shopping</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          title="Your cart is empty"
+          message="Add some items to get started"
+          actionLabel="Start Shopping"
+          onAction={() => router.push("/(tabs)")}
+        />
       ) : (
         <>
           <ScrollView

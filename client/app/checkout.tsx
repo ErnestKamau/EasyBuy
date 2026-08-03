@@ -27,7 +27,7 @@ import {
 } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ToastService } from "@/utils/toastService";
-import { useStripe } from "@stripe/stripe-react-native";
+import { useStripe } from "@/components/stripeNative";
 import {
   ArrowLeft,
   CreditCard,
@@ -36,6 +36,7 @@ import {
   Clock,
   CheckCircle,
 } from "lucide-react-native";
+import { SheetStatus, ReceiptTicket, Button } from "@/components/ui";
 
 type PaymentMethod = "cash" | "mpesa" | "card";
 type DeliveryType = "pickup" | "delivery";
@@ -53,6 +54,8 @@ export default function CheckoutScreen() {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [placedOrderNumber, setPlacedOrderNumber] = useState<string | null>(null);
+  const [sheetStatus, setSheetStatus] = useState<'processing' | 'success' | 'error' | null>(null);
   const [selectedPickupTime, setSelectedPickupTime] = useState<string | null>(
     null,
   );
@@ -483,6 +486,8 @@ export default function CheckoutScreen() {
       // Clear the cart after successful order creation
       clearCart();
       setOrderPlaced(true);
+      setPlacedOrderNumber(order.order_number || `#${order.id}`);
+      setSheetStatus(selectedPayment === "mpesa" ? "processing" : "success");
 
       // Determine success message based on payment method
       const successTitle =
@@ -523,70 +528,50 @@ export default function CheckoutScreen() {
 
   if (orderPlaced) {
     return (
-      <View style={styles.successContainer}>
+      <View style={[styles.successContainer, { paddingHorizontal: 24 }]}>
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
           backgroundColor={currentTheme.surface}
         />
-
-        <View style={styles.successContent}>
-          {paymentPolling ? (
-            <>
-              <View style={styles.successIcon}>
-                <ActivityIndicator size="large" color={currentTheme.primary} />
-              </View>
-              <Text style={styles.successTitle}>Processing Payment...</Text>
-              <Text style={styles.successMessage}>
-                Please complete the payment on your phone. This may take a few
-                moments.
-              </Text>
-            </>
-          ) : (
-            <>
-              <View style={styles.successIcon}>
-                <CheckCircle size={80} color={currentTheme.success} />
-              </View>
-              <Text style={styles.successTitle}>
-                Order Placed Successfully!
-              </Text>
-              <Text style={styles.successMessage}>
-                Your order has been received and will be prepared for pickup.
-              </Text>
-            </>
-          )}
-
-          <View style={styles.nextSteps}>
-            <View style={styles.stepItem}>
-              <Clock size={20} color={currentTheme.success} />
-              <Text style={styles.stepText}>Wait for admin confirmation</Text>
-            </View>
-            {selectedDelivery === "pickup" ? (
-              <View style={styles.stepItem}>
-                <MapPin size={20} color={currentTheme.success} />
-                <Text style={styles.stepText}>Visit the shop for pickup</Text>
-              </View>
-            ) : (
-              <View style={styles.stepItem}>
-                <MapPin size={20} color={currentTheme.success} />
-                <Text style={styles.stepText}>
-                  We'll deliver to your location
-                </Text>
-              </View>
-            )}
-            {selectedPayment !== "cash" && (
-              <View style={styles.stepItem}>
-                <CreditCard size={20} color={currentTheme.success} />
-                <Text style={styles.stepText}>
-                  {selectedPayment === "mpesa"
-                    ? "Pay via M-Pesa"
-                    : "Pay at the shop"}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.redirectText}>Redirecting to home...</Text>
-        </View>
+        <ReceiptTicket
+          title={paymentPolling ? "Almost there" : "Thank you!"}
+          subtitle={
+            paymentPolling
+              ? "Complete payment on your phone"
+              : "Your order has been confirmed"
+          }
+          rows={[
+            { label: "Order", value: placedOrderNumber || "—" },
+            { label: "Fulfillment", value: selectedDelivery === "pickup" ? "Pickup" : "Delivery" },
+            { label: "Payment", value: selectedPayment.toUpperCase() },
+          ]}
+          barcodeValue={placedOrderNumber || undefined}
+        />
+        <Button
+          title="Back to home"
+          onPress={() => router.replace("/(tabs)")}
+          fullWidth
+          style={{ marginTop: 16 }}
+        />
+        <SheetStatus
+          visible={sheetStatus != null}
+          status={sheetStatus === "error" ? "error" : paymentPolling || sheetStatus === "processing" ? "processing" : "success"}
+          title={
+            paymentPolling || sheetStatus === "processing"
+              ? "Processing..."
+              : "Success!"
+          }
+          message={
+            paymentPolling
+              ? "Complete the payment on your phone"
+              : "Your order was placed successfully"
+          }
+          onClose={() => setSheetStatus(null)}
+          onAction={() => {
+            setSheetStatus(null);
+            router.replace("/(tabs)");
+          }}
+        />
       </View>
     );
   }
@@ -701,7 +686,7 @@ export default function CheckoutScreen() {
             <View style={styles.paymentIcon}>
               <MapPin
                 size={24}
-                color={selectedDelivery === "pickup" ? "#22C55E" : "#64748B"}
+                color={selectedDelivery === "pickup" ? currentTheme.primary : currentTheme.textSecondary}
               />
             </View>
             <View style={styles.paymentContent}>
@@ -735,7 +720,7 @@ export default function CheckoutScreen() {
             <View style={styles.paymentIcon}>
               <MapPin
                 size={24}
-                color={selectedDelivery === "delivery" ? "#22C55E" : "#64748B"}
+                color={selectedDelivery === "delivery" ? currentTheme.primary : currentTheme.textSecondary}
               />
             </View>
             <View style={styles.paymentContent}>
@@ -786,7 +771,7 @@ export default function CheckoutScreen() {
                 ) : (
                   <MapPin
                     size={24}
-                    color={deliveryLocation ? "#22C55E" : "#64748B"}
+                    color={deliveryLocation ? currentTheme.primary : currentTheme.textSecondary}
                   />
                 )}
               </View>
@@ -883,7 +868,7 @@ export default function CheckoutScreen() {
                 <View style={styles.paymentIcon}>
                   <Clock
                     size={24}
-                    color={selectedPickupTime ? "#22C55E" : "#64748B"}
+                    color={selectedPickupTime ? currentTheme.primary : currentTheme.textSecondary}
                   />
                 </View>
                 <View style={styles.paymentContent}>
@@ -966,8 +951,8 @@ export default function CheckoutScreen() {
                   !canUseCash
                     ? "#94A3B8"
                     : selectedPayment === "cash"
-                      ? "#22C55E"
-                      : "#64748B"
+                      ? currentTheme.primary
+                      : currentTheme.textSecondary
                 }
               />
             </View>
@@ -1006,7 +991,7 @@ export default function CheckoutScreen() {
             <View style={styles.paymentIcon}>
               <Smartphone
                 size={24}
-                color={selectedPayment === "mpesa" ? "#22C55E" : "#64748B"}
+                color={selectedPayment === "mpesa" ? currentTheme.primary : currentTheme.textSecondary}
               />
             </View>
             <View style={styles.paymentContent}>
@@ -1040,7 +1025,7 @@ export default function CheckoutScreen() {
             <View style={styles.paymentIcon}>
               <CreditCard
                 size={24}
-                color={selectedPayment === "card" ? "#22C55E" : "#64748B"}
+                color={selectedPayment === "card" ? currentTheme.primary : currentTheme.textSecondary}
               />
             </View>
             <View style={styles.paymentContent}>

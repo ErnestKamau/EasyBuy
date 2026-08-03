@@ -40,11 +40,12 @@ import LottieView from "lottie-react-native";
 import { authApi, RegisterData, LoginData } from "../services/api";
 import { ToastService } from "@/utils/toastService";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme, useAppTheme } from "@/contexts/ThemeContext";
 import { defaultFontFamily, headingFontFamily } from "@/constants/Fonts";
 import CodeInput from "@/components/CodeInput";
 import NumericKeypad from "@/components/NumericKeypad";
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -682,6 +683,17 @@ export default function AuthScreens() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <LinearGradient
+        colors={
+          isDark
+            ? [currentTheme.horizonStart, currentTheme.horizonEnd]
+            : [currentTheme.horizonStart, currentTheme.background]
+        }
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 0.5 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
       {currentScreen === "email-verification" ? (
         renderScreen()
       ) : (
@@ -1398,11 +1410,13 @@ const createStyles = (theme: any, isDark: boolean) =>
       marginTop: -15,
     },
     formContainer: {
-      backgroundColor: theme.surface,
-      borderRadius: 16,
+      backgroundColor: isDark ? "rgba(35, 46, 39, 0.85)" : theme.surface,
+      borderRadius: 28,
       padding: 24,
       minHeight: 400,
       marginTop: -4,
+      borderWidth: StyleSheet.hairlineWidth * 2,
+      borderColor: isDark ? "rgba(183, 229, 186, 0.16)" : theme.border,
     },
     fullscreenContainer: {
       flex: 1,
@@ -1586,8 +1600,8 @@ const createStyles = (theme: any, isDark: boolean) =>
       height: 160,
       borderRadius: 80,
       backgroundColor: isDark
-        ? "rgba(91, 143, 199, 0.1)"
-        : "rgba(30, 58, 95, 0.08)",
+        ? "rgba(40, 135, 96, 0.15)"
+        : "rgba(40, 135, 96, 0.08)",
       justifyContent: "center",
       alignItems: "center",
       position: "relative",
@@ -1663,8 +1677,8 @@ const createStyles = (theme: any, isDark: boolean) =>
       height: 200,
       borderRadius: 100,
       backgroundColor: isDark
-        ? "rgba(91, 143, 199, 0.1)"
-        : "rgba(30, 58, 95, 0.08)",
+        ? "rgba(40, 135, 96, 0.15)"
+        : "rgba(40, 135, 96, 0.08)",
       justifyContent: "center",
       alignItems: "center",
       marginBottom: 32,

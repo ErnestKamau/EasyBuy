@@ -13,7 +13,7 @@ export default {
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#22C55E"
+      "backgroundColor": "#288760"
     },
     "ios": {
       "supportsTablet": true,
@@ -34,7 +34,7 @@ export default {
       },
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#22C55E"
+        "backgroundColor": "#288760"
       },
       "googleServicesFile": "./google-services.json",
       "intentFilters": [

@@ -42,7 +42,7 @@ import {
   User,
 } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
-import { useStripe } from "@stripe/stripe-react-native";
+import { useStripe } from "@/components/stripeNative";
 import {
   ArrowLeft,
   Plus,
