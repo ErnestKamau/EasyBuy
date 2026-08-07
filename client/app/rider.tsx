@@ -1,39 +1,57 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
-  Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
-  Switch,
   Alert,
   Modal,
   Linking,
+  Pressable,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { router } from "expo-router";
-import { 
-  Truck, 
-  MapPin, 
-  CheckCircle2, 
-  Navigation, 
-  Phone, 
+import {
+  Truck,
+  MapPin,
+  CheckCircle2,
+  Navigation,
+  Phone,
   Package,
   Power,
   RefreshCw,
-  LogOut
+  LogOut,
 } from "lucide-react-native";
 import * as Location from "expo-location";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useAppTheme } from "@/contexts/ThemeContext";
 import { Order, deliveryApi } from "@/services/api";
 import { websocketService } from "@/services/websocket";
 import { ToastService } from "@/utils/toastService";
+import { AppTheme } from "@/design";
+import { OrderStatus } from "@/components/ui/Badge";
+import {
+  Text,
+  Surface,
+  Card,
+  Button,
+  IconButton,
+  Switch,
+  StatusPill,
+  Divider,
+  GlassSurface,
+  Spinner,
+} from "@/components/ui";
+
+const RIDER_STATUS_MAP: Record<string, { pillStatus: OrderStatus; label: string }> = {
+  assigned: { pillStatus: "pending", label: "Assigned" },
+  driver_accepted: { pillStatus: "preparing", label: "Accepted" },
+  en_route: { pillStatus: "delivering", label: "En Route" },
+  delivered: { pillStatus: "delivered", label: "Delivered" },
+};
 
 export default function RiderDashboard() {
   const { user, logout } = useAuth();
-  const { currentTheme } = useTheme();
+  const theme = useAppTheme();
   const [loading, setLoading] = useState(true);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [isOnline, setIsOnline] = useState(false);
@@ -76,7 +94,7 @@ export default function RiderDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    
+
     if (user.role !== 'rider') {
       ToastService.showError("Access Denied", "Rider account required");
       router.replace("/(tabs)");
@@ -120,7 +138,7 @@ export default function RiderDashboard() {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
-      
+
       const { latitude, longitude, heading, speed } = location.coords;
       setCurrentLocation({ latitude, longitude });
 
@@ -215,202 +233,185 @@ export default function RiderDashboard() {
     }
   };
 
-  const renderOrderCard = (order: Order) => (
-    <View key={order.id} style={[styles.orderCard, { backgroundColor: currentTheme.surface }]}>
-      <View style={styles.orderHeader}>
-        <View>
-          <Text style={[styles.orderNumber, { color: currentTheme.text }]}>#{order.order_number}</Text>
-          <Text style={[styles.customerName, { color: currentTheme.textSecondary }]}>{order.user?.first_name} {order.user?.last_name}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.fulfillment_status) + '20' }]}>
-          <Text style={[styles.statusText, { color: getStatusColor(order.fulfillment_status) }]}>{order.fulfillment_status.toUpperCase()}</Text>
-        </View>
-      </View>
-
-      <View style={styles.addressContainer}>
-        <MapPin size={18} color={currentTheme.primary} />
-        <Text style={[styles.addressText, { color: currentTheme.text }]} numberOfLines={2}>{order.delivery_address}</Text>
-      </View>
-
-      <View style={styles.actionRow}>
-        {order.fulfillment_status === 'assigned' && (
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: currentTheme.primary }]}
-            onPress={() => handleStatusUpdate(order.id, 'driver_accepted')}
-          >
-            <CheckCircle2 size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Accept Assignment</Text>
-          </TouchableOpacity>
-        )}
-        
-        {order.fulfillment_status === 'driver_accepted' && (
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: '#8B5CF6' }]}
-            onPress={() => handleStatusUpdate(order.id, 'en_route')}
-          >
-            <Package size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Start Trip</Text>
-          </TouchableOpacity>
-        )}
-
-        {order.fulfillment_status === 'en_route' && (
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: '#22C55E' }]}
-            onPress={() => handleStatusUpdate(order.id, 'delivered')}
-          >
-            <Navigation size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Complete Delivery</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity 
-          style={[styles.circleButton, { backgroundColor: currentTheme.border }]}
-          onPress={() => {
-            if (order.delivery_lat && order.delivery_lng) {
-              setSelectedMapOrder(order);
-              setShowMapModal(true);
-            } else {
-              ToastService.showWarning("No Location", "This order does not have precise map coordinates.");
-            }
-          }}
-        >
-          <MapPin size={20} color={currentTheme.text} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.circleButton, { backgroundColor: currentTheme.border }]}
-          onPress={() => {
-            const phone = order.user?.phone_number;
-            if (phone) {
-              Linking.openURL(`tel:${phone}`);
-            } else {
-              ToastService.showWarning("No Phone", "Customer phone number is unavailable.");
-            }
-          }}
-        >
-          <Phone size={20} color={currentTheme.text} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'assigned': return '#F59E0B';
-      case 'driver_accepted': return '#8B5CF6';
-      case 'en_route': return '#3B82F6';
-      case 'delivered': return '#22C55E';
-      default: return '#64748B';
-    }
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
-      <View style={[styles.header, { backgroundColor: currentTheme.surface }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingHorizontal: theme.spacing[6],
+            paddingBottom: theme.spacing[6],
+            backgroundColor: theme.colors.surface,
+          },
+          theme.getElevation('elv200'),
+        ]}
+      >
         <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, { color: currentTheme.text }]}>Rider Dashboard</Text>
-          <Text style={[styles.headerSubtitle, { color: currentTheme.textSecondary }]}>Welcome back, {user?.first_name}</Text>
+          <Text variant="title">Rider Dashboard</Text>
+          <Text variant="bodySmall" color="secondary">Welcome back, {user?.first_name}</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity 
+          <IconButton
+            icon={<LogOut size={20} color={theme.colors.primary} />}
             onPress={handleLogout}
-            style={[styles.logoutButton, { backgroundColor: currentTheme.primary + '10' }]}
-          >
-            <LogOut size={20} color={currentTheme.primary} />
-          </TouchableOpacity>
+            accessibilityLabel="Logout"
+            style={{ backgroundColor: theme.colors.primaryMuted, marginRight: theme.spacing[4] }}
+          />
           <View style={styles.onlineToggle}>
-            <Text style={[styles.toggleLabel, { color: isOnline ? '#22C55E' : currentTheme.textSecondary }]}>
+            <Text
+              variant="caption"
+              style={{
+                color: isOnline ? theme.colors.success : theme.colors.textSecondary,
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                marginRight: theme.spacing[3],
+              }}
+            >
               {isOnline ? 'On' : 'Off'}
             </Text>
-            <Switch 
-              value={isOnline} 
-              onValueChange={toggleOnline}
-              trackColor={{ false: "#CBD5E1", true: "#86EFAC" }}
-              thumbColor={isOnline ? "#22C55E" : "#94A3B8"}
-            />
+            <Switch value={isOnline} onValueChange={toggleOnline} />
           </View>
         </View>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ padding: 20 }}>
+      <ScrollView style={styles.content} contentContainerStyle={{ padding: theme.spacing[6] }}>
         {/* Location Card */}
-        <View style={[styles.locationCard, { backgroundColor: currentTheme.surface }]}>
+        <Surface variant="elevated" padding={5} radius="lg" style={{ marginBottom: theme.spacing[7] }}>
           <View style={styles.locationHeader}>
-            <View style={[styles.locationIconContainer, { backgroundColor: currentTheme.primary + '15' }]}>
-              <MapPin size={24} color={currentTheme.primary} />
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: theme.radius.md,
+                backgroundColor: theme.colors.primaryMuted,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <MapPin size={24} color={theme.colors.primary} />
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={[styles.locationTitle, { color: currentTheme.textSecondary }]}>Your Current Location</Text>
-              <Text style={[styles.locationValue, { color: currentTheme.text }]} numberOfLines={1}>
+            <View style={{ flex: 1, marginLeft: theme.spacing[4] }}>
+              <Text variant="caption" color="secondary" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Your Current Location
+              </Text>
+              <Text variant="label" numberOfLines={1} style={{ marginTop: theme.spacing[1] }}>
                 {locationAddress || (isFetchingLocation ? "Detecting..." : "Not Set")}
               </Text>
             </View>
-            <TouchableOpacity 
+            <IconButton
+              icon={
+                isFetchingLocation ? (
+                  <Spinner />
+                ) : (
+                  <RefreshCw size={20} color={theme.colors.primary} />
+                )
+              }
               onPress={fetchCurrentLocation}
               disabled={isFetchingLocation}
+              accessibilityLabel="Refresh location"
+            />
+          </View>
+
+          {currentLocation && (
+            <View
               style={[
-                styles.refreshButton, 
-                { opacity: isFetchingLocation ? 0.5 : 1 }
+                styles.coordinatesRow,
+                { marginTop: theme.spacing[3], paddingTop: theme.spacing[3], borderTopColor: theme.colors.divider },
               ]}
             >
-              {isFetchingLocation ? (
-                <ActivityIndicator size="small" color={currentTheme.primary} />
-              ) : (
-                <RefreshCw size={20} color={currentTheme.primary} />
-              )}
-            </TouchableOpacity>
-          </View>
-          
-          {currentLocation && (
-            <View style={styles.coordinatesRow}>
-              <Text style={[styles.coordinateText, { color: currentTheme.textSecondary }]}>
+              <Text variant="caption" color="secondary" style={{ fontFamily: 'monospace' }}>
                 LAT: {currentLocation.latitude.toFixed(6)}
               </Text>
-              <View style={[styles.coordinateDivider, { backgroundColor: currentTheme.border }]} />
-              <Text style={[styles.coordinateText, { color: currentTheme.textSecondary }]}>
+              <Divider vertical style={{ height: 12, marginHorizontal: theme.spacing[3] }} />
+              <Text variant="caption" color="secondary" style={{ fontFamily: 'monospace' }}>
                 LNG: {currentLocation.longitude.toFixed(6)}
               </Text>
             </View>
           )}
-          
+
           {!isOnline && (
-            <Text style={[styles.locationHint, { color: currentTheme.textSecondary }]}>
+            <Text
+              variant="caption"
+              color="secondary"
+              style={{ fontStyle: 'italic', marginTop: theme.spacing[3], textAlign: 'center' }}
+            >
               Go online to enable automatic background tracking
             </Text>
           )}
-        </View>
+        </Surface>
 
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>Active Assignments ({activeOrders.length})</Text>
-          <TouchableOpacity onPress={fetchActiveAssignments}>
-            <RefreshCw size={18} color={currentTheme.primary} />
-          </TouchableOpacity>
+        <View style={[styles.sectionHeader, { marginBottom: theme.spacing[6] }]}>
+          <Text variant="title">Active Assignments ({activeOrders.length})</Text>
+          <IconButton
+            icon={<RefreshCw size={18} color={theme.colors.primary} />}
+            onPress={fetchActiveAssignments}
+            accessibilityLabel="Refresh assignments"
+          />
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={currentTheme.primary} style={{ marginTop: 50 }} />
+          <View style={{ marginTop: theme.spacing[10] }}>
+            <Spinner size="large" />
+          </View>
         ) : activeOrders.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Truck size={64} color={currentTheme.border} />
-            <Text style={[styles.emptyTitle, { color: currentTheme.textSecondary }]}>No Active Orders</Text>
-            <Text style={[styles.emptySubtitle, { color: currentTheme.textSecondary }]}>Switch to online to receive new delivery assignments</Text>
+          <View style={{ alignItems: 'center', marginTop: theme.spacing[12] }}>
+            <Truck size={64} color={theme.colors.border} />
+            <Text variant="title" color="secondary" style={{ marginTop: theme.spacing[5] }}>
+              No Active Orders
+            </Text>
+            <Text
+              variant="body"
+              color="secondary"
+              style={{ textAlign: 'center', marginTop: theme.spacing[2], paddingHorizontal: theme.spacing[9] }}
+            >
+              Switch to online to receive new delivery assignments
+            </Text>
           </View>
         ) : (
-          activeOrders.map(renderOrderCard)
+          activeOrders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              theme={theme}
+              onStatusUpdate={handleStatusUpdate}
+              onViewMap={() => {
+                if (
+                  Number.isFinite(Number(order.delivery_lat)) &&
+                  Number.isFinite(Number(order.delivery_lng))
+                ) {
+                  setSelectedMapOrder(order);
+                  setShowMapModal(true);
+                } else {
+                  ToastService.showWarning("No Location", "This order does not have precise map coordinates.");
+                }
+              }}
+              onCall={() => {
+                const phone = order.user?.phone_number;
+                if (phone) {
+                  Linking.openURL(`tel:${phone}`);
+                } else {
+                  ToastService.showWarning("No Phone", "Customer phone number is unavailable.");
+                }
+              }}
+            />
+          ))
         )}
       </ScrollView>
 
       {!isOnline && (
-        <View style={[styles.offlineOverlay, { backgroundColor: currentTheme.surface + 'F0' }]}>
-          <Power size={48} color={currentTheme.textSecondary} />
-          <Text style={[styles.offlineText, { color: currentTheme.text }]}>You are currently offline</Text>
-          <TouchableOpacity 
-            style={[styles.onlineButton, { backgroundColor: currentTheme.primary }]}
-            onPress={() => toggleOnline(true)}
-          >
-            <Text style={styles.onlineButtonText}>Go Online</Text>
-          </TouchableOpacity>
-        </View>
+        <GlassSurface
+          level={2}
+          borderRadius={0}
+          style={[styles.offlineOverlay, { top: 130 }]}
+        >
+          <View style={styles.offlineContent}>
+            <Power size={48} color={theme.colors.textSecondary} />
+            <Text variant="title" style={{ marginTop: theme.spacing[4], marginBottom: theme.spacing[6] }}>
+              You are currently offline
+            </Text>
+            <Button title="Go Online" onPress={() => toggleOnline(true)} />
+          </View>
+        </GlassSurface>
       )}
 
       {/* Map Viewer Modal */}
@@ -420,43 +421,62 @@ export default function RiderDashboard() {
         transparent={false}
         onRequestClose={() => setShowMapModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: currentTheme.background }}>
-          <View style={[styles.header, { backgroundColor: currentTheme.surface, paddingTop: 40, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 }]}>
-            <Text style={[styles.headerTitle, { color: currentTheme.text }]}>
-              Delivery Destination
-            </Text>
-            <TouchableOpacity onPress={() => setShowMapModal(false)}>
-              <Text style={{ color: currentTheme.primary, fontWeight: "600", fontSize: 16 }}>Close</Text>
-            </TouchableOpacity>
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+          <View
+            style={[
+              styles.header,
+              {
+                paddingTop: theme.spacing[9],
+                paddingHorizontal: theme.spacing[6],
+                paddingBottom: theme.spacing[5],
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <Text variant="title">Delivery Destination</Text>
+            <Pressable onPress={() => setShowMapModal(false)} hitSlop={8}>
+              <Text variant="label" color="brand">Close</Text>
+            </Pressable>
           </View>
-          
+
           <View style={{ flex: 1 }}>
-            {selectedMapOrder?.delivery_lat && selectedMapOrder?.delivery_lng && (
-              <MapView
-                provider={PROVIDER_GOOGLE}
-                style={StyleSheet.absoluteFillObject}
-                initialRegion={{
-                  latitude: selectedMapOrder.delivery_lat,
-                  longitude: selectedMapOrder.delivery_lng,
-                  latitudeDelta: 0.005,
-                  longitudeDelta: 0.005,
-                }}
-              >
-                <Marker 
-                  coordinate={{
-                    latitude: selectedMapOrder.delivery_lat,
-                    longitude: selectedMapOrder.delivery_lng,
+            {(() => {
+              const lat = Number(selectedMapOrder?.delivery_lat);
+              const lng = Number(selectedMapOrder?.delivery_lng);
+              if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+              return (
+                <MapView
+                  provider={PROVIDER_GOOGLE}
+                  style={StyleSheet.absoluteFillObject}
+                  initialRegion={{
+                    latitude: lat,
+                    longitude: lng,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
                   }}
-                  title="Deliver Here"
-                  description={selectedMapOrder.delivery_address || `Order #${selectedMapOrder.order_number}`}
-                />
-              </MapView>
-            )}
+                >
+                  <Marker
+                    coordinate={{ latitude: lat, longitude: lng }}
+                    title="Deliver Here"
+                    description={selectedMapOrder?.delivery_address || `Order #${selectedMapOrder?.order_number}`}
+                  />
+                </MapView>
+              );
+            })()}
           </View>
-          
-          <View style={{ padding: 20, backgroundColor: currentTheme.surface, borderTopWidth: 1, borderTopColor: currentTheme.border }}>
-             <Text style={{ color: currentTheme.text, fontSize: 16, fontWeight: '600', marginBottom: 6 }}>Destination Address</Text>
-             <Text style={{ color: currentTheme.textSecondary, fontSize: 14 }}>{selectedMapOrder?.delivery_address || "Address details unavailable"}</Text>
+
+          <View
+            style={{
+              padding: theme.spacing[6],
+              backgroundColor: theme.colors.surface,
+              borderTopWidth: StyleSheet.hairlineWidth * 2,
+              borderTopColor: theme.colors.border,
+            }}
+          >
+            <Text variant="label" style={{ marginBottom: theme.spacing[2] }}>Destination Address</Text>
+            <Text variant="body" color="secondary">
+              {selectedMapOrder?.delivery_address || "Address details unavailable"}
+            </Text>
           </View>
         </View>
       </Modal>
@@ -464,51 +484,117 @@ export default function RiderDashboard() {
   );
 }
 
+const OrderCard = ({
+  order,
+  theme,
+  onStatusUpdate,
+  onViewMap,
+  onCall,
+}: {
+  order: Order;
+  theme: AppTheme;
+  onStatusUpdate: (orderId: number, nextStatus: string) => void;
+  onViewMap: () => void;
+  onCall: () => void;
+}) => {
+  const statusMeta = RIDER_STATUS_MAP[order.fulfillment_status];
+
+  return (
+    <Card radius="lg" style={{ marginBottom: theme.spacing[6] }}>
+      <View style={[styles.orderHeader, { marginBottom: theme.spacing[5] }]}>
+        <View>
+          <Text variant="label">#{order.order_number}</Text>
+          <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing[1] }}>
+            {order.user?.first_name} {order.user?.last_name}
+          </Text>
+        </View>
+        <StatusPill
+          status={statusMeta?.pillStatus ?? order.fulfillment_status}
+          label={statusMeta?.label}
+        />
+      </View>
+
+      <View
+        style={[
+          styles.addressContainer,
+          {
+            marginBottom: theme.spacing[6],
+            padding: theme.spacing[3],
+            backgroundColor: theme.colors.backgroundSecondary,
+            borderRadius: theme.radius.sm,
+          },
+        ]}
+      >
+        <MapPin size={18} color={theme.colors.primary} />
+        <Text variant="bodySmall" numberOfLines={2} style={{ marginLeft: theme.spacing[3], flex: 1 }}>
+          {order.delivery_address}
+        </Text>
+      </View>
+
+      <View style={styles.actionRow}>
+        {order.fulfillment_status === 'assigned' && (
+          <Button
+            title="Accept Assignment"
+            onPress={() => onStatusUpdate(order.id, 'driver_accepted')}
+            leftIcon={<CheckCircle2 size={18} color={theme.colors.textOnPrimary} />}
+            style={{ flex: 1 }}
+          />
+        )}
+
+        {order.fulfillment_status === 'driver_accepted' && (
+          <Button
+            title="Start Trip"
+            onPress={() => onStatusUpdate(order.id, 'en_route')}
+            leftIcon={<Package size={18} color={theme.colors.textOnPrimary} />}
+            style={{ flex: 1 }}
+          />
+        )}
+
+        {order.fulfillment_status === 'en_route' && (
+          <Button
+            title="Complete Delivery"
+            onPress={() => onStatusUpdate(order.id, 'delivered')}
+            leftIcon={<Navigation size={18} color={theme.colors.textOnPrimary} />}
+            style={{ flex: 1 }}
+          />
+        )}
+
+        <IconButton
+          icon={<MapPin size={20} color={theme.colors.text} />}
+          onPress={onViewMap}
+          accessibilityLabel="View on map"
+          style={{ backgroundColor: theme.colors.backgroundSecondary, marginLeft: theme.spacing[3] }}
+        />
+
+        <IconButton
+          icon={<Phone size={20} color={theme.colors.text} />}
+          onPress={onCall}
+          accessibilityLabel="Call customer"
+          style={{ backgroundColor: theme.colors.backgroundSecondary, marginLeft: theme.spacing[3] }}
+        />
+      </View>
+    </Card>
+  );
+};
+
+// Layout-only styles (no theme colors — token-driven values are applied inline)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   header: {
     paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  headerSubtitle: {
-    fontSize: 14,
   },
   onlineToggle: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  toggleLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginRight: 8,
-    textTransform: 'uppercase',
-  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  logoutButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
   },
   content: {
     flex: 1,
@@ -517,182 +603,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  locationCard: {
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 24,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
   },
   locationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  locationIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  locationTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  locationValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  refreshButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   coordinatesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-  },
-  coordinateText: {
-    fontSize: 11,
-    fontFamily: 'monospace',
-    fontWeight: '600',
-  },
-  coordinateDivider: {
-    width: 1,
-    height: 12,
-    marginHorizontal: 12,
-  },
-  locationHint: {
-    fontSize: 11,
-    fontStyle: 'italic',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  orderCard: {
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 15,
-  },
-  orderNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  customerName: {
-    fontSize: 14,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '800',
   },
   addressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    padding: 12,
-    backgroundColor: 'rgba(0,0,0,0.02)',
-    borderRadius: 8,
-  },
-  addressText: {
-    fontSize: 14,
-    marginLeft: 10,
-    flex: 1,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  actionButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-  circleButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 10,
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 100,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 20,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 40,
-  },
   offlineOverlay: {
     ...StyleSheet.absoluteFillObject,
-    top: 130,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
   },
-  offlineText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  onlineButton: {
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 12,
-  },
-  onlineButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
+  offlineContent: {
+    alignItems: 'center',
   },
 });

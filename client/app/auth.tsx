@@ -2,15 +2,11 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
-  Text,
-  TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  ActivityIndicator,
-  Dimensions,
   Image,
 } from "react-native";
 import {
@@ -40,14 +36,20 @@ import LottieView from "lottie-react-native";
 import { authApi, RegisterData, LoginData } from "../services/api";
 import { ToastService } from "@/utils/toastService";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme, useAppTheme } from "@/contexts/ThemeContext";
-import { defaultFontFamily, headingFontFamily } from "@/constants/Fonts";
-import CodeInput from "@/components/CodeInput";
-import NumericKeypad from "@/components/NumericKeypad";
+import { useAppTheme } from "@/contexts/ThemeContext";
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const { width: screenWidth } = Dimensions.get("window");
+import { AppTheme } from "@/design";
+import {
+  Text,
+  Surface,
+  Button,
+  IconButton,
+  Input,
+  Checkbox,
+  OTPInput,
+  Divider,
+} from "@/components/ui";
 
 // Lottie Animation Component
 const LottieAnimation = ({
@@ -137,9 +139,9 @@ type AuthScreen =
 
 export default function AuthScreens() {
   const params = useLocalSearchParams();
-  const { currentTheme, themeName } = useTheme();
+  const theme = useAppTheme();
   const { login, socialLogin } = useAuth();
-  const isDark = themeName === "dark";
+  const isDark = theme.mode === "dark";
 
   const [currentScreen, setCurrentScreen] = useState<AuthScreen>(
     (params.mode as AuthScreen) || "login",
@@ -188,7 +190,7 @@ export default function AuthScreens() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
 
   // Verification state — pre-populate from URL params when redirected here after registration
-  const [verificationCode, setVerificationCode] = useState(["", "", "", ""]);
+  const [verificationCode, setVerificationCode] = useState("");
   const [userEmail, setUserEmail] = useState(
     (params.email as string) || "",
   );
@@ -202,11 +204,7 @@ export default function AuthScreens() {
     password_confirmation: "",
   });
 
-  const styles = createStyles(currentTheme, isDark);
   const insets = useSafeAreaInsets();
-
-  // Refs for OTP inputs
-  const codeInputRefs = useRef<(TextInput | null)[]>([]);
 
   // Handle login
   const handleLogin = useCallback(async () => {
@@ -338,7 +336,7 @@ export default function AuthScreens() {
       setVerificationFlow("registration");
       setCurrentScreen("email-verification");
       // Reset verification code input
-      setVerificationCode(["", "", "", ""]);
+      setVerificationCode("");
       ToastService.showSuccess(
         "Registration Successful!",
         "Please check your email for the OTP verification code",
@@ -369,7 +367,7 @@ export default function AuthScreens() {
       setUserEmail(forgotPasswordEmail);
       setVerificationFlow("password-reset");
       // Reset verification code input
-      setVerificationCode(["", "", "", ""]);
+      setVerificationCode("");
       setCurrentScreen("email-verification");
       ToastService.showSuccess(
         "Code Sent",
@@ -382,52 +380,20 @@ export default function AuthScreens() {
     }
   }, [forgotPasswordEmail]);
 
-  // Handle verification code input
-  const handleVerificationCodeChange = (index: number, value: string) => {
-    // Only allow single digit
-    if (value.length > 1) {
-      // If pasted multiple digits, take only the first one
-      value = value[0];
-    }
-
-    // Only allow numbers
-    if (value && !/^\d$/.test(value)) {
-      return;
-    }
-
-    const newCode = [...verificationCode];
-    newCode[index] = value;
-    setVerificationCode(newCode);
-
-    // Auto-focus next input
-    if (value && index < 3) {
-      codeInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  // Handle backspace to go to previous input
-  const handleVerificationCodeKeyPress = (index: number, key: string) => {
-    if (key === "Backspace" && !verificationCode[index] && index > 0) {
-      codeInputRefs.current[index - 1]?.focus();
-    }
-  };
-
   // Handle verification submit
   const handleVerifyCode = useCallback(async () => {
-    const code = verificationCode.join("");
-    if (code.length !== 4) {
+    if (verificationCode.length !== 4) {
       ToastService.showError("Invalid Code", "Please enter the 4-digit code");
       return;
     }
 
     setLoading(true);
     try {
-      const code = verificationCode.join("");
       const isRegistrationFlow = verificationFlow === "registration";
 
       if (isRegistrationFlow) {
         // Verify email code for registration
-        await authApi.verifyEmailCode(userEmail, code);
+        await authApi.verifyEmailCode(userEmail, verificationCode);
         ToastService.showSuccess(
           "Email Verified!",
           "Your email has been verified successfully",
@@ -435,7 +401,7 @@ export default function AuthScreens() {
         setCurrentScreen("account-created");
       } else {
         // Verify reset code for password reset
-        await authApi.verifyResetCode(userEmail, code);
+        await authApi.verifyResetCode(userEmail, verificationCode);
         ToastService.showSuccess(
           "Code Verified!",
           "Please set your new password",
@@ -444,8 +410,8 @@ export default function AuthScreens() {
       }
     } catch (error) {
       ToastService.showApiError(error, "Verification Failed");
-      // Clear code inputs on error
-      setVerificationCode(["", "", "", ""]);
+      // Clear code input on error
+      setVerificationCode("");
     } finally {
       setLoading(false);
     }
@@ -478,10 +444,9 @@ export default function AuthScreens() {
 
     setLoading(true);
     try {
-      const code = verificationCode.join("");
       await authApi.resetPassword(
         userEmail,
-        code,
+        verificationCode,
         resetPasswordData.password,
         resetPasswordData.password_confirmation,
       );
@@ -500,7 +465,7 @@ export default function AuthScreens() {
     } finally {
       setLoading(false);
     }
-  }, [resetPasswordData, verificationCode]);
+  }, [resetPasswordData, verificationCode, userEmail]);
 
   // Resend verification code
   const handleResendCode = useCallback(async () => {
@@ -551,7 +516,7 @@ export default function AuthScreens() {
               loading={loading}
               onRegister={handleRegister}
               onSwitchToLogin={() => setCurrentScreen("login")}
-              styles={styles}
+              theme={theme}
             />
           </Animated.View>
         );
@@ -574,7 +539,7 @@ export default function AuthScreens() {
               onGoogleLogin={handleGoogleLogin}
               onSwitchToRegister={() => setCurrentScreen("register")}
               onForgotPassword={() => setCurrentScreen("forgot-password")}
-              styles={styles}
+              theme={theme}
             />
           </Animated.View>
         );
@@ -590,7 +555,7 @@ export default function AuthScreens() {
               loading={loading}
               onSendCode={handleForgotPassword}
               onBack={() => setCurrentScreen("login")}
-              styles={styles}
+              theme={theme}
             />
           </Animated.View>
         );
@@ -603,7 +568,7 @@ export default function AuthScreens() {
             <EmailVerificationScreen
               email={userEmail}
               code={verificationCode}
-              onCodeChange={handleVerificationCodeChange}
+              onCodeChange={setVerificationCode}
               loading={loading}
               onVerify={handleVerifyCode}
               onResend={handleResendCode}
@@ -611,9 +576,7 @@ export default function AuthScreens() {
                 setVerificationFlow(null);
                 setCurrentScreen("login");
               }}
-              styles={styles}
-              codeInputRefs={codeInputRefs}
-              onKeyPress={handleVerificationCodeKeyPress}
+              theme={theme}
             />
           </Animated.View>
         );
@@ -632,7 +595,7 @@ export default function AuthScreens() {
               setShowConfirmPassword={setShowConfirmPassword}
               loading={loading}
               onReset={handleResetPassword}
-              styles={styles}
+              theme={theme}
             />
           </Animated.View>
         );
@@ -656,10 +619,10 @@ export default function AuthScreens() {
                   gender: undefined,
                   date_of_birth: "",
                 });
-                setVerificationCode(["", "", "", ""]);
+                setVerificationCode("");
                 setCurrentScreen("login");
               }}
-              styles={styles}
+              theme={theme}
             />
           </Animated.View>
         );
@@ -671,7 +634,7 @@ export default function AuthScreens() {
           >
             <PasswordChangedScreen
               onContinue={() => setCurrentScreen("login")}
-              styles={styles}
+              theme={theme}
             />
           </Animated.View>
         );
@@ -682,15 +645,15 @@ export default function AuthScreens() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <LinearGradient
         colors={
           isDark
-            ? [currentTheme.horizonStart, currentTheme.horizonEnd]
-            : [currentTheme.horizonStart, currentTheme.background]
+            ? [theme.colors.horizonStart, theme.colors.horizonEnd]
+            : [theme.colors.horizonStart, theme.colors.background]
         }
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.5 }}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
@@ -706,8 +669,9 @@ export default function AuthScreens() {
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingTop: Math.max(insets.top, 20),
-                paddingBottom: Math.max(insets.bottom, 20),
+                paddingHorizontal: theme.spacing[7],
+                paddingTop: Math.max(insets.top, theme.spacing[6]),
+                paddingBottom: Math.max(insets.bottom, theme.spacing[6]),
               },
             ]}
             keyboardShouldPersistTaps="handled"
@@ -720,6 +684,81 @@ export default function AuthScreens() {
     </SafeAreaView>
   );
 }
+
+// Shared header used across auth sub-screens
+const AuthHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
+  <View style={styles.headerContainer}>
+    <Text variant="h1" color="brand" style={{ textAlign: "center" }}>
+      {title}
+    </Text>
+    <Text variant="subtitle" color="secondary" style={{ textAlign: "center" }}>
+      {subtitle}
+    </Text>
+  </View>
+);
+
+// Icon in a soft circular badge — used for forgot-password / verification / success states
+const IconBadge = ({
+  icon,
+  theme,
+  size = 160,
+}: {
+  icon: React.ReactNode;
+  theme: AppTheme;
+  size?: number;
+}) => (
+  <View
+    style={{
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      backgroundColor: theme.colors.primaryMuted,
+      alignItems: "center",
+      justifyContent: "center",
+    }}
+  >
+    {icon}
+  </View>
+);
+
+const EyeToggle = ({
+  visible,
+  onToggle,
+  theme,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+  theme: AppTheme;
+}) => (
+  <Pressable onPress={onToggle} hitSlop={8}>
+    {visible ? (
+      <EyeOff size={theme.iconSize.md} color={theme.colors.textMuted} />
+    ) : (
+      <Eye size={theme.iconSize.md} color={theme.colors.textMuted} />
+    )}
+  </Pressable>
+);
+
+const AuthLink = ({
+  onPress,
+  text,
+  boldText,
+  theme,
+}: {
+  onPress: () => void;
+  text: string;
+  boldText: string;
+  theme: AppTheme;
+}) => (
+  <Pressable
+    onPress={onPress}
+    style={{ alignItems: "center", paddingVertical: theme.spacing[2] }}
+  >
+    <Text variant="body" color="secondary">
+      {text} <Text variant="body" color="brand" style={{ fontWeight: "600" }}>{boldText}</Text>
+    </Text>
+  </Pressable>
+);
 
 // Registration Screen Component
 const RegisterScreen = ({
@@ -734,203 +773,155 @@ const RegisterScreen = ({
   loading,
   onRegister,
   onSwitchToLogin,
-  styles,
+  theme,
 }: any) => (
-  <View style={styles.formContainer}>
-    <View style={styles.headerContainer}>
-      <Text style={styles.title}>Create Account</Text>
-      <Text style={styles.subtitle}>Sign up to continue</Text>
-    </View>
+  <Surface variant="glass" glassLevel={3} radius="xl" padding={7}>
+    <AuthHeader title="Create Account" subtitle="Sign up to continue" />
 
-    <View style={styles.inputWithIcon}>
-      <User size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        placeholderTextColor={styles.placeholderColor}
-        value={registerData.username}
+    <Input
+      leftIcon={<User size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      placeholder="Username"
+      value={registerData.username}
+      onChangeText={(text) =>
+        setRegisterData({ ...registerData, username: text })
+      }
+      autoCapitalize="none"
+      autoCorrect={false}
+      containerStyle={{ marginBottom: theme.spacing[5] }}
+    />
+
+    <View style={{ flexDirection: "row", gap: theme.spacing[4], marginBottom: theme.spacing[5] }}>
+      <Input
+        leftIcon={<User size={theme.iconSize.md} color={theme.colors.textMuted} />}
+        placeholder="First Name"
+        value={registerData.first_name}
         onChangeText={(text) =>
-          setRegisterData({ ...registerData, username: text })
+          setRegisterData({ ...registerData, first_name: text })
         }
-        autoCapitalize="none"
-        autoCorrect={false}
+        autoCapitalize="words"
+        containerStyle={{ flex: 1 }}
+      />
+
+      <Input
+        leftIcon={<User size={theme.iconSize.md} color={theme.colors.textMuted} />}
+        placeholder="Last Name"
+        value={registerData.last_name}
+        onChangeText={(text) =>
+          setRegisterData({ ...registerData, last_name: text })
+        }
+        autoCapitalize="words"
+        containerStyle={{ flex: 1 }}
       />
     </View>
 
-    <View style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}>
-      <View style={[styles.inputWithIcon, { flex: 1, marginBottom: 0 }]}>
-        <User size={20} color={styles.inputIcon.color} />
-        <TextInput
-          style={styles.input}
-          placeholder="First Name"
-          placeholderTextColor={styles.placeholderColor}
-          value={registerData.first_name}
-          onChangeText={(text) =>
-            setRegisterData({ ...registerData, first_name: text })
-          }
-          autoCapitalize="words"
+    <Input
+      leftIcon={<Mail size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      placeholder="Email Address"
+      value={registerData.email}
+      onChangeText={(text) =>
+        setRegisterData({ ...registerData, email: text })
+      }
+      keyboardType="email-address"
+      autoCapitalize="none"
+      autoComplete="email"
+      containerStyle={{ marginBottom: theme.spacing[5] }}
+    />
+
+    <Input
+      leftIcon={<Phone size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      placeholder="Phone Number (Optional)"
+      value={registerData.phone_number}
+      onChangeText={(text) =>
+        setRegisterData({ ...registerData, phone_number: text })
+      }
+      keyboardType="phone-pad"
+      containerStyle={{ marginBottom: theme.spacing[5] }}
+    />
+
+    <Input
+      leftIcon={<User size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      placeholder="Date of Birth (YYYY-MM-DD)"
+      value={registerData.date_of_birth}
+      onChangeText={(text) => {
+        // Allow only numbers and dashes, format as user types
+        let formatted = text.replaceAll(/[^\d-]/g, "");
+        // Auto-format as YYYY-MM-DD
+        if (formatted.length > 4 && !formatted.includes("-")) {
+          formatted = formatted.slice(0, 4) + "-" + formatted.slice(4);
+        }
+        if (formatted.length > 7 && formatted.split("-").length === 2) {
+          formatted = formatted.slice(0, 7) + "-" + formatted.slice(7);
+        }
+        // Limit to 10 characters (YYYY-MM-DD)
+        formatted = formatted.slice(0, 10);
+        setRegisterData({ ...registerData, date_of_birth: formatted });
+      }}
+      keyboardType="numeric"
+      maxLength={10}
+      containerStyle={{ marginBottom: theme.spacing[5] }}
+    />
+
+    <Input
+      leftIcon={<Lock size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      rightIcon={
+        <EyeToggle
+          visible={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          theme={theme}
         />
-      </View>
+      }
+      placeholder="Password (min 8 characters)"
+      value={registerData.password}
+      onChangeText={(text) =>
+        setRegisterData({ ...registerData, password: text })
+      }
+      secureTextEntry={!showPassword}
+      autoCapitalize="none"
+      containerStyle={{ marginBottom: theme.spacing[5] }}
+    />
 
-      <View style={[styles.inputWithIcon, { flex: 1, marginBottom: 0 }]}>
-        <User size={20} color={styles.inputIcon.color} />
-        <TextInput
-          style={styles.input}
-          placeholder="Last Name"
-          placeholderTextColor={styles.placeholderColor}
-          value={registerData.last_name}
-          onChangeText={(text) =>
-            setRegisterData({ ...registerData, last_name: text })
-          }
-          autoCapitalize="words"
+    <Input
+      leftIcon={<Lock size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      rightIcon={
+        <EyeToggle
+          visible={showConfirmPassword}
+          onToggle={() => setShowConfirmPassword(!showConfirmPassword)}
+          theme={theme}
         />
-      </View>
-    </View>
+      }
+      placeholder="Confirm Password"
+      value={registerData.password_confirmation}
+      onChangeText={(text) =>
+        setRegisterData({ ...registerData, password_confirmation: text })
+      }
+      secureTextEntry={!showConfirmPassword}
+      autoCapitalize="none"
+      containerStyle={{ marginBottom: theme.spacing[6] }}
+    />
 
-    <View style={styles.inputWithIcon}>
-      <Mail size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Email Address"
-        placeholderTextColor={styles.placeholderColor}
-        value={registerData.email}
-        onChangeText={(text) =>
-          setRegisterData({ ...registerData, email: text })
-        }
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
-      />
-    </View>
+    <Checkbox
+      checked={privacyAccepted}
+      onChange={setPrivacyAccepted}
+      label="I agree with privacy policy"
+    />
 
-    <View style={styles.inputWithIcon}>
-      <Phone size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Phone Number (Optional)"
-        placeholderTextColor={styles.placeholderColor}
-        value={registerData.phone_number}
-        onChangeText={(text) =>
-          setRegisterData({ ...registerData, phone_number: text })
-        }
-        keyboardType="phone-pad"
-      />
-    </View>
+    <View style={{ height: theme.spacing[6] }} />
 
-    <View style={styles.inputWithIcon}>
-      <User size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Date of Birth (YYYY-MM-DD)"
-        placeholderTextColor={styles.placeholderColor}
-        value={registerData.date_of_birth}
-        onChangeText={(text) => {
-          // Allow only numbers and dashes, format as user types
-          let formatted = text.replaceAll(/[^\d-]/g, "");
-          // Auto-format as YYYY-MM-DD
-          if (formatted.length > 4 && !formatted.includes("-")) {
-            formatted = formatted.slice(0, 4) + "-" + formatted.slice(4);
-          }
-          if (formatted.length > 7 && formatted.split("-").length === 2) {
-            formatted = formatted.slice(0, 7) + "-" + formatted.slice(7);
-          }
-          // Limit to 10 characters (YYYY-MM-DD)
-          formatted = formatted.slice(0, 10);
-          setRegisterData({ ...registerData, date_of_birth: formatted });
-        }}
-        keyboardType="numeric"
-        maxLength={10}
-      />
-    </View>
-
-    <View style={styles.inputWithIcon}>
-      <Lock size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Password (min 8 characters)"
-        placeholderTextColor={styles.placeholderColor}
-        value={registerData.password}
-        onChangeText={(text) =>
-          setRegisterData({ ...registerData, password: text })
-        }
-        secureTextEntry={!showPassword}
-        autoCapitalize="none"
-      />
-      <TouchableOpacity
-        onPress={() => setShowPassword(!showPassword)}
-        style={styles.eyeIcon}
-      >
-        {showPassword ? (
-          <EyeOff size={20} color={styles.inputIcon.color} />
-        ) : (
-          <Eye size={20} color={styles.inputIcon.color} />
-        )}
-      </TouchableOpacity>
-    </View>
-
-    <View style={styles.inputWithIcon}>
-      <Lock size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm Password"
-        placeholderTextColor={styles.placeholderColor}
-        value={registerData.password_confirmation}
-        onChangeText={(text) =>
-          setRegisterData({ ...registerData, password_confirmation: text })
-        }
-        secureTextEntry={!showConfirmPassword}
-        autoCapitalize="none"
-      />
-      <TouchableOpacity
-        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-        style={styles.eyeIcon}
-      >
-        {showConfirmPassword ? (
-          <EyeOff size={20} color={styles.inputIcon.color} />
-        ) : (
-          <Eye size={20} color={styles.inputIcon.color} />
-        )}
-      </TouchableOpacity>
-    </View>
-
-    <TouchableOpacity
-      style={[styles.checkboxContainer, { marginBottom: 24 }]}
-      onPress={() => setPrivacyAccepted(!privacyAccepted)}
-      activeOpacity={0.7}
-    >
-      <View
-        style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}
-      >
-        {privacyAccepted && (
-          <CheckCircle size={16} color={styles.checkboxIconColor} />
-        )}
-      </View>
-      <Text style={styles.checkboxText}>I agree with privacy policy</Text>
-    </TouchableOpacity>
-
-    <TouchableOpacity
-      style={[styles.primaryButton, loading && styles.buttonDisabled]}
+    <Button
+      title="Sign Up"
       onPress={onRegister}
-      disabled={loading}
-      activeOpacity={0.8}
-    >
-      {loading ? (
-        <ActivityIndicator color={styles.primaryButtonText.color} />
-      ) : (
-        <Text style={styles.primaryButtonText}>Sign Up</Text>
-      )}
-    </TouchableOpacity>
+      loading={loading}
+      fullWidth
+      style={{ marginBottom: theme.spacing[4] }}
+    />
 
-    <TouchableOpacity
-      style={styles.linkContainer}
+    <AuthLink
       onPress={onSwitchToLogin}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.linkText}>
-        Already have an account? <Text style={styles.linkTextBold}>Login</Text>
-      </Text>
-    </TouchableOpacity>
-  </View>
+      text="Already have an account?"
+      boldText="Login"
+      theme={theme}
+    />
+  </Surface>
 );
 
 // Login Screen Component
@@ -947,133 +938,110 @@ const LoginScreen = ({
   onGoogleLogin,
   onSwitchToRegister,
   onForgotPassword,
-  styles,
+  theme,
 }: any) => (
-  <View style={styles.formContainer}>
-    <View style={{ alignItems: "center", marginBottom: 16 }}>
+  <Surface variant="glass" glassLevel={3} radius="xl" padding={7}>
+    <View style={{ alignItems: "center", marginBottom: theme.spacing[5] }}>
       <Image
         source={require("@/assets/images/online-shopping-from-mobile.png")}
         style={{
           width: 180,
           height: 180,
-          marginBottom: 12,
+          marginBottom: theme.spacing[4],
         }}
         resizeMode="contain"
       />
     </View>
 
-    <View style={styles.headerContainer}>
-      <Text style={styles.title}>Login Account</Text>
-      <Text style={styles.subtitle}>Welcome Back!</Text>
-    </View>
+    <AuthHeader title="Login Account" subtitle="Welcome Back!" />
 
-    <View style={styles.inputWithIcon}>
-      <User size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Username or Email"
-        placeholderTextColor={styles.placeholderColor}
-        value={loginData.username}
-        onChangeText={(text) => setLoginData({ ...loginData, username: text })}
-        autoCapitalize="none"
-        autoComplete="username"
+    <Input
+      leftIcon={<User size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      placeholder="Username or Email"
+      value={loginData.username}
+      onChangeText={(text) => setLoginData({ ...loginData, username: text })}
+      autoCapitalize="none"
+      autoComplete="username"
+      containerStyle={{ marginBottom: theme.spacing[5] }}
+    />
+
+    <Input
+      leftIcon={<Lock size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      rightIcon={
+        <EyeToggle
+          visible={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          theme={theme}
+        />
+      }
+      placeholder="Password"
+      value={loginData.password}
+      onChangeText={(text) => setLoginData({ ...loginData, password: text })}
+      secureTextEntry={!showPassword}
+      autoCapitalize="none"
+      autoComplete="password"
+      containerStyle={{ marginBottom: theme.spacing[5] }}
+    />
+
+    <View style={styles.rememberForgotRow}>
+      <Checkbox
+        checked={rememberMe}
+        onChange={setRememberMe}
+        label="Keep me logged in"
       />
+      <Pressable onPress={onForgotPassword} hitSlop={8}>
+        <Text variant="label" color="brand">
+          Forgot Password?
+        </Text>
+      </Pressable>
     </View>
 
-    <View style={styles.inputWithIcon}>
-      <Lock size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor={styles.placeholderColor}
-        value={loginData.password}
-        onChangeText={(text) => setLoginData({ ...loginData, password: text })}
-        secureTextEntry={!showPassword}
-        autoCapitalize="none"
-        autoComplete="password"
-      />
-      <TouchableOpacity
-        onPress={() => setShowPassword(!showPassword)}
-        style={styles.eyeIcon}
-      >
-        {showPassword ? (
-          <EyeOff size={20} color={styles.inputIcon.color} />
-        ) : (
-          <Eye size={20} color={styles.inputIcon.color} />
-        )}
-      </TouchableOpacity>
-    </View>
+    <View style={{ height: theme.spacing[3] }} />
 
-    <View style={styles.rememberForgotContainer}>
-      <TouchableOpacity
-        style={styles.checkboxContainer}
-        onPress={() => setRememberMe(!rememberMe)}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-          {rememberMe && (
-            <CheckCircle size={16} color={styles.checkboxIconColor} />
-          )}
-        </View>
-        <Text style={styles.checkboxText}>Keep me logged in</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={onForgotPassword}
-        activeOpacity={0.7}
-        style={{ marginLeft: "auto", marginRight: -14, alignItems: "center" }}
-      >
-        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-      </TouchableOpacity>
-    </View>
-
-    <TouchableOpacity
-      style={[styles.primaryButton, loading && styles.buttonDisabled]}
+    <Button
+      title="Login"
       onPress={onLogin}
-      disabled={loading}
-      activeOpacity={0.8}
-    >
-      {loading ? (
-        <ActivityIndicator color={styles.primaryButtonText.color} />
-      ) : (
-        <Text style={styles.primaryButtonText}>Login</Text>
-      )}
-    </TouchableOpacity>
+      loading={loading}
+      fullWidth
+      style={{ marginBottom: theme.spacing[5] }}
+    />
 
     <View style={styles.socialDivider}>
-      <View style={styles.socialDividerLine} />
-      <Text style={styles.socialDividerText}>OR</Text>
-      <View style={styles.socialDividerLine} />
+      <Divider style={{ flex: 1 }} />
+      <Text
+        variant="caption"
+        color="muted"
+        style={{ marginHorizontal: theme.spacing[4] }}
+      >
+        OR
+      </Text>
+      <Divider style={{ flex: 1 }} />
     </View>
 
-    <TouchableOpacity
-      style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
-      onPress={onGoogleLogin}
-      disabled={googleLoading || loading}
-      activeOpacity={0.8}
-    >
-      {googleLoading ? (
-        <ActivityIndicator color="#000" />
-      ) : (
-        <>
-          <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-             <Text style={{ color: '#4285F4', fontWeight: 'bold', fontSize: 18 }}>G</Text>
-          </View>
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
-        </>
-      )}
-    </TouchableOpacity>
+    <View style={{ height: theme.spacing[5] }} />
 
-    <TouchableOpacity
-      style={styles.linkContainer}
+    <Button
+      title="Continue with Google"
+      variant="secondary"
+      onPress={onGoogleLogin}
+      loading={googleLoading}
+      disabled={googleLoading || loading}
+      fullWidth
+      leftIcon={
+        <Text style={{ color: "#4285F4", fontWeight: "bold", fontSize: 18 }}>
+          G
+        </Text>
+      }
+      style={{ marginBottom: theme.spacing[5] }}
+    />
+
+    <AuthLink
       onPress={onSwitchToRegister}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.linkText}>
-        Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text>
-      </Text>
-    </TouchableOpacity>
-  </View>
+      text="Don't have an account?"
+      boldText="Sign Up"
+      theme={theme}
+    />
+  </Surface>
 );
 
 // Forgot Password Screen Component
@@ -1083,67 +1051,68 @@ const ForgotPasswordScreen = ({
   loading,
   onSendCode,
   onBack,
-  styles,
+  theme,
 }: any) => (
-  <View style={styles.formContainer}>
-    <TouchableOpacity
-      style={styles.backButton}
+  <Surface variant="glass" glassLevel={3} radius="xl" padding={7}>
+    <IconButton
+      icon={<ArrowLeft size={theme.iconSize.lg} color={theme.colors.text} />}
       onPress={onBack}
-      activeOpacity={0.7}
-    >
-      <ArrowLeft size={24} color={styles.backButtonIcon.color} />
-    </TouchableOpacity>
+      accessibilityLabel="Back"
+      style={{ alignSelf: "flex-start", marginBottom: theme.spacing[5] }}
+    />
 
-    <View style={styles.iconContainer}>
-      <View style={styles.iconWrapper}>
-        <Shield size={80} color={styles.iconColor} strokeWidth={1.5} />
-      </View>
-    </View>
-
-    <View style={styles.headerContainer}>
-      <Text style={styles.title}>Forgot Password?</Text>
-      <Text style={styles.subtitle}>No worries, We got you.</Text>
-    </View>
-
-    <Text style={styles.infoText}>We'll send you code to reset it.</Text>
-
-    <View style={styles.inputWithIcon}>
-      <Mail size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Email Address"
-        placeholderTextColor={styles.placeholderColor}
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
+    <View style={{ alignItems: "center", marginBottom: theme.spacing[8] }}>
+      <IconBadge
+        theme={theme}
+        icon={<Shield size={80} color={theme.colors.primary} strokeWidth={1.5} />}
       />
     </View>
 
-    <TouchableOpacity
-      style={[styles.primaryButton, loading && styles.buttonDisabled]}
-      onPress={onSendCode}
-      disabled={loading}
-      activeOpacity={0.8}
-    >
-      {loading ? (
-        <ActivityIndicator color={styles.primaryButtonText.color} />
-      ) : (
-        <Text style={styles.primaryButtonText}>Send Code</Text>
-      )}
-    </TouchableOpacity>
+    <AuthHeader title="Forgot Password?" subtitle="No worries, We got you." />
 
-    <TouchableOpacity
-      style={styles.linkContainer}
-      onPress={onBack}
-      activeOpacity={0.7}
+    <Text
+      variant="body"
+      color="secondary"
+      style={{ textAlign: "center", marginBottom: theme.spacing[6] }}
     >
-      <Text style={styles.linkText}>
-        <ArrowLeft size={14} color={styles.linkText.color} /> Back to log in?
+      We'll send you code to reset it.
+    </Text>
+
+    <Input
+      leftIcon={<Mail size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      placeholder="Email Address"
+      value={email}
+      onChangeText={setEmail}
+      keyboardType="email-address"
+      autoCapitalize="none"
+      autoComplete="email"
+      containerStyle={{ marginBottom: theme.spacing[6] }}
+    />
+
+    <Button
+      title="Send Code"
+      onPress={onSendCode}
+      loading={loading}
+      fullWidth
+      style={{ marginBottom: theme.spacing[4] }}
+    />
+
+    <Pressable
+      onPress={onBack}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: theme.spacing[2],
+        paddingVertical: theme.spacing[2],
+      }}
+    >
+      <ArrowLeft size={theme.iconSize.sm} color={theme.colors.textSecondary} />
+      <Text variant="body" color="secondary">
+        Back to log in?
       </Text>
-    </TouchableOpacity>
-  </View>
+    </Pressable>
+  </Surface>
 );
 
 // Email Verification Screen Component
@@ -1155,78 +1124,60 @@ const EmailVerificationScreen = ({
   onVerify,
   onResend,
   onBack,
-  styles,
-  codeInputRefs,
-  onKeyPress,
+  theme,
 }: any) => (
-  <View style={styles.formContainer}>
-    <TouchableOpacity
-      style={styles.backButton}
+  <Surface variant="glass" glassLevel={3} radius="xl" padding={7}>
+    <IconButton
+      icon={<ArrowLeft size={theme.iconSize.lg} color={theme.colors.text} />}
       onPress={onBack}
-      activeOpacity={0.7}
+      accessibilityLabel="Back"
+      style={{ alignSelf: "flex-start", marginBottom: theme.spacing[5] }}
+    />
+
+    <View style={{ alignItems: "center", marginBottom: theme.spacing[8] }}>
+      <IconBadge
+        theme={theme}
+        icon={<Mail size={80} color={theme.colors.primary} strokeWidth={1.5} />}
+      />
+    </View>
+
+    <AuthHeader title="Verify Email" subtitle="Enter the 4-digit code sent to" />
+
+    <Text
+      variant="body"
+      color="primary"
+      style={{ textAlign: "center", marginBottom: theme.spacing[8] }}
     >
-      <ArrowLeft size={24} color={styles.backButtonIcon.color} />
-    </TouchableOpacity>
-
-    <View style={styles.iconContainer}>
-      <View style={styles.iconWrapper}>
-        <Mail size={80} color={styles.iconColor} strokeWidth={1.5} />
-      </View>
-    </View>
-
-    <View style={styles.headerContainer}>
-      <Text style={styles.title}>Verify Email</Text>
-      <Text style={styles.subtitle}>Enter the 4-digit code sent to</Text>
-    </View>
-
-    <Text style={styles.emailText}>
-      {email} <Text style={styles.emailHighlight} onPress={onBack}>Edit</Text>
+      {email}{" "}
+      <Text
+        variant="body"
+        color="brand"
+        style={{ fontWeight: "700" }}
+        onPress={onBack}
+      >
+        Edit
+      </Text>
     </Text>
 
-    <View style={styles.codeContainer}>
-      {code.map((digit: string, index: number) => (
-        <TextInput
-          key={index}
-          ref={(el) => {
-            codeInputRefs.current[index] = el;
-          }}
-          style={styles.codeInput}
-          value={digit}
-          onChangeText={(text) => onCodeChange(index, text)}
-          onKeyPress={({ nativeEvent }) => onKeyPress(index, nativeEvent.key)}
-          keyboardType="numeric"
-          maxLength={1}
-          selectTextOnFocus
-          placeholder="0"
-          placeholderTextColor={styles.placeholderColor}
-        />
-      ))}
+    <View style={{ marginBottom: theme.spacing[8] }}>
+      <OTPInput length={4} value={code} onChange={onCodeChange} />
     </View>
 
-    <TouchableOpacity
-      style={[styles.primaryButton, loading && styles.buttonDisabled]}
+    <Button
+      title="Verify"
       onPress={onVerify}
-      disabled={loading}
-      activeOpacity={0.8}
-    >
-      {loading ? (
-        <ActivityIndicator color={styles.primaryButtonText.color} />
-      ) : (
-        <Text style={styles.primaryButtonText}>Verify</Text>
-      )}
-    </TouchableOpacity>
+      loading={loading}
+      fullWidth
+      style={{ marginBottom: theme.spacing[4] }}
+    />
 
-    <TouchableOpacity
-      style={styles.linkContainer}
+    <AuthLink
       onPress={onResend}
-      disabled={loading}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.linkText}>
-        Didn't receive code? <Text style={styles.linkTextBold}>Resend</Text>
-      </Text>
-    </TouchableOpacity>
-  </View>
+      text="Didn't receive code?"
+      boldText="Resend"
+      theme={theme}
+    />
+  </Surface>
 );
 
 // Reset Password Screen Component
@@ -1239,464 +1190,180 @@ const ResetPasswordScreen = ({
   setShowConfirmPassword,
   loading,
   onReset,
-  styles,
+  theme,
 }: any) => (
-  <View style={styles.formContainer}>
-    <View style={styles.iconContainer}>
-      <View style={styles.iconWrapper}>
-        <LottieAnimation
-          source={require("@/assets/lottie/set-password.json")}
-          size={160}
-          autoPlay={true}
-          loop={true}
-          fallbackIcon={Lock}
-          fallbackColor={styles.iconColor}
+  <Surface variant="glass" glassLevel={3} radius="xl" padding={7}>
+    <View style={{ alignItems: "center", marginBottom: theme.spacing[8] }}>
+      <IconBadge
+        theme={theme}
+        icon={
+          <LottieAnimation
+            source={require("@/assets/lottie/set-password.json")}
+            size={160}
+            autoPlay={true}
+            loop={true}
+            fallbackIcon={Lock}
+            fallbackColor={theme.colors.primary}
+          />
+        }
+      />
+    </View>
+
+    <AuthHeader title="Set New Password" subtitle="Create a unique password." />
+
+    <Input
+      leftIcon={<Lock size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      rightIcon={
+        <EyeToggle
+          visible={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          theme={theme}
         />
-      </View>
-    </View>
+      }
+      placeholder="New Password"
+      value={passwordData.password}
+      onChangeText={(text) =>
+        setPasswordData({ ...passwordData, password: text })
+      }
+      secureTextEntry={!showPassword}
+      autoCapitalize="none"
+      containerStyle={{ marginBottom: theme.spacing[5] }}
+    />
 
-    <View style={styles.headerContainer}>
-      <Text style={styles.title}>Set New Password</Text>
-      <Text style={styles.subtitle}>Create a unique password.</Text>
-    </View>
+    <Input
+      leftIcon={<Lock size={theme.iconSize.md} color={theme.colors.textMuted} />}
+      rightIcon={
+        <EyeToggle
+          visible={showConfirmPassword}
+          onToggle={() => setShowConfirmPassword(!showConfirmPassword)}
+          theme={theme}
+        />
+      }
+      placeholder="Confirm Password"
+      value={passwordData.password_confirmation}
+      onChangeText={(text) =>
+        setPasswordData({ ...passwordData, password_confirmation: text })
+      }
+      secureTextEntry={!showConfirmPassword}
+      autoCapitalize="none"
+      containerStyle={{ marginBottom: theme.spacing[6] }}
+    />
 
-    <View style={styles.inputWithIcon}>
-      <Lock size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="New Password"
-        placeholderTextColor={styles.placeholderColor}
-        value={passwordData.password}
-        onChangeText={(text) =>
-          setPasswordData({ ...passwordData, password: text })
-        }
-        secureTextEntry={!showPassword}
-        autoCapitalize="none"
-      />
-      <TouchableOpacity
-        onPress={() => setShowPassword(!showPassword)}
-        style={styles.eyeIcon}
-      >
-        {showPassword ? (
-          <EyeOff size={20} color={styles.inputIcon.color} />
-        ) : (
-          <Eye size={20} color={styles.inputIcon.color} />
-        )}
-      </TouchableOpacity>
-    </View>
-
-    <View style={styles.inputWithIcon}>
-      <Lock size={20} color={styles.inputIcon.color} />
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm Password"
-        placeholderTextColor={styles.placeholderColor}
-        value={passwordData.password_confirmation}
-        onChangeText={(text) =>
-          setPasswordData({ ...passwordData, password_confirmation: text })
-        }
-        secureTextEntry={!showConfirmPassword}
-        autoCapitalize="none"
-      />
-      <TouchableOpacity
-        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-        style={styles.eyeIcon}
-      >
-        {showConfirmPassword ? (
-          <EyeOff size={20} color={styles.inputIcon.color} />
-        ) : (
-          <Eye size={20} color={styles.inputIcon.color} />
-        )}
-      </TouchableOpacity>
-    </View>
-
-    <TouchableOpacity
-      style={[styles.primaryButton, loading && styles.buttonDisabled]}
-      onPress={onReset}
-      disabled={loading}
-      activeOpacity={0.8}
-    >
-      {loading ? (
-        <ActivityIndicator color={styles.primaryButtonText.color} />
-      ) : (
-        <Text style={styles.primaryButtonText}>Reset Password</Text>
-      )}
-    </TouchableOpacity>
-  </View>
+    <Button title="Reset Password" onPress={onReset} loading={loading} fullWidth />
+  </Surface>
 );
 
 // Account Created Success Screen
-const AccountCreatedScreen = ({ onContinue, styles }: any) => (
-  <View style={styles.successContainer}>
-    <View style={styles.iconContainer}>
-      <View style={styles.successIconWrapper}>
-        <CheckCircle
-          size={120}
-          color={styles.successIcon.color}
-          strokeWidth={2}
-        />
-      </View>
+const AccountCreatedScreen = ({ onContinue, theme }: any) => (
+  <Surface
+    variant="glass"
+    glassLevel={3}
+    radius="xl"
+    padding={8}
+    style={{ minHeight: 500, justifyContent: "center", alignItems: "center" }}
+  >
+    <View style={{ alignItems: "center", marginBottom: theme.spacing[8] }}>
+      <IconBadge
+        theme={theme}
+        size={200}
+        icon={<CheckCircle size={120} color={theme.colors.primary} strokeWidth={2} />}
+      />
     </View>
 
-    <View style={styles.headerContainer}>
-      <Text style={styles.title}>Account Created!</Text>
-      <Text style={styles.subtitle}>Welcome to EasyBuy.</Text>
-    </View>
+    <AuthHeader title="Account Created!" subtitle="Welcome to EasyBuy." />
 
-    <Text style={styles.successMessage}>Your account has been created</Text>
-    <Text style={styles.successTitle}>Successfully!</Text>
-
-    <TouchableOpacity
-      style={styles.primaryButton}
-      onPress={onContinue}
-      activeOpacity={0.8}
+    <Text variant="body" color="secondary" style={{ textAlign: "center" }}>
+      Your account has been created
+    </Text>
+    <Text
+      variant="h2"
+      color="brand"
+      style={{ textAlign: "center", marginBottom: theme.spacing[9] }}
     >
-      <Text style={styles.primaryButtonText}>Continue</Text>
-      <ArrowRight size={20} color={styles.primaryButtonText.color} />
-    </TouchableOpacity>
-  </View>
+      Successfully!
+    </Text>
+
+    <Button
+      title="Continue"
+      onPress={onContinue}
+      fullWidth
+      rightIcon={<ArrowRight size={theme.iconSize.md} color={theme.colors.textOnPrimary} />}
+    />
+  </Surface>
 );
 
 // Password Changed Success Screen
-const PasswordChangedScreen = ({ onContinue, styles }: any) => (
-  <View style={styles.successContainer}>
-    <View style={styles.iconContainer}>
-      <View style={styles.successIconWrapper}>
-        <LottieAnimation
-          source={require("@/assets/lottie/success.json")}
-          size={160}
-          autoPlay={true}
-          loop={false}
-          fallbackIcon={CheckCircle}
-          fallbackColor={styles.successIcon.color}
-        />
-      </View>
+const PasswordChangedScreen = ({ onContinue, theme }: any) => (
+  <Surface
+    variant="glass"
+    glassLevel={3}
+    radius="xl"
+    padding={8}
+    style={{ minHeight: 500, justifyContent: "center", alignItems: "center" }}
+  >
+    <View style={{ alignItems: "center", marginBottom: theme.spacing[8] }}>
+      <IconBadge
+        theme={theme}
+        size={200}
+        icon={
+          <LottieAnimation
+            source={require("@/assets/lottie/success.json")}
+            size={160}
+            autoPlay={true}
+            loop={false}
+            fallbackIcon={CheckCircle}
+            fallbackColor={theme.colors.primary}
+          />
+        }
+      />
     </View>
 
-    <View style={styles.headerContainer}>
-      <Text style={styles.title}>Password Changed!</Text>
-      <Text style={styles.subtitle}>No hassle anymore.</Text>
-    </View>
+    <AuthHeader title="Password Changed!" subtitle="No hassle anymore." />
 
-    <Text style={styles.successMessage}>Your password has been reset</Text>
-    <Text style={styles.successTitle}>Successfully!</Text>
-
-    <TouchableOpacity
-      style={styles.primaryButton}
-      onPress={onContinue}
-      activeOpacity={0.8}
+    <Text variant="body" color="secondary" style={{ textAlign: "center" }}>
+      Your password has been reset
+    </Text>
+    <Text
+      variant="h2"
+      color="brand"
+      style={{ textAlign: "center", marginBottom: theme.spacing[9] }}
     >
-      <Text style={styles.primaryButtonText}>Continue</Text>
-      <ArrowRight size={20} color={styles.primaryButtonText.color} />
-    </TouchableOpacity>
-  </View>
+      Successfully!
+    </Text>
+
+    <Button
+      title="Continue"
+      onPress={onContinue}
+      fullWidth
+      rightIcon={<ArrowRight size={theme.iconSize.md} color={theme.colors.textOnPrimary} />}
+    />
+  </Surface>
 );
 
-// Styles
-const createStyles = (theme: any, isDark: boolean) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-      marginTop: 0,
-    },
-    keyboardAvoid: {
-      flex: 1,
-    },
-    scrollContent: {
-      flexGrow: 1,
-      justifyContent: "center",
-      paddingHorizontal: 24,
-      marginTop: -15,
-    },
-    formContainer: {
-      backgroundColor: isDark ? "rgba(35, 46, 39, 0.85)" : theme.surface,
-      borderRadius: 28,
-      padding: 24,
-      minHeight: 400,
-      marginTop: -4,
-      borderWidth: StyleSheet.hairlineWidth * 2,
-      borderColor: isDark ? "rgba(183, 229, 186, 0.16)" : theme.border,
-    },
-    fullscreenContainer: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    headerContainer: {
-      alignItems: "center",
-      marginBottom: 28,
-      marginTop: -20,
-    },
-    title: {
-      fontSize: 32,
-      fontWeight: "700",
-      color: theme.primary,
-      marginBottom: 8,
-      letterSpacing: -0.5,
-      fontFamily: headingFontFamily,
-      marginTop: -4,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: theme.textSecondary,
-      textAlign: "center",
-      fontFamily: defaultFontFamily,
-      marginTop: -6,
-      marginBottom: -6,
-    },
-    inputWithIcon: {
-      flexDirection: "row",
-      alignItems: "center",
-      borderWidth: 2,
-      borderColor: theme.primary,
-      borderRadius: 12,
-      backgroundColor: theme.surface,
-      paddingHorizontal: 16,
-      marginBottom: 20,
-      minHeight: 56,
-      marginTop: -2,
-    },
-    input: {
-      flex: 1,
-      paddingVertical: 16,
-      fontSize: 14,
-      color: theme.text,
-      fontFamily: defaultFontFamily,
-    },
-    inputIcon: {
-      marginRight: 12,
-      color: theme.textSecondary,
-    },
-    placeholderColor: theme.textSecondary,
-    eyeIcon: {
-      padding: 4,
-    },
-    primaryButton: {
-      backgroundColor: theme.primary,
-      borderRadius: 12,
-      paddingVertical: 18,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 14,
-      minHeight: 56,
-      flexDirection: "row",
-      gap: 8,
-      shadowColor: theme.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 8,
-      elevation: 4,
-      marginTop: -6,
-    },
-    primaryButtonText: {
-      color: theme.surface,
-      fontSize: 18,
-      fontWeight: "600",
-      letterSpacing: 0.3,
-      fontFamily: defaultFontFamily,
-    },
-    buttonDisabled: {
-      opacity: 0.6,
-    },
-    linkContainer: {
-      alignItems: "center",
-      paddingVertical: 2,
-      marginBottom: 0,
-    },
-    linkText: {
-      fontSize: 16,
-      color: theme.textSecondary,
-      fontFamily: defaultFontFamily,
-    },
-    linkTextBold: {
-      fontSize: 16,
-      color: theme.primary,
-      fontWeight: "600",
-      fontFamily: defaultFontFamily,
-    },
-    socialDivider: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginVertical: 20,
-    },
-    socialDividerLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
-    },
-    socialDividerText: {
-      marginHorizontal: 16,
-      color: theme.textSecondary,
-      fontSize: 14,
-      fontFamily: defaultFontFamily,
-    },
-    googleButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "#fff",
-      borderWidth: 1,
-      borderColor: isDark ? "transparent" : "#e5e7eb",
-      borderRadius: 16,
-      paddingVertical: 14,
-      marginBottom: 20,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 3,
-      elevation: 2,
-    },
-    googleButtonText: {
-      color: "#000",
-      fontSize: 16,
-      fontWeight: "600",
-      marginLeft: 12,
-      fontFamily: defaultFontFamily,
-    },
-    checkboxContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      flex: 1,
-    },
-    checkbox: {
-      width: 24,
-      height: 24,
-      borderWidth: 2,
-      borderColor: theme.primary,
-      borderRadius: 6,
-      marginRight: 12,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    checkboxChecked: {
-      backgroundColor: theme.primary,
-    },
-    checkboxIconColor: theme.surface,
-    checkboxText: {
-      fontSize: 14,
-      color: theme.text,
-      flex: 1,
-    },
-    rememberForgotContainer: {
-      flexDirection: "row",
-      justifyContent: "flex-start",
-      alignItems: "center",
-      marginBottom: 24,
-      paddingHorizontal: 8,
-      paddingVertical: 12,
-      overflow: "hidden",
-    },
-    forgotPasswordText: {
-      fontSize: 14,
-      color: theme.primary,
-      fontWeight: "600",
-    },
-    iconContainer: {
-      alignItems: "center",
-      marginBottom: 32,
-    },
-    iconWrapper: {
-      width: 160,
-      height: 160,
-      borderRadius: 80,
-      backgroundColor: isDark
-        ? "rgba(40, 135, 96, 0.15)"
-        : "rgba(40, 135, 96, 0.08)",
-      justifyContent: "center",
-      alignItems: "center",
-      position: "relative",
-    },
-    emailIconWrapper: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    iconColor: theme.primary,
-    checkmarkOverlay: {
-      position: "absolute",
-      bottom: -10,
-      right: -10,
-      backgroundColor: theme.surface,
-      borderRadius: 20,
-      padding: 4,
-    },
-    backButton: {
-      alignSelf: "flex-start",
-      marginBottom: 20,
-      padding: 8,
-    },
-    backButtonIcon: {
-      color: theme.text,
-    },
-    infoText: {
-      fontSize: 16,
-      color: theme.textSecondary,
-      textAlign: "center",
-      marginBottom: 24,
-    },
-    emailText: {
-      fontSize: 16,
-      color: theme.text,
-      textAlign: "center",
-      marginBottom: 32,
-    },
-    emailHighlight: {
-      color: theme.primary,
-      fontWeight: "700",
-    },
-    codeContainer: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      marginBottom: 32,
-      gap: 12,
-    },
-    codeInput: {
-      flex: 1,
-      height: 64,
-      borderWidth: 2,
-      borderColor: theme.primary,
-      borderRadius: 12,
-      textAlign: "center",
-      fontSize: 24,
-      fontWeight: "700",
-      color: theme.text,
-      backgroundColor: theme.surface,
-    },
-    successContainer: {
-      backgroundColor: theme.surface,
-      borderRadius: 16,
-      padding: 32,
-      alignItems: "center",
-      minHeight: 500,
-      justifyContent: "center",
-    },
-    successIconWrapper: {
-      width: 200,
-      height: 200,
-      borderRadius: 100,
-      backgroundColor: isDark
-        ? "rgba(40, 135, 96, 0.15)"
-        : "rgba(40, 135, 96, 0.08)",
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 32,
-    },
-    successIcon: {
-      color: theme.primary,
-    },
-    successMessage: {
-      fontSize: 16,
-      color: theme.textSecondary,
-      textAlign: "center",
-      marginBottom: 8,
-    },
-    successTitle: {
-      fontSize: 28,
-      fontWeight: "700",
-      color: theme.primary,
-      textAlign: "center",
-      marginBottom: 40,
-    },
-  });
+// Layout-only styles (no theme colors — token-driven values are applied inline)
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  keyboardAvoid: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  headerContainer: {
+    alignItems: "center",
+    marginBottom: 20,
+    gap: 4,
+  },
+  rememberForgotRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  socialDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+});

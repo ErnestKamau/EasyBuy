@@ -3,20 +3,16 @@ import React, { useState, useEffect, useRef } from "react";
 import * as ExpoLocation from "expo-location";
 import {
   View,
-  Text,
-  StyleSheet,
   ScrollView,
-  TouchableOpacity,
   StatusBar,
-  ActivityIndicator,
   Modal,
-  Dimensions,
+  StyleSheet,
+  Pressable,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCart } from "@/contexts/CartContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { Theme } from "@/constants/Themes";
+import { useAppTheme } from "@/contexts/ThemeContext";
 import {
   ordersApi,
   CartItemForOrder,
@@ -36,7 +32,22 @@ import {
   Clock,
   CheckCircle,
 } from "lucide-react-native";
-import { SheetStatus, ReceiptTicket, Button } from "@/components/ui";
+import { AppTheme } from "@/design";
+import {
+  Text,
+  Surface,
+  Button,
+  IconButton,
+  SegmentedControl,
+  Chip,
+  ListItem,
+  KeyValueRow,
+  Divider,
+  Spinner,
+  Modal as UIModal,
+  SheetStatus,
+  ReceiptTicket,
+} from "@/components/ui";
 
 type PaymentMethod = "cash" | "mpesa" | "card";
 type DeliveryType = "pickup" | "delivery";
@@ -44,8 +55,8 @@ type DeliveryType = "pickup" | "delivery";
 export default function CheckoutScreen() {
   const { state, clearCart } = useCart();
   const { user } = useAuth();
-  const { currentTheme, themeName } = useTheme();
-  const isDark = themeName === "dark";
+  const theme = useAppTheme();
+  const isDark = theme.mode === "dark";
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const params = useLocalSearchParams();
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>("cash");
@@ -523,15 +534,12 @@ export default function CheckoutScreen() {
     }
   };
 
-  // Initialize styles with current theme
-  const styles = createStyles(currentTheme, isDark);
-
   if (orderPlaced) {
     return (
-      <View style={[styles.successContainer, { paddingHorizontal: 24 }]}>
+      <View style={[styles.successContainer, { backgroundColor: theme.colors.surface, paddingHorizontal: theme.spacing[6] }]}>
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={currentTheme.surface}
+          backgroundColor={theme.colors.surface}
         />
         <ReceiptTicket
           title={paymentPolling ? "Almost there" : "Thank you!"}
@@ -551,7 +559,7 @@ export default function CheckoutScreen() {
           title="Back to home"
           onPress={() => router.replace("/(tabs)")}
           fullWidth
-          style={{ marginTop: 16 }}
+          style={{ marginTop: theme.spacing[4] }}
         />
         <SheetStatus
           visible={sheetStatus != null}
@@ -577,334 +585,250 @@ export default function CheckoutScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={currentTheme.surface}
+        backgroundColor={theme.colors.surface}
       />
 
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
+      <View
+        style={[
+          styles.header,
+          {
+            paddingHorizontal: theme.spacing[6],
+            paddingVertical: theme.spacing[5],
+            backgroundColor: theme.colors.surface,
+            borderBottomWidth: StyleSheet.hairlineWidth * 2,
+            borderBottomColor: theme.colors.border,
+          },
+        ]}
+      >
+        <IconButton
+          icon={<ArrowLeft size={theme.iconSize.lg} color={theme.colors.text} />}
           onPress={() => router.back()}
-          style={styles.headerButton}
-        >
-          <ArrowLeft size={24} color={currentTheme.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Checkout</Text>
-        <View style={styles.headerPlaceholder} />
+          accessibilityLabel="Back"
+        />
+        <Text variant="title">Checkout</Text>
+        <View style={{ width: theme.touchTarget }} />
       </View>
 
       <ScrollView
-        style={styles.scrollContainer}
+        style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Order Summary */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.sectionTitle}>Order Summary</Text>
+        <Surface
+          variant="elevated"
+          padding={6}
+          radius="lg"
+          style={{ margin: theme.spacing[6], marginBottom: theme.spacing[4] }}
+        >
+          <Text variant="title" style={{ marginBottom: theme.spacing[3] }}>
+            Order Summary
+          </Text>
 
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Items ({state.totalItems})</Text>
-            <Text style={styles.summaryValue}>
-              Ksh {state.totalAmount.toLocaleString()}
-            </Text>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Delivery</Text>
-            <Text style={styles.summaryValue}>
-              {selectedDelivery === "pickup" ? "Pickup at shop" : "Delivery"}
-            </Text>
-          </View>
-
+          <KeyValueRow
+            label={`Items (${state.totalItems})`}
+            value={`Ksh ${state.totalAmount.toLocaleString()}`}
+          />
+          <KeyValueRow
+            label="Delivery"
+            value={selectedDelivery === "pickup" ? "Pickup at shop" : "Delivery"}
+          />
           {selectedDelivery === "delivery" && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Delivery Fee</Text>
-              <Text style={styles.summaryValue}>
-                Ksh {deliveryFee.toLocaleString()}
-              </Text>
-            </View>
+            <KeyValueRow
+              label="Delivery Fee"
+              value={`Ksh ${deliveryFee.toLocaleString()}`}
+            />
           )}
 
-          <View style={styles.summaryDivider} />
+          <Divider style={{ marginVertical: theme.spacing[3] }} />
 
-          {/* Show wallet credit if user has positive balance */}
-          {user && user.wallet_balance > 0 && (
+          {user && user.wallet_balance > 0 ? (
             <>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Wallet Credit</Text>
-                <Text
-                  style={[styles.summaryValue, { color: currentTheme.success }]}
-                >
-                  - Ksh{" "}
-                  {Math.min(
-                    user.wallet_balance,
-                    state.totalAmount,
-                  ).toLocaleString()}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingVertical: theme.spacing[2],
+                }}
+              >
+                <Text variant="caption" color="muted" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
+                  Wallet Credit
+                </Text>
+                <Text variant="body" color="success">
+                  - Ksh {Math.min(user.wallet_balance, state.totalAmount).toLocaleString()}
                 </Text>
               </View>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Amount Due</Text>
-                <Text style={styles.totalValue}>
-                  Ksh{" "}
-                  {Math.max(
-                    0,
-                    state.totalAmount +
-                      (selectedDelivery === "delivery" ? deliveryFee : 0) -
-                      user.wallet_balance,
-                  ).toLocaleString()}
-                </Text>
-              </View>
-            </>
-          )}
-          {/* Show total if no wallet credit */}
-          {(!user || user.wallet_balance <= 0) && (
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>
-                Ksh{" "}
-                {(
+              <KeyValueRow
+                label="Amount Due"
+                value={`Ksh ${Math.max(
+                  0,
                   state.totalAmount +
-                  (selectedDelivery === "delivery" ? deliveryFee : 0)
-                ).toLocaleString()}
-              </Text>
-            </View>
+                    (selectedDelivery === "delivery" ? deliveryFee : 0) -
+                    user.wallet_balance,
+                ).toLocaleString()}`}
+                emphasize
+              />
+            </>
+          ) : (
+            <KeyValueRow
+              label="Total"
+              value={`Ksh ${(
+                state.totalAmount + (selectedDelivery === "delivery" ? deliveryFee : 0)
+              ).toLocaleString()}`}
+              emphasize
+            />
           )}
-        </View>
+        </Surface>
 
         {/* Delivery Option */}
-        <View style={styles.deliveryCard}>
-          <Text style={styles.sectionTitle}>Delivery Option</Text>
-
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              selectedDelivery === "pickup" && styles.selectedPaymentOption,
+        <Surface
+          variant="elevated"
+          padding={6}
+          radius="lg"
+          style={{ marginHorizontal: theme.spacing[6], marginBottom: theme.spacing[4] }}
+        >
+          <Text variant="title" style={{ marginBottom: theme.spacing[4] }}>
+            Delivery Option
+          </Text>
+          <SegmentedControl
+            options={[
+              { value: "pickup", label: "Pickup at Shop" },
+              { value: "delivery", label: "Delivery" },
             ]}
-            onPress={() => setSelectedDelivery("pickup")}
-          >
-            <View style={styles.paymentIcon}>
-              <MapPin
-                size={24}
-                color={selectedDelivery === "pickup" ? currentTheme.primary : currentTheme.textSecondary}
-              />
-            </View>
-            <View style={styles.paymentContent}>
-              <Text
-                style={[
-                  styles.paymentTitle,
-                  selectedDelivery === "pickup" && styles.selectedPaymentTitle,
-                ]}
-              >
-                Pickup at Shop
-              </Text>
-              <Text style={styles.paymentDescription}>
-                Visit our shop to collect your order
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.radioButton,
-                selectedDelivery === "pickup" && styles.selectedRadioButton,
-              ]}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              selectedDelivery === "delivery" && styles.selectedPaymentOption,
-            ]}
-            onPress={() => setSelectedDelivery("delivery")}
-          >
-            <View style={styles.paymentIcon}>
-              <MapPin
-                size={24}
-                color={selectedDelivery === "delivery" ? currentTheme.primary : currentTheme.textSecondary}
-              />
-            </View>
-            <View style={styles.paymentContent}>
-              <Text
-                style={[
-                  styles.paymentTitle,
-                  selectedDelivery === "delivery" &&
-                    styles.selectedPaymentTitle,
-                ]}
-              >
-                Delivery
-              </Text>
-              <Text style={styles.paymentDescription}>
-                We'll deliver your order to your location
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.radioButton,
-                selectedDelivery === "delivery" && styles.selectedRadioButton,
-              ]}
-            />
-          </TouchableOpacity>
-        </View>
+            value={selectedDelivery}
+            onChange={(v) => setSelectedDelivery(v as DeliveryType)}
+          />
+          <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing[3] }}>
+            {selectedDelivery === "pickup"
+              ? "Visit our shop to collect your order"
+              : "We'll deliver your order to your location"}
+          </Text>
+        </Surface>
 
         {/* Delivery Address (only show if delivery is selected) */}
         {selectedDelivery === "delivery" && (
-          <View style={styles.deliveryCard}>
-            <Text style={styles.sectionTitle}>Delivery Address</Text>
-            <Text style={styles.paymentSubtitle}>
+          <Surface
+            variant="elevated"
+            padding={6}
+            radius="lg"
+            style={{ marginHorizontal: theme.spacing[6], marginBottom: theme.spacing[4] }}
+          >
+            <Text variant="title" style={{ marginBottom: theme.spacing[2] }}>
+              Delivery Address
+            </Text>
+            <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing[3] }}>
               Where should we deliver your order?
             </Text>
 
-            <TouchableOpacity
-              style={[
-                styles.paymentOption,
-                deliveryLocation && styles.selectedPaymentOption,
-              ]}
-              onPress={fetchLocation}
-              disabled={isFetchingLocation}
-            >
-              <View style={styles.paymentIcon}>
-                {isFetchingLocation ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={currentTheme.primary}
-                  />
+            <ListItem
+              title={deliveryLocation ? "Location Set" : "Detect My Location"}
+              subtitle={deliveryAddress || "Tap to use your current GPS location"}
+              icon={
+                isFetchingLocation ? (
+                  <Spinner />
                 ) : (
                   <MapPin
-                    size={24}
-                    color={deliveryLocation ? currentTheme.primary : currentTheme.textSecondary}
+                    size={22}
+                    color={deliveryLocation ? theme.colors.primary : theme.colors.textSecondary}
                   />
-                )}
-              </View>
-              <View style={styles.paymentContent}>
-                <Text
-                  style={[
-                    styles.paymentTitle,
-                    deliveryLocation && styles.selectedPaymentTitle,
-                  ]}
-                >
-                  {deliveryLocation ? "Location Set" : "Detect My Location"}
-                </Text>
-                <Text style={styles.paymentDescription} numberOfLines={1}>
-                  {deliveryAddress || "Tap to use your current GPS location"}
-                </Text>
-              </View>
-              {!isFetchingLocation && (
-                <View
-                  style={[
-                    styles.radioButton,
-                    deliveryLocation && styles.selectedRadioButton,
-                  ]}
-                />
-              )}
-            </TouchableOpacity>
+                )
+              }
+              onPress={isFetchingLocation ? undefined : fetchLocation}
+            />
 
-            <TouchableOpacity
-              style={styles.paymentOption}
+            <ListItem
+              title="Choose Location on Map"
+              subtitle="Pinpoint your exact delivery address"
+              icon={<MapPin size={22} color={theme.colors.primary} />}
               onPress={openMapPicker}
-            >
-              <View style={styles.paymentIcon}>
-                <MapPin size={24} color={currentTheme.primary} />
-              </View>
-              <View style={styles.paymentContent}>
-                <Text
-                  style={[styles.paymentTitle, { color: currentTheme.text }]}
-                >
-                  Choose Location on Map
-                </Text>
-                <Text style={styles.paymentDescription}>
-                  Pinpoint your exact delivery address
-                </Text>
-              </View>
-            </TouchableOpacity>
+            />
 
             {deliveryLocation && (
-              <View style={styles.locationCoordinates}>
-                <Text style={styles.coordinatesText}>
+              <View
+                style={{
+                  marginTop: theme.spacing[2],
+                  padding: theme.spacing[3],
+                  backgroundColor: theme.colors.backgroundSecondary,
+                  borderRadius: theme.radius.sm,
+                }}
+              >
+                <Text variant="caption" color="secondary" style={{ fontFamily: "monospace" }}>
                   Lat: {deliveryLocation.latitude.toFixed(6)}, Lng:{" "}
                   {deliveryLocation.longitude.toFixed(6)}
                 </Text>
               </View>
             )}
-          </View>
+          </Surface>
         )}
 
         {/* Pickup Time Selection (only show if pickup is selected) */}
         {selectedDelivery === "pickup" && (
-          <View style={styles.deliveryCard}>
-            <Text style={styles.sectionTitle}>Select Pickup Time</Text>
-            <Text style={styles.paymentSubtitle}>
+          <Surface
+            variant="elevated"
+            padding={6}
+            radius="lg"
+            style={{ marginHorizontal: theme.spacing[6], marginBottom: theme.spacing[4] }}
+          >
+            <Text variant="title" style={{ marginBottom: theme.spacing[2] }}>
+              Select Pickup Time
+            </Text>
+            <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing[3] }}>
               Choose when you'll collect your order
             </Text>
 
             {loadingSlots ? (
-              <View style={{ padding: 20, alignItems: "center" }}>
-                <ActivityIndicator size="large" color={currentTheme.primary} />
-                <Text
-                  style={{ color: currentTheme.textSecondary, marginTop: 10 }}
-                >
+              <View style={{ paddingVertical: theme.spacing[6], alignItems: "center" }}>
+                <Spinner size="large" />
+                <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing[3] }}>
                   Loading available times...
                 </Text>
               </View>
             ) : !availableSlots || availableSlots.length === 0 ? (
-              <View style={{ padding: 20, alignItems: "center" }}>
-                <Clock size={40} color={currentTheme.textSecondary} />
-                <Text
-                  style={{ color: currentTheme.textSecondary, marginTop: 10 }}
-                >
+              <View style={{ paddingVertical: theme.spacing[6], alignItems: "center" }}>
+                <Clock size={40} color={theme.colors.textSecondary} />
+                <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing[3] }}>
                   No pickup slots available
                 </Text>
               </View>
             ) : (
-              <TouchableOpacity
-                style={[
-                  styles.paymentOption,
-                  selectedPickupTime && styles.selectedPaymentOption,
-                ]}
+              <ListItem
+                title={
+                  selectedPickupTime
+                    ? availableSlots.find((s) => s.datetime === selectedPickupTime)?.label ||
+                      "Time Selected"
+                    : "Select Pickup Time"
+                }
+                subtitle={selectedPickupTime ? "Tap to change" : "Choose from available times"}
+                icon={
+                  <Clock
+                    size={22}
+                    color={selectedPickupTime ? theme.colors.primary : theme.colors.textSecondary}
+                  />
+                }
                 onPress={() => {
                   setTempSelectedTime(selectedPickupTime);
                   setShowPickupModal(true);
                 }}
-              >
-                <View style={styles.paymentIcon}>
-                  <Clock
-                    size={24}
-                    color={selectedPickupTime ? currentTheme.primary : currentTheme.textSecondary}
-                  />
-                </View>
-                <View style={styles.paymentContent}>
-                  <Text
-                    style={[
-                      styles.paymentTitle,
-                      selectedPickupTime && styles.selectedPaymentTitle,
-                    ]}
-                  >
-                    {selectedPickupTime
-                      ? availableSlots.find(
-                          (s) => s.datetime === selectedPickupTime,
-                        )?.label || "Time Selected"
-                      : "Select Pickup Time"}
-                  </Text>
-                  <Text style={styles.paymentDescription}>
-                    {selectedPickupTime
-                      ? "Tap to change"
-                      : "Choose from available times"}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.radioButton,
-                    selectedPickupTime && styles.selectedRadioButton,
-                  ]}
-                />
-              </TouchableOpacity>
+              />
             )}
-          </View>
+          </Surface>
         )}
 
         {/* Payment Method */}
-        <View style={styles.paymentCard}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <Text style={styles.paymentSubtitle}>
+        <Surface
+          variant="elevated"
+          padding={6}
+          radius="lg"
+          style={{ marginHorizontal: theme.spacing[6], marginBottom: theme.spacing[6] }}
+        >
+          <Text variant="title" style={{ marginBottom: theme.spacing[2] }}>
+            Payment Method
+          </Text>
+          <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing[4] }}>
             {selectedPayment === "card"
               ? "Pay via Debit/Credit Card"
               : selectedPayment === "mpesa"
@@ -913,170 +837,96 @@ export default function CheckoutScreen() {
           </Text>
 
           {selectedPayment === "mpesa" && (
-            <View style={styles.paybillInstructions}>
-              <Text style={styles.paybillTitle}>M-Pesa Payment:</Text>
-              <Text style={styles.paybillStep}>
-                1. Click "Place Order" below
+            <Surface
+              variant="filled"
+              padding={4}
+              radius="md"
+              style={{ backgroundColor: theme.colors.successMuted, marginBottom: theme.spacing[4], gap: theme.spacing[2] }}
+            >
+              <Text variant="label" style={{ color: theme.colors.success }}>
+                M-Pesa Payment:
               </Text>
-              <Text style={styles.paybillStep}>
-                2. A prompt will appear on your phone
-              </Text>
-              <Text style={styles.paybillStep}>
-                3. Enter your M-Pesa PIN to complete payment
-              </Text>
-              <Text
-                style={[
-                  styles.paybillStep,
-                  { marginTop: 8, fontStyle: "italic", fontSize: 13 },
-                ]}
-              >
+              <Text variant="bodySmall">1. Click "Place Order" below</Text>
+              <Text variant="bodySmall">2. A prompt will appear on your phone</Text>
+              <Text variant="bodySmall">3. Enter your M-Pesa PIN to complete payment</Text>
+              <Text variant="caption" color="secondary" style={{ fontStyle: "italic", marginTop: theme.spacing[1] }}>
                 (Phone: {user?.phone_number || "No phone number set"})
               </Text>
-            </View>
+            </Surface>
           )}
 
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              selectedPayment === "cash" && styles.selectedPaymentOption,
-              !canUseCash && styles.disabledPaymentOption,
-            ]}
-            onPress={() => handlePaymentMethodSelect("cash")}
-            disabled={!canUseCash}
-          >
-            <View style={styles.paymentIcon}>
-              <CreditCard
-                size={24}
-                color={
-                  !canUseCash
-                    ? "#94A3B8"
-                    : selectedPayment === "cash"
-                      ? currentTheme.primary
-                      : currentTheme.textSecondary
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[3] }}>
+            <View style={{ opacity: canUseCash ? 1 : 0.5 }}>
+              <Chip
+                label="Cash"
+                selected={selectedPayment === "cash"}
+                onPress={() => handlePaymentMethodSelect("cash")}
+                icon={
+                  <CreditCard
+                    size={16}
+                    color={selectedPayment === "cash" ? theme.colors.primary : theme.colors.textSecondary}
+                  />
                 }
               />
             </View>
-            <View style={styles.paymentContent}>
-              <Text
-                style={[
-                  styles.paymentTitle,
-                  selectedPayment === "cash" && styles.selectedPaymentTitle,
-                  !canUseCash && styles.disabledPaymentTitle,
-                ]}
-              >
-                Cash Payment {!canUseCash && "(Unavailable)"}
-              </Text>
-              <Text style={styles.paymentDescription}>
-                {!canUseCash
-                  ? "Clear your debt to use cash payment"
-                  : "Pay with cash when you collect your order"}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.radioButton,
-                selectedPayment === "cash" && styles.selectedRadioButton,
-                !canUseCash && styles.disabledRadioButton,
-              ]}
+            <Chip
+              label="M-Pesa"
+              selected={selectedPayment === "mpesa"}
+              onPress={() => handlePaymentMethodSelect("mpesa")}
+              icon={
+                <Smartphone
+                  size={16}
+                  color={selectedPayment === "mpesa" ? theme.colors.primary : theme.colors.textSecondary}
+                />
+              }
             />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              selectedPayment === "mpesa" && styles.selectedPaymentOption,
-            ]}
-            onPress={() => handlePaymentMethodSelect("mpesa")}
-          >
-            <View style={styles.paymentIcon}>
-              <Smartphone
-                size={24}
-                color={selectedPayment === "mpesa" ? currentTheme.primary : currentTheme.textSecondary}
-              />
-            </View>
-            <View style={styles.paymentContent}>
-              <Text
-                style={[
-                  styles.paymentTitle,
-                  selectedPayment === "mpesa" && styles.selectedPaymentTitle,
-                ]}
-              >
-                M-Pesa Payment
-              </Text>
-              <Text style={styles.paymentDescription}>
-                Pay via M-Pesa Paybill (542542)
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.radioButton,
-                selectedPayment === "mpesa" && styles.selectedRadioButton,
-              ]}
+            <Chip
+              label="Card"
+              selected={selectedPayment === "card"}
+              onPress={() => handlePaymentMethodSelect("card")}
+              icon={
+                <CreditCard
+                  size={16}
+                  color={selectedPayment === "card" ? theme.colors.primary : theme.colors.textSecondary}
+                />
+              }
             />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              selectedPayment === "card" && styles.selectedPaymentOption,
-            ]}
-            onPress={() => handlePaymentMethodSelect("card")}
-          >
-            <View style={styles.paymentIcon}>
-              <CreditCard
-                size={24}
-                color={selectedPayment === "card" ? currentTheme.primary : currentTheme.textSecondary}
-              />
-            </View>
-            <View style={styles.paymentContent}>
-              <Text
-                style={[
-                  styles.paymentTitle,
-                  selectedPayment === "card" && styles.selectedPaymentTitle,
-                ]}
-              >
-                Card Payment
-              </Text>
-              <Text style={styles.paymentDescription}>
-                Pay with Debit or Credit Card
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.radioButton,
-                selectedPayment === "card" && styles.selectedRadioButton,
-              ]}
-            />
-          </TouchableOpacity>
-        </View>
+          </View>
+          {!canUseCash && (
+            <Text variant="caption" color="error" style={{ marginTop: theme.spacing[3] }}>
+              Clear your debt to use cash payment
+            </Text>
+          )}
+        </Surface>
       </ScrollView>
 
       {/* Bottom Action */}
-      <View style={styles.bottomBar}>
-        <View style={styles.totalContainer}>
-          <Text style={styles.totalLabelSmall}>Total Amount</Text>
-          <Text style={styles.totalAmountLarge}>
-            Ksh {state.totalAmount.toLocaleString()}
-          </Text>
+      <View
+        style={[
+          styles.bottomBar,
+          {
+            backgroundColor: theme.colors.surface,
+            paddingHorizontal: theme.spacing[6],
+            paddingTop: theme.spacing[4],
+            paddingBottom: theme.spacing[9],
+            borderTopWidth: StyleSheet.hairlineWidth * 2,
+            borderTopColor: theme.colors.border,
+          },
+          theme.getElevation("elv400"),
+        ]}
+      >
+        <View style={{ flex: 1, marginRight: theme.spacing[4] }}>
+          <Text variant="bodySmall" color="secondary">Total Amount</Text>
+          <Text variant="h3">Ksh {state.totalAmount.toLocaleString()}</Text>
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.placeOrderButton,
-            isProcessing && styles.disabledButton,
-          ]}
+        <Button
+          title="Place Order"
           onPress={handlePlaceOrder}
-          disabled={isProcessing || state.items.length === 0}
-        >
-          {isProcessing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <CheckCircle size={18} color="#FFFFFF" />
-          )}
-          <Text style={styles.placeOrderButtonText}>
-            {isProcessing ? "Placing Order..." : "Place Order"}
-          </Text>
-        </TouchableOpacity>
+          loading={isProcessing}
+          disabled={state.items.length === 0}
+          leftIcon={<CheckCircle size={18} color={theme.colors.textOnPrimary} />}
+        />
       </View>
 
       {/* Map Picker Modal */}
@@ -1086,21 +936,23 @@ export default function CheckoutScreen() {
         transparent={false}
         onRequestClose={() => setShowMapModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: currentTheme.background }}>
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
           <View
             style={[
               styles.mapModalHeader,
-              { backgroundColor: currentTheme.surface },
+              {
+                paddingHorizontal: theme.spacing[6],
+                paddingBottom: theme.spacing[5],
+                backgroundColor: theme.colors.surface,
+                borderBottomWidth: StyleSheet.hairlineWidth * 2,
+                borderBottomColor: theme.colors.border,
+              },
             ]}
           >
-            <Text style={[styles.mapModalTitle, { color: currentTheme.text }]}>
-              Select Location
-            </Text>
-            <TouchableOpacity onPress={() => setShowMapModal(false)}>
-              <Text style={{ color: currentTheme.primary, fontWeight: "600" }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
+            <Text variant="title">Select Location</Text>
+            <Pressable onPress={() => setShowMapModal(false)} hitSlop={8}>
+              <Text variant="label" color="brand">Cancel</Text>
+            </Pressable>
           </View>
 
           <View style={styles.mapContainer}>
@@ -1124,588 +976,111 @@ export default function CheckoutScreen() {
 
             {/* Center Marker */}
             <View style={styles.mapMarkerContainer} pointerEvents="none">
-              <MapPin size={32} color="#EF4444" fill="#EF4444" />
+              <MapPin size={32} color={theme.colors.error} fill={theme.colors.error} />
             </View>
           </View>
 
           <View
-            style={[
-              styles.mapFooter,
-              { backgroundColor: currentTheme.surface },
-            ]}
+            style={{
+              padding: theme.spacing[6],
+              paddingBottom: theme.spacing[9],
+              backgroundColor: theme.colors.surface,
+              borderTopWidth: StyleSheet.hairlineWidth * 2,
+              borderTopColor: theme.colors.border,
+            }}
           >
-            {isReverseGeocoding ? (
-              <View
-                style={[
-                  styles.modalConfirmButton,
-                  { backgroundColor: currentTheme.primary, opacity: 0.7 },
-                ]}
-              >
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.modalConfirmButton,
-                  { backgroundColor: currentTheme.primary },
-                ]}
-                onPress={handleConfirmMapLocation}
-              >
-                <Text style={styles.modalConfirmText}>Confirm Location</Text>
-              </TouchableOpacity>
-            )}
+            <Button
+              title="Confirm Location"
+              onPress={handleConfirmMapLocation}
+              loading={isReverseGeocoding}
+              fullWidth
+            />
           </View>
         </View>
       </Modal>
 
       {/* Pickup Time Modal */}
-      <Modal
+      <UIModal
         visible={showPickupModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPickupModal(false)}
+        onClose={() => setShowPickupModal(false)}
+        title="Select Pickup Time"
+        primaryAction={{
+          label: "Confirm",
+          onPress: () => {
+            if (tempSelectedTime) {
+              setSelectedPickupTime(tempSelectedTime);
+              setShowPickupModal(false);
+            } else {
+              ToastService.showError("No Selection", "Please select a time slot");
+            }
+          },
+        }}
+        secondaryAction={{ label: "Cancel", onPress: () => setShowPickupModal(false) }}
       >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: currentTheme.surface },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: currentTheme.text }]}>
-                Select Pickup Time
-              </Text>
-              <TouchableOpacity onPress={() => setShowPickupModal(false)}>
-                <Text
-                  style={[styles.modalClose, { color: currentTheme.primary }]}
-                >
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalScrollView}>
-              {availableSlots.map((slot) => (
-                <TouchableOpacity
-                  key={slot.time}
-                  style={[
-                    styles.modalSlotItem,
-                    { borderBottomColor: currentTheme.border },
-                    tempSelectedTime === slot.datetime && {
-                      backgroundColor: currentTheme.primary + "15",
-                      borderLeftWidth: 4,
-                      borderLeftColor: currentTheme.primary,
-                    },
-                    !slot.available && { opacity: 0.5 },
-                  ]}
-                  onPress={() => {
-                    if (slot.available) {
-                      setTempSelectedTime(slot.datetime);
-                    } else {
-                      ToastService.showWarning(
-                        "Slot Full",
-                        "This time slot is fully booked",
-                      );
-                    }
-                  }}
-                  disabled={!slot.available}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[styles.slotLabel, { color: currentTheme.text }]}
-                    >
-                      {slot.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.slotAvailability,
-                        { color: currentTheme.textSecondary },
-                      ]}
-                    >
-                      {slot.available
-                        ? `${slot.remaining} slots available`
-                        : "Fully booked"}
-                    </Text>
-                  </View>
-                  {tempSelectedTime === slot.datetime && (
-                    <CheckCircle size={24} color={currentTheme.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
+        <ScrollView style={{ maxHeight: 340 }}>
+          {availableSlots.map((slot) => {
+            const selected = tempSelectedTime === slot.datetime;
+            return (
+              <View
+                key={slot.time}
                 style={[
-                  styles.modalConfirmButton,
-                  { backgroundColor: currentTheme.primary },
+                  { opacity: slot.available ? 1 : 0.5, borderRadius: theme.radius.md },
+                  selected && { backgroundColor: theme.colors.primaryMuted },
                 ]}
-                onPress={() => {
-                  if (tempSelectedTime) {
-                    setSelectedPickupTime(tempSelectedTime);
-                    setShowPickupModal(false);
-                  } else {
-                    ToastService.showError(
-                      "No Selection",
-                      "Please select a time slot",
-                    );
-                  }
-                }}
               >
-                <Text style={styles.modalConfirmText}>Confirm</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+                <ListItem
+                  title={slot.label}
+                  subtitle={slot.available ? `${slot.remaining} slots available` : "Fully booked"}
+                  onPress={slot.available ? () => setTempSelectedTime(slot.datetime) : undefined}
+                  showChevron={false}
+                  trailing={
+                    selected ? <CheckCircle size={20} color={theme.colors.primary} /> : undefined
+                  }
+                />
+              </View>
+            );
+          })}
+        </ScrollView>
+      </UIModal>
     </View>
   );
 }
 
-const createStyles = (theme: Theme, isDark: boolean) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    successContainer: {
-      flex: 1,
-      backgroundColor: theme.surface,
-    },
-    successContent: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      paddingHorizontal: 40,
-    },
-    successIcon: {
-      marginBottom: 32,
-    },
-    successTitle: {
-      fontSize: 28,
-      fontWeight: "800",
-      color: theme.text,
-      textAlign: "center",
-      marginBottom: 16,
-    },
-    successMessage: {
-      fontSize: 16,
-      color: theme.textSecondary,
-      textAlign: "center",
-      marginBottom: 40,
-      lineHeight: 24,
-    },
-    nextSteps: {
-      width: "100%",
-      marginBottom: 40,
-    },
-    stepItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: 12,
-      gap: 16,
-    },
-    stepText: {
-      fontSize: 16,
-      color: theme.text,
-      fontWeight: "500",
-    },
-    redirectText: {
-      fontSize: 14,
-      color: theme.textSecondary,
-      textAlign: "center",
-    },
-
-    // Header
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      paddingTop: 60,
-      backgroundColor: theme.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-    },
-    headerButton: {
-      padding: 4,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: "700",
-      color: theme.text,
-    },
-    headerPlaceholder: {
-      width: 32,
-    },
-
-    // Content
-    scrollContainer: {
-      flex: 1,
-    },
-
-    // Cards
-    summaryCard: {
-      backgroundColor: theme.surface,
-      margin: 20,
-      marginBottom: 12,
-      padding: 20,
-      borderRadius: 12,
-    },
-    deliveryCard: {
-      backgroundColor: theme.surface,
-      marginHorizontal: 20,
-      marginBottom: 12,
-      padding: 20,
-      borderRadius: 12,
-    },
-    paymentCard: {
-      backgroundColor: theme.surface,
-      marginHorizontal: 20,
-      marginBottom: 12,
-      padding: 20,
-      borderRadius: 12,
-    },
-    noteCard: {
-      backgroundColor: isDark ? "#3B2D0F" : "#FFFBEB",
-      marginHorizontal: 20,
-      marginBottom: 20,
-      padding: 16,
-      borderRadius: 12,
-      flexDirection: "row",
-      gap: 12,
-    },
-
-    // Section styling
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: "700",
-      color: theme.text,
-      marginBottom: 16,
-    },
-
-    // Summary
-    summaryRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingVertical: 8,
-    },
-    summaryLabel: {
-      fontSize: 14,
-      color: theme.textSecondary,
-    },
-    summaryValue: {
-      fontSize: 14,
-      fontWeight: "500",
-      color: theme.text,
-    },
-    summaryDivider: {
-      height: 1,
-      backgroundColor: theme.border,
-      marginVertical: 12,
-    },
-    totalRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingVertical: 4,
-    },
-    totalLabel: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: theme.text,
-    },
-    totalValue: {
-      fontSize: 18,
-      fontWeight: "700",
-      color: theme.success,
-    },
-
-    // Info items
-    infoItem: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      marginBottom: 16,
-      gap: 12,
-    },
-    infoContent: {
-      flex: 1,
-    },
-    infoTitle: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: theme.text,
-      marginBottom: 4,
-    },
-    infoDescription: {
-      fontSize: 14,
-      color: theme.textSecondary,
-      lineHeight: 20,
-    },
-
-    // Payment options
-    paymentSubtitle: {
-      fontSize: 14,
-      color: theme.textSecondary,
-      marginBottom: 20,
-    },
-    paymentOption: {
-      flexDirection: "row",
-      alignItems: "center",
-      padding: 16,
-      borderWidth: 2,
-      borderColor: theme.border,
-      borderRadius: 12,
-      marginBottom: 12,
-      gap: 16,
-    },
-    selectedPaymentOption: {
-      borderColor: theme.success,
-      backgroundColor: isDark ? "#1B4D2F" : "#F0FDF4",
-    },
-    paymentIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: isDark ? theme.border : "#F8FAFC",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    paymentContent: {
-      flex: 1,
-    },
-    paymentTitle: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: theme.text,
-      marginBottom: 4,
-    },
-    selectedPaymentTitle: {
-      color: theme.success,
-    },
-    paymentDescription: {
-      fontSize: 14,
-      color: theme.textSecondary,
-    },
-    paybillInstructions: {
-      backgroundColor: isDark ? "#1B4D2F" : "#F0FDF4",
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: theme.success,
-    },
-    paybillTitle: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: isDark ? theme.success : "#15803D",
-      marginBottom: 12,
-    },
-    paybillStep: {
-      fontSize: 14,
-      color: theme.text,
-      marginBottom: 8,
-      lineHeight: 20,
-    },
-    paybillHighlight: {
-      fontWeight: "700",
-      color: isDark ? theme.success : "#15803D",
-    },
-    radioButton: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      borderWidth: 2,
-      borderColor: theme.border,
-    },
-    selectedRadioButton: {
-      borderColor: theme.success,
-      backgroundColor: theme.success,
-    },
-    disabledPaymentOption: {
-      opacity: 0.5,
-      backgroundColor: isDark ? "#1E293B" : "#F1F5F9",
-    },
-    disabledPaymentTitle: {
-      color: theme.textSecondary,
-    },
-    disabledRadioButton: {
-      borderColor: theme.textSecondary,
-      backgroundColor: "transparent",
-    },
-
-    // Note
-    noteContent: {
-      flex: 1,
-    },
-    noteTitle: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: isDark ? "#FCD34D" : "#92400E",
-      marginBottom: 4,
-    },
-    noteDescription: {
-      fontSize: 12,
-      color: isDark ? "#FCD34D" : "#92400E",
-      lineHeight: 18,
-    },
-
-    // Bottom bar
-    bottomBar: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: theme.surface,
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      paddingBottom: 34,
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 8,
-    },
-    totalContainer: {
-      flex: 1,
-      marginRight: 16,
-    },
-    totalLabelSmall: {
-      fontSize: 14,
-      color: theme.textSecondary,
-    },
-    totalAmountLarge: {
-      fontSize: 20,
-      fontWeight: "800",
-      color: theme.text,
-    },
-    placeOrderButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: theme.success,
-      paddingVertical: 16,
-      paddingHorizontal: 24,
-      borderRadius: 12,
-      gap: 8,
-    },
-    disabledButton: {
-      backgroundColor: theme.textSecondary,
-    },
-    placeOrderButtonText: {
-      color: "#FFFFFF",
-      fontSize: 16,
-      fontWeight: "700",
-    },
-    // Modal Styles
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.5)",
-      justifyContent: "flex-end",
-    },
-    modalContent: {
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      paddingBottom: 20,
-      maxHeight: "80%",
-    },
-    modalHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-    },
-    modalTitle: {
-      fontSize: 20,
-      fontWeight: "700",
-    },
-    modalClose: {
-      fontSize: 16,
-      fontWeight: "600",
-    },
-    modalScrollView: {
-      maxHeight: 400,
-    },
-    modalSlotItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      padding: 16,
-      borderBottomWidth: 1,
-    },
-    slotLabel: {
-      fontSize: 16,
-      fontWeight: "600",
-      marginBottom: 4,
-    },
-    slotAvailability: {
-      fontSize: 14,
-    },
-    modalFooter: {
-      padding: 20,
-      paddingTop: 16,
-    },
-    modalConfirmButton: {
-      padding: 16,
-      borderRadius: 12,
-      alignItems: "center",
-    },
-    modalConfirmText: {
-      color: "#FFFFFF",
-      fontSize: 16,
-      fontWeight: "700",
-    },
-    locationCoordinates: {
-      marginTop: 8,
-      padding: 12,
-      backgroundColor: isDark ? "#1E293B" : "#F8FAFC",
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: theme.border,
-    },
-    coordinatesText: {
-      fontSize: 12,
-      color: theme.textSecondary,
-      fontFamily: "SpaceMono_400Regular", // If available, or just monospace
-    },
-    mapModalHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: 20,
-      paddingTop: 50, // accommodate safe area roughly
-      borderBottomWidth: 1,
-    },
-    mapModalTitle: {
-      fontSize: 18,
-      fontWeight: "700",
-    },
-    mapContainer: {
-      flex: 1,
-      position: "relative",
-    },
-    map: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    mapMarkerContainer: {
-      position: "absolute",
-      top: "50%",
-      left: "50%",
-      marginTop: -32,
-      marginLeft: -16,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 3,
-      elevation: 5,
-    },
-    mapFooter: {
-      padding: 20,
-      paddingBottom: 40, // safe area bottom
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-    },
-  });
+// Layout-only styles (no theme colors — token-driven values are applied inline)
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  successContainer: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  bottomBar: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  mapModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 50,
+  },
+  mapContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapMarkerContainer: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginTop: -32,
+    marginLeft: -16,
+  },
+});

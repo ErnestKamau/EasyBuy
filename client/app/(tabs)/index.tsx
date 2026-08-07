@@ -43,10 +43,7 @@ import {
   SkeletonProductCard,
   Text as UIText,
   Screen,
-  HamburgerButton,
-  DrawerMenu,
 } from "@/components/ui";
-import { useAuth } from "@/contexts/AuthContext";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -71,8 +68,6 @@ export default function HomeScreen() {
   const { currentTheme, themeName } = useTheme();
   const theme = useAppTheme();
   const { addItem } = useCart();
-  const { logout } = useAuth();
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const getColorsForCategory = (_categoryName: string) => ({
     color: theme.colors.primary,
@@ -590,14 +585,11 @@ export default function HomeScreen() {
         />
       }
     >
-      <View style={[styles.welcomeSection, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-        <View style={{ flex: 1 }}>
-          <UIText variant="h3">Hello{user?.first_name ? `, ${user.first_name}` : ''}</UIText>
-          <Text style={dynamicStyles.welcomeSubtext}>
-            What would you like to buy today?
-          </Text>
-        </View>
-        <HamburgerButton open={drawerOpen} onPress={() => setDrawerOpen(true)} />
+      <View style={styles.welcomeSection}>
+        <UIText variant="h3">Hello{user?.first_name ? `, ${user.first_name}` : ''}</UIText>
+        <Text style={dynamicStyles.welcomeSubtext}>
+          What would you like to buy today?
+        </Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -718,13 +710,6 @@ export default function HomeScreen() {
 
       <View style={styles.bottomSpacing} />
     </ScrollView>
-    <DrawerMenu
-      open={drawerOpen}
-      onClose={() => setDrawerOpen(false)}
-      userName={user ? `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() : undefined}
-      userEmail={user?.email}
-      onLogout={logout}
-    />
     </View>
   );
 }

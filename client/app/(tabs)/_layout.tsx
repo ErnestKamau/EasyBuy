@@ -1,12 +1,14 @@
 // app/(tabs)/_layout.tsx — Jade Horizon GlassTabBar
-import React from 'react';
+import React, { useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Tabs } from 'expo-router';
+import { Menu } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme, useAppTheme } from '@/contexts/ThemeContext';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { GlassTabBar, Badge } from '@/components/ui';
+import { GlassTabBar, Badge, IconButton, DrawerMenu } from '@/components/ui';
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
@@ -20,32 +22,43 @@ export default function TabLayout() {
   const { currentTheme } = useTheme();
   const theme = useAppTheme();
   const { unreadCount } = useNotifications();
+  const { user, logout } = useAuth();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <Tabs
-      tabBar={(props) => <GlassTabBar {...props} />}
-      screenOptions={{
-        tabBarActiveTintColor: currentTheme.tabIconSelected,
-        tabBarInactiveTintColor: currentTheme.tabIconDefault,
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: currentTheme.surface,
-          borderBottomWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        headerTitleStyle: {
-          ...theme.typography.title,
-          color: currentTheme.text,
-        },
-        headerShadowVisible: false,
-      }}
-    >
+    <View style={{ flex: 1 }}>
+      <Tabs
+        tabBar={(props) => <GlassTabBar {...props} />}
+        screenOptions={{
+          tabBarActiveTintColor: currentTheme.tabIconSelected,
+          tabBarInactiveTintColor: currentTheme.tabIconDefault,
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: currentTheme.surface,
+            borderBottomWidth: 0,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          headerTitleStyle: {
+            ...theme.typography.title,
+            color: currentTheme.text,
+          },
+          headerShadowVisible: false,
+        }}
+      >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+          headerLeft: () => (
+            <IconButton
+              icon={<Menu size={22} color={currentTheme.text} />}
+              onPress={() => setDrawerOpen((o) => !o)}
+              accessibilityLabel={drawerOpen ? 'Close menu' : 'Open menu'}
+              style={{ marginLeft: 8 }}
+            />
+          ),
           headerRight: () => (
             <Link href="/modal" asChild>
               <Pressable style={{ marginRight: 16, position: 'relative' }}>
@@ -95,6 +108,15 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
         }}
       />
-    </Tabs>
+      </Tabs>
+
+      <DrawerMenu
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        userName={user ? `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() : undefined}
+        userEmail={user?.email}
+        onLogout={logout}
+      />
+    </View>
   );
 }

@@ -97,29 +97,6 @@ const createProductDynamicStyles = (currentTheme: any, themeName: string) =>
       width: "85%",
       height: "85%",
     },
-    thumbnailList: {
-      paddingHorizontal: 20,
-      gap: 12,
-      marginBottom: 20,
-    },
-    thumbnailContainer: {
-      width: 64,
-      height: 64,
-      borderRadius: 12,
-      backgroundColor: currentTheme.surface,
-      padding: 4,
-      borderWidth: 1,
-      borderColor: currentTheme.border,
-    },
-    activeThumbnail: {
-      borderColor: currentTheme.primary,
-      borderWidth: 2,
-    },
-    thumbnailImage: {
-      width: "100%",
-      height: "100%",
-      borderRadius: 8,
-    },
     productCard: {
       backgroundColor: currentTheme.surface,
       borderTopLeftRadius: 32,
@@ -532,31 +509,6 @@ export default function ProductDetailScreen() {
               resizeMode="contain"
             />
           </View>
-
-          {/* Mock Thumbnail List */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={dynamicStyles.thumbnailList}
-          >
-            {[1, 2, 3, 4, 5].map((i) => (
-              <TouchableOpacity
-                key={i}
-                style={[
-                  dynamicStyles.thumbnailContainer,
-                  i === 1 && dynamicStyles.activeThumbnail,
-                ]}
-              >
-                <Image
-                  source={{
-                    uri: product.image_url || "https://via.placeholder.com/400x400",
-                  }}
-                  style={dynamicStyles.thumbnailImage}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
 
         <View style={dynamicStyles.productCard}>
@@ -649,28 +601,54 @@ export default function ProductDetailScreen() {
         </View>
       </ScrollView>
 
-      <GlassSurface level={3} borderRadius={0} style={{ borderLeftWidth: 0, borderRightWidth: 0, borderBottomWidth: 0 }}>
-      <View style={[dynamicStyles.bottomBar, { backgroundColor: 'transparent', borderTopWidth: 0, elevation: 0, shadowOpacity: 0 }]}>
-        <View style={dynamicStyles.priceContainer}>
-          <Text style={dynamicStyles.totalLabel}>Total Price</Text>
-          <Text style={dynamicStyles.totalAmount}>
-            Ksh {totalPrice.toLocaleString()}
-          </Text>
-        </View>
-        <TouchableOpacity
+      <GlassSurface
+        level={3}
+        borderRadius={0}
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderLeftWidth: 0,
+          borderRightWidth: 0,
+          borderBottomWidth: 0,
+        }}
+      >
+        <View
           style={[
-            dynamicStyles.addToCartButton,
-            product.in_stock === 0 && dynamicStyles.disabledButton,
+            dynamicStyles.bottomBar,
+            {
+              position: "relative",
+              bottom: undefined,
+              left: undefined,
+              right: undefined,
+              backgroundColor: "transparent",
+              borderTopWidth: 0,
+              elevation: 0,
+              shadowOpacity: 0,
+            },
           ]}
-          onPress={addToCart}
-          disabled={product.in_stock === 0}
         >
-          <ShoppingBag size={20} color="#FFFFFF" />
-          <Text style={dynamicStyles.addToCartText}>
-            {product.in_stock === 0 ? "Out of Stock" : "Add to Cart"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <View style={dynamicStyles.priceContainer}>
+            <Text style={dynamicStyles.totalLabel}>Total Price</Text>
+            <Text style={dynamicStyles.totalAmount}>
+              Ksh {totalPrice.toLocaleString()}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              dynamicStyles.addToCartButton,
+              product.in_stock === 0 && dynamicStyles.disabledButton,
+            ]}
+            onPress={addToCart}
+            disabled={product.in_stock === 0}
+          >
+            <ShoppingBag size={20} color="#FFFFFF" />
+            <Text style={dynamicStyles.addToCartText}>
+              {product.in_stock === 0 ? "Out of Stock" : "Add to Cart"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </GlassSurface>
     </View>
   );

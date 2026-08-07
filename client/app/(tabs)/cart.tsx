@@ -249,7 +249,9 @@ const createDynamicStyles = (currentTheme: any, themeName: string) =>
       backgroundColor: currentTheme.surface,
       paddingHorizontal: 20,
       paddingVertical: 16,
-      paddingBottom: 34,
+      // Extra bottom clearance so the floating GlassTabBar (absolutely
+      // positioned, not reserved space) doesn't sit on top of this bar.
+      marginBottom: 90,
       borderTopWidth: 1,
       borderTopColor: currentTheme.border,
       shadowColor: "#000",

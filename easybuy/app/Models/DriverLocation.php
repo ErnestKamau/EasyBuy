@@ -31,8 +31,8 @@ class DriverLocation extends Model
     ];
 
     protected $casts = [
-        'latitude'    => 'decimal:8',
-        'longitude'   => 'decimal:8',
+        'latitude'    => 'float',
+        'longitude'   => 'float',
         'heading'     => 'decimal:2',
         'speed'       => 'decimal:2',
         'recorded_at' => 'datetime',

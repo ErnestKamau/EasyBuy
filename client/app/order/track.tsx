@@ -179,10 +179,10 @@ export default function OrderTrackingScreen() {
           longitude: Number(tracking.destination.lng),
         }
       : null) ||
-    (order.delivery_lat && order.delivery_lng
+    (Number.isFinite(Number(order.delivery_lat)) && Number.isFinite(Number(order.delivery_lng))
       ? {
-          latitude: order.delivery_lat,
-          longitude: order.delivery_lng,
+          latitude: Number(order.delivery_lat),
+          longitude: Number(order.delivery_lng),
         }
       : null);
 

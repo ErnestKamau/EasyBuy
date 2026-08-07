@@ -13,6 +13,7 @@ import {
   FlatList,
   Animated,
   Dimensions,
+  Pressable,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { router } from "expo-router";
@@ -43,6 +44,8 @@ import {
 } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
 import { useStripe } from "@/components/stripeNative";
+import { useAppTheme } from "@/contexts/ThemeContext";
+import { Text as UIText, Surface, Button as UIButton, IconButton, StatusPill, Spinner, Modal as UIModal, ListItem, Avatar } from "@/components/ui";
 import {
   ArrowLeft,
   Plus,
@@ -70,12 +73,12 @@ import {
   Search,
   Filter,
   Bell,
-  User as UserIcon,
 } from "lucide-react-native";
 
 export default function AdminScreen() {
   const { user } = useAuth();
   const { currentTheme, themeName } = useTheme();
+  const theme = useAppTheme();
   const isDark = themeName === "dark";
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(true);
@@ -1307,7 +1310,10 @@ export default function AdminScreen() {
                     <TouchableOpacity
                       style={[styles.assignRiderButton, { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1', marginLeft: 8 }]}
                       onPress={() => {
-                        if (item.delivery_lat && item.delivery_lng) {
+                        if (
+                          Number.isFinite(Number(item.delivery_lat)) &&
+                          Number.isFinite(Number(item.delivery_lng))
+                        ) {
                           setSelectedMapOrder(item);
                           setShowMapModal(true);
                         } else {
@@ -1372,66 +1378,114 @@ export default function AdminScreen() {
   };
 
   const renderCategoryItem = ({ item }: { item: Category }) => (
-    <View style={styles.itemCard}>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.itemSubtitle}>{item.products_count} products</Text>
+    <Surface
+      variant="elevated"
+      padding={4}
+      radius="lg"
+      style={{ flexDirection: "row", alignItems: "center", marginBottom: theme.spacing[3] }}
+    >
+      <View style={{ flex: 1 }}>
+        <UIText variant="label">{item.name}</UIText>
+        <UIText variant="caption" color="secondary" style={{ marginTop: theme.spacing[1] }}>
+          {item.products_count} products
+        </UIText>
       </View>
-      <View style={styles.itemActions}>
-        <TouchableOpacity
-          style={styles.editButton}
+      <View style={{ flexDirection: "row", gap: theme.spacing[2] }}>
+        <IconButton
+          icon={<Edit size={16} color={theme.colors.info} />}
           onPress={() => openCategoryModal(item)}
-        >
-          <Edit size={16} color="#3B82F6" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
+          accessibilityLabel="Edit category"
+          size={36}
+          style={{ backgroundColor: theme.colors.infoMuted }}
+        />
+        <IconButton
+          icon={<Trash2 size={16} color={theme.colors.error} />}
           onPress={() => deleteCategory(item)}
-        >
-          <Trash2 size={16} color="#EF4444" />
-        </TouchableOpacity>
+          accessibilityLabel="Delete category"
+          size={36}
+          style={{ backgroundColor: theme.colors.dangerMuted }}
+        />
       </View>
-    </View>
+    </Surface>
   );
 
-  const renderProductItem = ({ item }: { item: Product }) => (
-    <View style={styles.itemCard}>
-      {item.image_url ? (
-        <Image
-          source={{ uri: item.image_url }}
-          style={styles.productListImage}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.productListImagePlaceholder}>
-          <Package size={24} color="#94A3B8" />
-        </View>
-      )}
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.itemSubtitle}>
-          {item.category_name} • Ksh {item.sale_price} • Stock: {item.in_stock}
-        </Text>
-        {item.is_low_stock && (
-          <Text style={styles.lowStockIndicator}>⚠️ Low Stock</Text>
+  const renderProductItem = ({ item }: { item: Product }) => {
+    const isOutOfStock = item.in_stock <= 0;
+    const stockRatio = item.minimum_stock
+      ? Math.min(1, item.in_stock / (item.minimum_stock * 2))
+      : item.in_stock > 0
+        ? 1
+        : 0;
+    const stockTone = isOutOfStock
+      ? theme.colors.error
+      : item.is_low_stock
+        ? theme.colors.warning
+        : theme.colors.success;
+
+    return (
+      <Surface
+        variant="elevated"
+        padding={4}
+        radius="lg"
+        style={{ flexDirection: "row", alignItems: "center", marginBottom: theme.spacing[3] }}
+      >
+        {item.image_url ? (
+          <Image
+            source={{ uri: item.image_url }}
+            style={{ width: 60, height: 60, borderRadius: theme.radius.sm, marginRight: theme.spacing[3] }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: theme.radius.sm,
+              marginRight: theme.spacing[3],
+              backgroundColor: theme.colors.backgroundSecondary,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Package size={24} color={theme.colors.textMuted} />
+          </View>
         )}
-      </View>
-      <View style={styles.itemActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => openProductModal(item)}
-        >
-          <Edit size={16} color="#3B82F6" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => deleteProduct(item)}
-        >
-          <Trash2 size={16} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+        <View style={{ flex: 1, gap: theme.spacing[1] }}>
+          <UIText variant="label">{item.name}</UIText>
+          <UIText variant="caption" color="secondary">
+            {item.category_name} • Ksh {item.sale_price} • Stock: {item.in_stock}
+          </UIText>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: theme.spacing[3], marginTop: theme.spacing[1] }}>
+            <View style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: theme.colors.border, overflow: "hidden" }}>
+              <View style={{ width: `${stockRatio * 100}%`, height: "100%", borderRadius: 3, backgroundColor: stockTone }} />
+            </View>
+            {(item.is_low_stock || isOutOfStock) && (
+              <StatusPill
+                status={isOutOfStock ? "cancelled" : "pending"}
+                label={isOutOfStock ? "Out of Stock" : "Low Stock"}
+              />
+            )}
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", gap: theme.spacing[2] }}>
+          <IconButton
+            icon={<Edit size={16} color={theme.colors.info} />}
+            onPress={() => openProductModal(item)}
+            accessibilityLabel="Edit product"
+            size={36}
+            style={{ backgroundColor: theme.colors.infoMuted }}
+          />
+          <IconButton
+            icon={<Trash2 size={16} color={theme.colors.error} />}
+            onPress={() => deleteProduct(item)}
+            accessibilityLabel="Delete product"
+            size={36}
+            style={{ backgroundColor: theme.colors.dangerMuted }}
+          />
+        </View>
+      </Surface>
+    );
+  };
 
   if (loading) {
     return (
@@ -1449,93 +1503,156 @@ export default function AdminScreen() {
 
   const renderDashboard = () => {
     if (!dashboardStats) return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 100 }}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={{ marginTop: 16, color: currentTheme.textSecondary }}>Loading insights...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: theme.spacing[12] }}>
+        <Spinner size="large" />
+        <UIText variant="body" color="secondary" style={{ marginTop: theme.spacing[4] }}>Loading insights...</UIText>
       </View>
     );
 
     const formatCurrency = (amount: number) => `KES ${amount.toLocaleString()}`;
 
-    const renderCard = (title: string, value: string | number, icon: any, color: string, subValue?: string) => {
+    const CARD_TONES = {
+      success: { bg: theme.colors.successMuted, fg: theme.colors.success },
+      info: { bg: theme.colors.infoMuted, fg: theme.colors.info },
+      error: { bg: theme.colors.dangerMuted, fg: theme.colors.error },
+      warning: { bg: theme.colors.warningMuted, fg: theme.colors.warning },
+    } as const;
+
+    const renderCard = (
+      title: string,
+      value: string | number,
+      icon: any,
+      tone: keyof typeof CARD_TONES,
+      subValue?: string,
+    ) => {
       const Icon = icon;
+      const { bg, fg } = CARD_TONES[tone];
       return (
-        <View style={styles.dashboardCard}>
-          <View style={styles.dashboardCardHeader}>
-            <View style={[styles.dashboardCardIcon, { backgroundColor: `${color}20` }]}>
-              <Icon size={20} color={color} />
+        <Surface
+          variant="elevated"
+          padding={5}
+          radius="xl"
+          style={{ flex: 1, minWidth: "45%" }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: theme.spacing[3], marginBottom: theme.spacing[4] }}>
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: theme.radius.md,
+                backgroundColor: bg,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Icon size={20} color={fg} />
             </View>
-            <Text style={styles.dashboardCardTitle}>{title}</Text>
+            <UIText variant="overline" color="secondary" style={{ flex: 1 }}>{title}</UIText>
           </View>
-          <Text style={styles.dashboardCardValue}>{value}</Text>
-          {subValue && <Text style={styles.dashboardCardSubValue}>{subValue}</Text>}
-        </View>
+          <UIText variant="h2">{value}</UIText>
+          {subValue && (
+            <UIText variant="caption" color="secondary" style={{ marginTop: theme.spacing[1] }}>
+              {subValue}
+            </UIText>
+          )}
+        </Surface>
       );
     };
 
     const maxRevenue = Math.max(...dashboardStats.sales_trend.map(d => d.revenue), 1);
 
     return (
-      <View style={styles.dashboardSection}>
-        <View style={styles.dashboardGrid}>
-          {renderCard("Today's Revenue", formatCurrency(dashboardStats.revenue.today), TrendingUp, "#22C55E", `Month: ${formatCurrency(dashboardStats.revenue.this_month)}`)}
-          {renderCard("Pending Orders", dashboardStats.orders.pending, ShoppingBag, "#3B82F6", `${dashboardStats.orders.total} Total`)}
-          {renderCard("Low Stock", dashboardStats.products.low_stock, Package, "#EF4444", `${dashboardStats.products.out_of_stock} Out of Stock`)}
-          {renderCard("Riders Online", dashboardStats.riders.online, Truck, "#8B5CF6", `${dashboardStats.riders.active} Active`)}
+      <View style={{ padding: theme.spacing[5] }}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[4], marginBottom: theme.spacing[6] }}>
+          {renderCard("Today's Revenue", formatCurrency(dashboardStats.revenue.today), TrendingUp, "success", `Month: ${formatCurrency(dashboardStats.revenue.this_month)}`)}
+          {renderCard("Pending Orders", dashboardStats.orders.pending, ShoppingBag, "info", `${dashboardStats.orders.total} Total`)}
+          {renderCard("Low Stock", dashboardStats.products.low_stock, Package, "error", `${dashboardStats.products.out_of_stock} Out of Stock`)}
+          {renderCard("Riders Online", dashboardStats.riders.online, Truck, "warning", `${dashboardStats.riders.active} Active`)}
         </View>
 
-        <View style={styles.chartSection}>
-          <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>Sales Trend (Last 14 Days)</Text>
-            <TrendingUp size={20} color="#6366F1" />
+        <Surface variant="elevated" padding={6} radius="xl" style={{ marginBottom: theme.spacing[6] }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: theme.spacing[6] }}>
+            <UIText variant="title">Sales Trend (Last 14 Days)</UIText>
+            <TrendingUp size={20} color={theme.colors.primary} />
           </View>
-          <View style={styles.chartContainer}>
+          <View style={{ height: 180, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingTop: theme.spacing[2] }}>
             {dashboardStats.sales_trend.map((day) => (
-              <View key={day.full_date} style={styles.chartBarContainer}>
-                <View 
-                  style={[
-                    styles.chartBar, 
-                    { 
-                      height: `${(day.revenue / maxRevenue) * 100}%`,
-                      minHeight: day.revenue > 0 ? 5 : 0 
-                    }
-                  ]} 
+              <View key={day.full_date} style={{ flex: 1, alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                <View
+                  style={{
+                    width: 12,
+                    borderRadius: theme.radius.xs,
+                    backgroundColor: theme.colors.primary,
+                    height: `${(day.revenue / maxRevenue) * 100}%`,
+                    minHeight: day.revenue > 0 ? 5 : 0,
+                  }}
                 />
-                <Text style={styles.chartLabel}>{day.date}</Text>
+                <UIText variant="caption" color="muted" style={{ marginTop: theme.spacing[2], transform: [{ rotate: "-45deg" }] }}>
+                  {day.date}
+                </UIText>
               </View>
             ))}
           </View>
-        </View>
+        </Surface>
 
-        <View style={styles.recentActivitySection}>
-          <Text style={styles.recentActivityTitle}>Recent Orders</Text>
+        <Surface variant="elevated" padding={6} radius="xl">
+          <UIText variant="title" style={{ marginBottom: theme.spacing[4] }}>Recent Orders</UIText>
           {dashboardStats.recent_orders.length > 0 ? (
-            dashboardStats.recent_orders.map((order) => (
-              <TouchableOpacity key={order.id} style={styles.activityItem} onPress={() => {
-                setActiveTab('orders');
-              }}>
-                <View style={[styles.activityIcon, { backgroundColor: order.status === 'delivered' ? '#22C55E20' : '#3B82F620' }]}>
-                  <ShoppingBag size={20} color={order.status === 'delivered' ? '#22C55E' : '#3B82F6'} />
-                </View>
-                <View style={styles.activityInfo}>
-                  <Text style={styles.activityTitle}>{order.customer}</Text>
-                  <Text style={styles.activitySubtitle}>{order.order_number} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.activityAmount}>{formatCurrency(order.amount)}</Text>
-                  <Text style={[styles.activitySubtitle, { fontSize: 10 }]}>{order.status}</Text>
-                </View>
-              </TouchableOpacity>
-            ))
+            dashboardStats.recent_orders.map((order) => {
+              const isDelivered = order.status === 'delivered';
+              return (
+                <TouchableOpacity
+                  key={order.id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: theme.spacing[3],
+                    borderBottomWidth: StyleSheet.hairlineWidth * 2,
+                    borderBottomColor: theme.colors.divider,
+                  }}
+                  onPress={() => {
+                    setActiveTab('orders');
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginRight: theme.spacing[3],
+                      backgroundColor: isDelivered ? theme.colors.successMuted : theme.colors.infoMuted,
+                    }}
+                  >
+                    <ShoppingBag size={20} color={isDelivered ? theme.colors.success : theme.colors.info} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <UIText variant="label">{order.customer}</UIText>
+                    <UIText variant="caption" color="secondary" style={{ marginTop: theme.spacing[1] }}>
+                      {order.order_number} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </UIText>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <UIText variant="label" color="success">{formatCurrency(order.amount)}</UIText>
+                    <UIText variant="caption" color="secondary" style={{ marginTop: theme.spacing[1] }}>{order.status}</UIText>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
           ) : (
-            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-              <Text style={styles.noOrdersSubtext}>No recent orders found</Text>
+            <View style={{ paddingVertical: theme.spacing[5], alignItems: 'center' }}>
+              <UIText variant="body" color="secondary">No recent orders found</UIText>
             </View>
           )}
-          <TouchableOpacity style={styles.viewAllButton} onPress={() => setActiveTab('orders')}>
-            <Text style={styles.viewAllText}>View All Orders</Text>
-          </TouchableOpacity>
-        </View>
+          <UIButton
+            title="View All Orders"
+            variant="ghost"
+            onPress={() => setActiveTab('orders')}
+            fullWidth
+            style={{ marginTop: theme.spacing[3] }}
+          />
+        </Surface>
       </View>
     );
   };
@@ -2073,43 +2190,65 @@ export default function AdminScreen() {
         transparent={false}
         onRequestClose={() => setShowMapModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: currentTheme.background }}>
-          <View style={[styles.header, { backgroundColor: currentTheme.surface, paddingTop: 60, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.1, elevation: 4 }]}>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: currentTheme.text }}>
-              Delivery Destination
-            </Text>
-            <TouchableOpacity onPress={() => setShowMapModal(false)}>
-              <Text style={{ color: currentTheme.primary, fontWeight: "600", fontSize: 16 }}>Close</Text>
-            </TouchableOpacity>
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+          <View
+            style={[
+              theme.getElevation("elv200"),
+              {
+                paddingTop: theme.spacing[11],
+                paddingBottom: theme.spacing[5],
+                paddingHorizontal: theme.spacing[6],
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <UIText variant="title">Delivery Destination</UIText>
+            <Pressable onPress={() => setShowMapModal(false)} hitSlop={8}>
+              <UIText variant="label" color="brand">Close</UIText>
+            </Pressable>
           </View>
-          
+
           <View style={{ flex: 1 }}>
-            {selectedMapOrder?.delivery_lat && selectedMapOrder?.delivery_lng && (
-              <MapView
-                provider={PROVIDER_GOOGLE}
-                style={StyleSheet.absoluteFillObject}
-                initialRegion={{
-                  latitude: selectedMapOrder.delivery_lat,
-                  longitude: selectedMapOrder.delivery_lng,
-                  latitudeDelta: 0.005,
-                  longitudeDelta: 0.005,
-                }}
-              >
-                <Marker 
-                  coordinate={{
-                    latitude: selectedMapOrder.delivery_lat,
-                    longitude: selectedMapOrder.delivery_lng,
+            {(() => {
+              const lat = Number(selectedMapOrder?.delivery_lat);
+              const lng = Number(selectedMapOrder?.delivery_lng);
+              if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+              return (
+                <MapView
+                  provider={PROVIDER_GOOGLE}
+                  style={StyleSheet.absoluteFillObject}
+                  initialRegion={{
+                    latitude: lat,
+                    longitude: lng,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
                   }}
-                  title={`Order #${selectedMapOrder.order_number}`}
-                  description={selectedMapOrder.delivery_address}
-                />
-              </MapView>
-            )}
+                >
+                  <Marker
+                    coordinate={{ latitude: lat, longitude: lng }}
+                    title={`Order #${selectedMapOrder?.order_number}`}
+                    description={selectedMapOrder?.delivery_address}
+                  />
+                </MapView>
+              );
+            })()}
           </View>
-          
-          <View style={{ padding: 20, backgroundColor: currentTheme.surface, borderTopWidth: 1, borderTopColor: currentTheme.border }}>
-             <Text style={{ color: currentTheme.text, fontSize: 16, fontWeight: '600', marginBottom: 6 }}>Destination Details</Text>
-             <Text style={{ color: currentTheme.textSecondary, fontSize: 14 }}>{selectedMapOrder?.delivery_address || "Address not provided"}</Text>
+
+          <View
+            style={{
+              padding: theme.spacing[6],
+              backgroundColor: theme.colors.surface,
+              borderTopWidth: StyleSheet.hairlineWidth * 2,
+              borderTopColor: theme.colors.border,
+            }}
+          >
+            <UIText variant="label" style={{ marginBottom: theme.spacing[2] }}>Destination Details</UIText>
+            <UIText variant="body" color="secondary">
+              {selectedMapOrder?.delivery_address || "Address not provided"}
+            </UIText>
           </View>
         </View>
       </Modal>
@@ -2790,19 +2929,19 @@ export default function AdminScreen() {
           )}
 
           {activeTab === "alerts" && (
-            <View style={styles.tabContent}>
-              <Text style={styles.sectionTitle}>Low Stock Alerts</Text>
+            <View style={{ paddingBottom: theme.spacing[6] }}>
+              <UIText variant="title" style={{ marginBottom: theme.spacing[4] }}>Low Stock Alerts</UIText>
               {lowStockProducts.length > 0 ? (
                 lowStockProducts.map((item) => (
                   <View key={item.id}>{renderProductItem({ item })}</View>
                 ))
               ) : (
-                <View style={styles.noAlerts}>
-                  <AlertTriangle size={48} color="#22C55E" />
-                  <Text style={styles.noAlertsText}>No low stock alerts</Text>
-                  <Text style={styles.noAlertsSubtext}>
-                    All products are well stocked
-                  </Text>
+                <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: theme.spacing[12] }}>
+                  <AlertTriangle size={48} color={theme.colors.success} />
+                  <UIText variant="title" color="success" style={{ marginTop: theme.spacing[4], marginBottom: theme.spacing[2] }}>
+                    No low stock alerts
+                  </UIText>
+                  <UIText variant="body" color="secondary">All products are well stocked</UIText>
                 </View>
               )}
             </View>
@@ -3517,45 +3656,32 @@ export default function AdminScreen() {
       </Modal>
 
       {/* Assign Driver Modal */}
-      <Modal visible={showAssignModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '70%', backgroundColor: currentTheme.surface }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: currentTheme.text }]}>Assign Driver</Text>
-              <TouchableOpacity onPress={() => setShowAssignModal(false)} style={styles.closeButton}>
-                <X size={24} color={currentTheme.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.formContainer}>
-               <Text style={[styles.fieldLabel, { color: currentTheme.textSecondary }]}>Available Drivers Near Shop</Text>
-               <ScrollView>
-               {availableDrivers.length === 0 ? (
-                 <Text style={{ paddingVertical: 20, textAlign: 'center', color: currentTheme.textSecondary }}>No available drivers found</Text>
-               ) : (
-                 availableDrivers.map(driver => (
-                   <TouchableOpacity 
-                    key={driver.id} 
-                    style={[styles.itemCard, { marginBottom: 10, padding: 15, borderRadius: 12, backgroundColor: currentTheme.background, flexDirection: 'row', alignItems: 'center' }]}
-                    onPress={() => handleAssignDriver(driver.id)}
-                    disabled={isAssigning}
-                   >
-                     <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: currentTheme.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: 15 }}>
-                        <UserIcon size={20} color={currentTheme.primary} />
-                     </View>
-                     <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 16, fontWeight: '600', color: currentTheme.text }}>{driver.first_name} {driver.last_name}</Text>
-                        <Text style={{ fontSize: 13, color: currentTheme.textSecondary }}>{driver.vehicle_type || 'Rider'} • {driver.vehicle_registration || 'Available'}</Text>
-                     </View>
-                     {isAssigning ? <ActivityIndicator size="small" color={currentTheme.primary} /> : <Truck size={20} color={currentTheme.primary} />}
-                   </TouchableOpacity>
-                 ))
-               )}
-               </ScrollView>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <UIModal
+        visible={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        title="Assign Driver"
+      >
+        <UIText variant="label" color="secondary">Available Drivers Near Shop</UIText>
+        <ScrollView style={{ maxHeight: 340 }}>
+          {availableDrivers.length === 0 ? (
+            <UIText variant="body" color="secondary" style={{ paddingVertical: theme.spacing[5], textAlign: 'center' }}>
+              No available drivers found
+            </UIText>
+          ) : (
+            availableDrivers.map((driver) => (
+              <ListItem
+                key={driver.id}
+                title={`${driver.first_name} ${driver.last_name}`}
+                subtitle={`${driver.vehicle_type || 'Rider'} • ${driver.vehicle_registration || 'Available'}`}
+                icon={<Avatar name={`${driver.first_name} ${driver.last_name}`} size="md" />}
+                trailing={isAssigning ? <Spinner /> : <Truck size={20} color={theme.colors.primary} />}
+                showChevron={false}
+                onPress={isAssigning ? undefined : () => handleAssignDriver(driver.id)}
+              />
+            ))
+          )}
+        </ScrollView>
+      </UIModal>
     </View>
   );
 }
@@ -3938,91 +4064,6 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       backgroundColor: theme.success,
       borderRadius: 8,
       padding: 12,
-    },
-
-    // Item Cards (Products/Categories)
-    itemCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: theme.surface,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 12,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      elevation: 2,
-      borderWidth: 1,
-      borderColor: isDark ? theme.border : "#F1F5F9",
-    },
-    productListImage: {
-      width: 60,
-      height: 60,
-      borderRadius: 8,
-      marginRight: 12,
-      backgroundColor: theme.surface,
-    },
-    productListImagePlaceholder: {
-      width: 60,
-      height: 60,
-      borderRadius: 8,
-      marginRight: 12,
-      backgroundColor: theme.surface,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    itemInfo: {
-      flex: 1,
-    },
-    itemName: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: theme.text,
-      marginBottom: 4,
-    },
-    itemSubtitle: {
-      fontSize: 14,
-      color: theme.textSecondary,
-    },
-    lowStockIndicator: {
-      fontSize: 12,
-      color: theme.error,
-      fontWeight: "600",
-      marginTop: 4,
-    },
-    itemActions: {
-      flexDirection: "row",
-      gap: 8,
-    },
-    editButton: {
-      backgroundColor: "#DBEAFE",
-      borderRadius: 8,
-      padding: 8,
-    },
-    deleteButton: {
-      backgroundColor: "#FEE2E2",
-      borderRadius: 8,
-      padding: 8,
-    },
-
-    // No Alerts
-    noAlerts: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      paddingVertical: 60,
-    },
-    noAlertsText: {
-      fontSize: 18,
-      fontWeight: "600",
-      color: theme.success,
-      marginTop: 16,
-      marginBottom: 8,
-    },
-    noAlertsSubtext: {
-      fontSize: 14,
-      color: theme.textSecondary,
     },
 
     // Modal
@@ -4800,174 +4841,5 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       color: theme.text,
       minWidth: 100,
       textAlign: "center",
-    },
-
-    // Dashboard Styles
-    dashboardSection: {
-      padding: 16,
-    },
-    dashboardGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 12,
-      marginBottom: 20,
-    },
-    dashboardCard: {
-      flex: 1,
-      minWidth: "45%",
-      backgroundColor: theme.surface,
-      borderRadius: 20,
-      padding: 16,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-      elevation: 4,
-      borderWidth: 1,
-      borderColor: isDark ? theme.border : "#F1F5F9",
-    },
-    dashboardCardHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 16,
-    },
-    dashboardCardIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    dashboardCardTitle: {
-      fontSize: 13,
-      fontWeight: "700",
-      color: theme.textSecondary,
-      textTransform: "uppercase",
-      letterSpacing: 0.5,
-    },
-    dashboardCardValue: {
-      fontSize: 24,
-      fontWeight: "800",
-      color: theme.text,
-      marginBottom: 6,
-      letterSpacing: -0.5,
-    },
-    dashboardCardSubValue: {
-      fontSize: 12,
-      fontWeight: "500",
-      color: theme.textSecondary,
-    },
-    chartSection: {
-      backgroundColor: theme.surface,
-      borderRadius: 20,
-      padding: 20,
-      marginBottom: 20,
-      borderWidth: 1,
-      borderColor: isDark ? theme.border : "#F1F5F9",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.05,
-      shadowRadius: 10,
-      elevation: 2,
-    },
-    chartHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 20,
-    },
-    chartTitle: {
-      fontSize: 15,
-      fontWeight: "800",
-      color: theme.text,
-      letterSpacing: -0.3,
-    },
-    chartContainer: {
-      height: 180,
-      flexDirection: "row",
-      alignItems: "flex-end",
-      justifyContent: "space-between",
-      paddingTop: 10,
-    },
-    chartBarContainer: {
-      flex: 1,
-      alignItems: "center",
-      height: "100%",
-      justifyContent: "flex-end",
-    },
-    chartBar: {
-      width: 12,
-      borderRadius: 6,
-      backgroundColor: "#6366F1",
-    },
-    chartLabel: {
-      fontSize: 9,
-      color: theme.textSecondary,
-      marginTop: 8,
-      transform: [{ rotate: "-45deg" }],
-    },
-    recentActivitySection: {
-      backgroundColor: theme.surface,
-      borderRadius: 20,
-      padding: 20,
-      marginBottom: 20,
-      borderWidth: 1,
-      borderColor: isDark ? theme.border : "#F1F5F9",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.05,
-      shadowRadius: 10,
-      elevation: 2,
-    },
-    recentActivityTitle: {
-      fontSize: 15,
-      fontWeight: "800",
-      color: theme.text,
-      marginBottom: 16,
-      letterSpacing: -0.3,
-    },
-    activityItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: isDark ? theme.border : "#F8FAFC",
-    },
-    activityIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: "center",
-      alignItems: "center",
-      marginRight: 12,
-    },
-    activityInfo: {
-      flex: 1,
-    },
-    activityTitle: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: theme.text,
-      marginBottom: 2,
-    },
-    activitySubtitle: {
-      fontSize: 12,
-      color: theme.textSecondary,
-    },
-    activityAmount: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: theme.success,
-    },
-    viewAllButton: {
-      marginTop: 12,
-      alignItems: "center",
-      paddingVertical: 10,
-    },
-    viewAllText: {
-      fontSize: 14,
-      color: "#6366F1",
-      fontWeight: "600",
     },
   });

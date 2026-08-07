@@ -1,20 +1,10 @@
 // app/wallet/history.tsx
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  StatusBar,
-} from "react-native";
+import { View, StyleSheet, FlatList, RefreshControl, StatusBar } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { Theme } from "@/constants/Themes";
+import { useAppTheme } from "@/contexts/ThemeContext";
 import { walletApi, WalletTransaction } from "@/services/api";
 import { ToastService } from "@/utils/toastService";
 import {
@@ -22,16 +12,15 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Wallet,
-  Calendar,
-  Filter,
-  CreditCard,
   ShoppingBag,
 } from "lucide-react-native";
+import { AppTheme } from "@/design";
+import { Text, IconButton, Chip, EmptyState, SkeletonList, Spinner } from "@/components/ui";
 
 export default function WalletHistoryScreen() {
   const { user, refreshAuth } = useAuth();
-  const { currentTheme, themeName } = useTheme();
-  const isDark = themeName === "dark";
+  const theme = useAppTheme();
+  const isDark = theme.mode === "dark";
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,8 +36,6 @@ export default function WalletHistoryScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-
-  const styles = createStyles(currentTheme, isDark);
 
   useEffect(() => {
     loadData();
@@ -120,356 +107,253 @@ export default function WalletHistoryScreen() {
     }
   };
 
-  const getTransactionIcon = (type: string, description: string) => {
-    if (type === "credit") {
-      if (description.toLowerCase().includes("refund"))
-        return <ArrowDownLeft size={20} color={currentTheme.success} />;
-      return <Wallet size={20} color={currentTheme.success} />;
-    } else {
-      if (description.toLowerCase().includes("order"))
-        return <ShoppingBag size={20} color={currentTheme.error} />;
-      return <ArrowUpRight size={20} color={currentTheme.error} />;
-    }
-  };
-
-  const renderTransactionItem = ({ item }: { item: WalletTransaction }) => {
-    const isCredit = item.type === "credit";
-    const date = new Date(item.created_at);
-
-    return (
-      <View style={styles.transactionCard}>
-        <View
-          style={[
-            styles.iconContainer,
-            {
-              backgroundColor: isCredit
-                ? `${currentTheme.success}20`
-                : `${currentTheme.error}20`,
-            },
-          ]}
-        >
-          {getTransactionIcon(item.type, item.description)}
-        </View>
-
-        <View style={styles.transactionDetails}>
-          <Text style={styles.transactionTitle}>{item.description}</Text>
-          <Text style={styles.transactionDate}>
-            {date.toLocaleDateString()} •{" "}
-            {date.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </Text>
-        </View>
-
-        <View style={styles.amountContainer}>
-          <Text
-            style={[
-              styles.amountText,
-              { color: isCredit ? currentTheme.success : currentTheme.error },
-            ]}
-          >
-            {isCredit ? "+" : "-"} KES {item.amount.toLocaleString()}
-          </Text>
-          <Text style={styles.balanceAfter}>
-            Bal:{" "}
-            {item.balance_after !== undefined && item.balance_after !== null
-              ? item.balance_after.toLocaleString()
-              : "N/A"}
-          </Text>
-        </View>
-      </View>
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={currentTheme.primary} />
-      </View>
-    );
-  }
+  const renderTransactionItem = ({ item }: { item: WalletTransaction }) => (
+    <TransactionRow transaction={item} theme={theme} />
+  );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={currentTheme.surface}
+        backgroundColor={theme.colors.surface}
       />
 
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
+      <View
+        style={[
+          styles.header,
+          {
+            paddingHorizontal: theme.spacing[6],
+            paddingTop: theme.spacing[11],
+            paddingBottom: theme.spacing[5],
+            backgroundColor: theme.colors.surface,
+          },
+        ]}
+      >
+        <IconButton
+          icon={<ArrowLeft size={theme.iconSize.lg} color={theme.colors.text} />}
           onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <ArrowLeft size={24} color={currentTheme.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Wallet History</Text>
-        <View style={{ width: 24 }} />
+          accessibilityLabel="Back"
+        />
+        <Text variant="title">Wallet History</Text>
+        <View style={{ width: theme.touchTarget }} />
       </View>
 
-      <FlatList
-        data={transactions}
-        renderItem={renderTransactionItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        ListHeaderComponent={
-          <>
-            {/* Balance Card */}
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Current Balance</Text>
-              <Text
-                style={[
-                  styles.balanceValue,
-                  {
-                    color:
-                      summary.current_balance >= 0
-                        ? currentTheme.success
-                        : currentTheme.error,
-                  },
-                ]}
+      {loading ? (
+        <View style={{ padding: theme.spacing[6] }}>
+          <SkeletonList count={5} />
+        </View>
+      ) : (
+        <FlatList
+          data={transactions}
+          renderItem={renderTransactionItem}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={{ paddingBottom: theme.spacing[9] }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={
+            <>
+              <BalanceCard summary={summary} theme={theme} />
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: theme.spacing[3],
+                  paddingHorizontal: theme.spacing[6],
+                  marginBottom: theme.spacing[6],
+                }}
               >
-                KES {summary.current_balance.toLocaleString()}
-              </Text>
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Total Spent</Text>
-                  <Text style={styles.statValue}>
-                    KES {summary.total_spent.toLocaleString()}
-                  </Text>
-                </View>
-                <View style={styles.divider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Total Credited</Text>
-                  <Text style={styles.statValue}>
-                    KES {summary.total_credited.toLocaleString()}
-                  </Text>
-                </View>
+                {(["all", "credit", "debit"] as const).map((type) => (
+                  <Chip
+                    key={type}
+                    label={type.charAt(0).toUpperCase() + type.slice(1)}
+                    selected={filterType === type}
+                    onPress={() => setFilterType(type)}
+                  />
+                ))}
               </View>
-            </View>
 
-            {/* Filters */}
-            <View style={styles.filterContainer}>
-              {(["all", "credit", "debit"] as const).map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.filterButton,
-                    filterType === type && {
-                      backgroundColor: currentTheme.primary,
-                    },
-                  ]}
-                  onPress={() => setFilterType(type)}
-                >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      filterType === type && { color: "#ffffff" },
-                    ]}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.sectionTitle}>Transactions</Text>
-          </>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Wallet size={48} color={currentTheme.textSecondary} />
-            <Text style={styles.emptyText}>No transactions found</Text>
-          </View>
-        }
-        ListFooterComponent={
-          loadingMore ? (
-            <ActivityIndicator
-              style={{ padding: 20 }}
-              color={currentTheme.primary}
+              <Text
+                variant="title"
+                style={{ marginLeft: theme.spacing[6], marginBottom: theme.spacing[4] }}
+              >
+                Transactions
+              </Text>
+            </>
+          }
+          ListEmptyComponent={
+            <EmptyState
+              title="No transactions found"
+              message="Your wallet activity will show up here"
             />
-          ) : (
-            <View style={{ height: 40 }} />
-          )
-        }
-      />
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ padding: theme.spacing[6] }}>
+                <Spinner />
+              </View>
+            ) : (
+              <View style={{ height: theme.spacing[9] }} />
+            )
+          }
+        />
+      )}
     </View>
   );
 }
 
-const createStyles = (theme: Theme, isDark: boolean) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    centerContainer: {
-      flex: 1,
-      justifyContent: "center",
+const BalanceCard = ({
+  summary,
+  theme,
+}: {
+  summary: { current_balance: number; total_credited: number; total_spent: number };
+  theme: AppTheme;
+}) => (
+  <LinearGradient
+    colors={[theme.colors.primary, theme.colors.secondary]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={{
+      margin: theme.spacing[6],
+      padding: theme.spacing[7],
+      borderRadius: theme.radius.xl,
       alignItems: "center",
-      backgroundColor: theme.background,
-    },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 20,
-      paddingTop: 60,
-      paddingBottom: 16,
-      backgroundColor: theme.surface,
-    },
-    backButton: {
-      padding: 4,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: "700",
-      color: theme.text,
-    },
-    listContainer: {
-      paddingBottom: 40,
-    },
+      ...theme.getElevation("elv300"),
+    }}
+  >
+    <Text variant="label" style={{ color: theme.colors.textOnPrimary, opacity: 0.8 }}>
+      Current Balance
+    </Text>
+    <Text
+      variant="display"
+      style={{ color: theme.colors.textOnPrimary, marginTop: theme.spacing[2], marginBottom: theme.spacing[6] }}
+    >
+      KES {summary.current_balance.toLocaleString()}
+    </Text>
+    <View
+      style={{
+        flexDirection: "row",
+        width: "100%",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingTop: theme.spacing[4],
+        borderTopWidth: StyleSheet.hairlineWidth * 2,
+        borderTopColor: "rgba(255,255,255,0.25)",
+      }}
+    >
+      <View style={{ flex: 1, alignItems: "center" }}>
+        <Text variant="caption" style={{ color: theme.colors.textOnPrimary, opacity: 0.8 }}>
+          Total Spent
+        </Text>
+        <Text variant="label" style={{ color: theme.colors.textOnPrimary, marginTop: theme.spacing[1] }}>
+          KES {summary.total_spent.toLocaleString()}
+        </Text>
+      </View>
+      <View style={{ width: StyleSheet.hairlineWidth * 2, height: 40, backgroundColor: "rgba(255,255,255,0.25)" }} />
+      <View style={{ flex: 1, alignItems: "center" }}>
+        <Text variant="caption" style={{ color: theme.colors.textOnPrimary, opacity: 0.8 }}>
+          Total Credited
+        </Text>
+        <Text variant="label" style={{ color: theme.colors.textOnPrimary, marginTop: theme.spacing[1] }}>
+          KES {summary.total_credited.toLocaleString()}
+        </Text>
+      </View>
+    </View>
+  </LinearGradient>
+);
 
-    // Balance Card
-    balanceCard: {
-      margin: 20,
-      padding: 24,
-      backgroundColor: theme.surface,
-      borderRadius: 16,
-      alignItems: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.1,
-      shadowRadius: 12,
-      elevation: 5,
-    },
-    balanceLabel: {
-      fontSize: 14,
-      color: theme.textSecondary,
-      marginBottom: 8,
-    },
-    balanceValue: {
-      fontSize: 32,
-      fontWeight: "800",
-      marginBottom: 24,
-    },
-    statsRow: {
-      flexDirection: "row",
-      width: "100%",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingTop: 16,
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-    },
-    statItem: {
-      flex: 1,
-      alignItems: "center",
-    },
-    divider: {
-      width: 1,
-      height: 40,
-      backgroundColor: theme.border,
-    },
-    statLabel: {
-      fontSize: 12,
-      color: theme.textSecondary,
-      marginBottom: 4,
-    },
-    statValue: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: theme.text,
-    },
+const TransactionRow = ({
+  transaction,
+  theme,
+}: {
+  transaction: WalletTransaction;
+  theme: AppTheme;
+}) => {
+  const isCredit = transaction.type === "credit";
+  const date = new Date(transaction.created_at);
+  const isRefund = transaction.description.toLowerCase().includes("refund");
+  const isOrderDebit = transaction.description.toLowerCase().includes("order");
 
-    // Filters
-    filterContainer: {
-      flexDirection: "row",
-      paddingHorizontal: 20,
-      marginBottom: 24,
-      gap: 12,
-    },
-    filterButton: {
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: theme.border,
-      backgroundColor: theme.surface,
-    },
-    filterText: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: theme.textSecondary,
-    },
+  const Icon = isCredit
+    ? isRefund
+      ? ArrowDownLeft
+      : Wallet
+    : isOrderDebit
+      ? ShoppingBag
+      : ArrowUpRight;
 
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: "700",
-      color: theme.text,
-      marginLeft: 20,
-      marginBottom: 12,
-    },
+  return (
+    <View
+      style={[
+        styles.transactionRow,
+        {
+          marginHorizontal: theme.spacing[6],
+          marginBottom: theme.spacing[3],
+          padding: theme.spacing[4],
+          borderRadius: theme.radius.lg,
+          backgroundColor: theme.colors.surface,
+          borderWidth: StyleSheet.hairlineWidth * 2,
+          borderColor: theme.colors.border,
+        },
+      ]}
+    >
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          alignItems: "center",
+          justifyContent: "center",
+          marginRight: theme.spacing[4],
+          backgroundColor: isCredit ? theme.colors.successMuted : theme.colors.dangerMuted,
+        }}
+      >
+        <Icon size={20} color={isCredit ? theme.colors.success : theme.colors.error} />
+      </View>
 
-    // Transaction Item
-    transactionCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginHorizontal: 20,
-      marginBottom: 12,
-      padding: 16,
-      backgroundColor: theme.surface,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.border,
-    },
-    iconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: "center",
-      alignItems: "center",
-      marginRight: 12,
-    },
-    transactionDetails: {
-      flex: 1,
-    },
-    transactionTitle: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: theme.text,
-      marginBottom: 4,
-    },
-    transactionDate: {
-      fontSize: 12,
-      color: theme.textSecondary,
-    },
-    amountContainer: {
-      alignItems: "flex-end",
-    },
-    amountText: {
-      fontSize: 16,
-      fontWeight: "700",
-      marginBottom: 4,
-    },
-    balanceAfter: {
-      fontSize: 12,
-      color: theme.textSecondary,
-    },
+      <View style={{ flex: 1 }}>
+        <Text variant="body" numberOfLines={1}>
+          {transaction.description}
+        </Text>
+        <Text variant="caption" color="muted" style={{ marginTop: theme.spacing[1] }}>
+          {date.toLocaleDateString()} •{" "}
+          {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </Text>
+      </View>
 
-    emptyState: {
-      alignItems: "center",
-      padding: 40,
-    },
-    emptyText: {
-      marginTop: 12,
-      fontSize: 16,
-      color: theme.textSecondary,
-    },
-  });
+      <View style={{ alignItems: "flex-end" }}>
+        <Text
+          variant="label"
+          style={{ color: isCredit ? theme.colors.success : theme.colors.error }}
+        >
+          {isCredit ? "+" : "-"} KES {transaction.amount.toLocaleString()}
+        </Text>
+        <Text variant="caption" color="muted" style={{ marginTop: theme.spacing[1] }}>
+          Bal:{" "}
+          {transaction.balance_after !== undefined && transaction.balance_after !== null
+            ? transaction.balance_after.toLocaleString()
+            : "N/A"}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+// Layout-only styles (no theme colors — token-driven values are applied inline)
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  transactionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+});
