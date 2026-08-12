@@ -24,7 +24,7 @@ import {
   ChevronRight,
   Calendar,
 } from "lucide-react-native";
-import { StatusPill, OrderRow, SkeletonList, EmptyState } from "@/components/ui";
+import { StatusPill, OrderCard, EmptyState } from "@/components/ui";
 
 // Helper function to create dynamic styles
 const createDynamicStyles = (currentTheme: any, themeName: string) =>
@@ -319,67 +319,13 @@ export default function OrdersScreen(): React.ReactElement {
   };
 
   const renderOrderCard = ({ item }: { item: Order }) => {
-    const statusStyle = getStatusBadgeStyle(item.order_status);
-    const paymentStyle = getPaymentStatusBadgeStyle(item.payment_status);
-    const orderTotal = calculateOrderTotal(item);
-
     return (
-      <TouchableOpacity
-        style={dynamicStyles.orderCard}
-        onPress={() => router.push(`/order/${item.id}` as any)}
-        activeOpacity={0.7}
-      >
-        <View style={dynamicStyles.orderHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={dynamicStyles.orderNumber}>{item.order_number}</Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginTop: 4,
-              }}
-            >
-              <Calendar size={12} color={currentTheme.textSecondary} />
-              <Text style={dynamicStyles.orderDate}>
-                {formatDate(item.order_date)} • {formatTime(item.order_time)}
-              </Text>
-            </View>
-          </View>
-          <StatusPill status={item.order_status} />
-        </View>
-
-        <View style={dynamicStyles.orderInfo}>
-          <View style={{ flex: 1 }}>
-            <Text style={dynamicStyles.orderAmount}>
-              Ksh {orderTotal.toLocaleString()}
-            </Text>
-            <View style={dynamicStyles.paymentStatusContainer}>
-              <View
-                style={[
-                  dynamicStyles.paymentStatusBadge,
-                  { backgroundColor: paymentStyle.backgroundColor },
-                ]}
-              >
-                <Text
-                  style={[
-                    dynamicStyles.paymentStatusText,
-                    { color: paymentStyle.color },
-                  ]}
-                >
-                  Payment: {item.payment_status.toUpperCase()}
-                </Text>
-              </View>
-              {item.items && item.items.length > 0 && (
-                <Text style={dynamicStyles.orderItemsCount}>
-                  {item.items.length}{" "}
-                  {item.items.length === 1 ? "item" : "items"}
-                </Text>
-              )}
-            </View>
-          </View>
-          <ChevronRight size={20} color={currentTheme.textSecondary} />
-        </View>
-      </TouchableOpacity>
+      <View style={{ marginHorizontal: 16, marginVertical: 8 }}>
+        <OrderCard
+          order={item}
+          onPress={() => router.push(`/order/${item.id}` as any)}
+        />
+      </View>
     );
   };
 

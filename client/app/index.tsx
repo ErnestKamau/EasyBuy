@@ -29,6 +29,6 @@ export default function Index() {
     }
   }
   
-  const target = user?.role === 'rider' ? '/rider' : '/(tabs)';
+  const target = user?.role === 'rider' ? '/(rider)' : '/(tabs)';
   return <Redirect href={target as any} />;
 }

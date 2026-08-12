@@ -65,11 +65,13 @@ export interface User {
   role?: 'admin' | 'customer' | 'rider';
   online_status?: 'online' | 'offline' | 'busy';
   vehicle_type?: string;
+  vehicle_model?: string;
   vehicle_registration?: string;
   fcm_token?: string;
   email_verified_at?: string | null;
   wallet_balance: number; // Current balance (positive = credit, negative = debt)
   max_debt_limit: number; // Maximum debt allowed (e.g., -5000)
+  average_rating?: number;
   created_at: string;
   updated_at: string;
 }
@@ -457,8 +459,10 @@ export interface Order {
   pickup_time?: string;
   type: 'delivery' | 'pickup';
   order_status: 'pending' | 'confirmed' | 'cancelled'; // Note: removed delivery statuses from order_status as they belong to fulfillment_status
-  fulfillment_status: 'pending' | 'preparing' | 'ready' | 'assigned' | 'driver_accepted' | 'en_route' | 'delivered' | 'picked_up';
+  fulfillment_status: 'pending' | 'preparing' | 'ready' | 'assigned' | 'driver_accepted' | 'en_route' | 'arrived' | 'delivered' | 'picked_up';
   payment_status: 'pending' | 'fully-paid' | 'partially-paid' | 'failed' | 'debt';
+  payment_method?: 'cash' | 'mpesa' | 'card' | null;
+  payment_timing?: 'now' | 'on_delivery';
   order_date: string;
   order_time: string;
   total_amount: number;
@@ -474,7 +478,9 @@ export interface Order {
   assigned_at?: string;
   accepted_at?: string;
   picked_up_at?: string;
-  delivered_at?: string;
+  delivery_qr_code?: string | null;
+  delivery_verification_code?: string | null;
+  arrived_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -497,12 +503,15 @@ export const ordersApi = {
       longitude: number;
       address: string;
       delivery_fee?: number;
-    }
+    },
+    paymentTiming?: 'now' | 'on_delivery'
   ): Promise<Order> {
     const { data } = await api.post<{ success: boolean; data: Order }>('/orders', {
       items,
       notes: notes || '',
-      payment_status: paymentMethod === 'cash' ? 'pending' : paymentMethod === 'mpesa' ? 'pending' : 'pending',
+      payment_status: 'pending',
+      payment_method: paymentMethod,
+      payment_timing: paymentTiming ?? 'now',
       pickup_time: pickupTime || undefined,
       delivery_lat: deliveryData?.latitude,
       delivery_lng: deliveryData?.longitude,
@@ -706,11 +715,16 @@ export const salesApi = {
 export interface OrderTracking {
   order_id: number;
   fulfillment_status: Order['fulfillment_status'];
+  payment_status?: Order['payment_status'];
+  payment_method?: Order['payment_method'];
+  payment_timing?: Order['payment_timing'];
   driver: {
     id: number;
     name: string;
     vehicle_type?: string;
+    vehicle_model?: string;
     vehicle_registration?: string;
+    average_rating?: number;
   } | null;
   driver_location: {
     lat: number;
@@ -732,9 +746,22 @@ export interface OrderTracking {
   } | null;
 }
 
+export interface RiderProfile {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone_number?: string;
+  vehicle_type?: string;
+  vehicle_model?: string;
+  vehicle_registration?: string;
+  average_rating: number;
+  rating_count: number;
+  online_status?: string;
+}
+
 // Delivery/Driver API
 export const deliveryApi = {
-  // Rider endpoints
   async updateLocation(
     lat: number,
     lng: number,
@@ -758,6 +785,26 @@ export const deliveryApi = {
     return data.order ?? null;
   },
 
+  async getAssignedDeliveries(): Promise<Order[]> {
+    const { data } = await api.get<{ orders: Order[] }>('/rider/deliveries');
+    return data.orders ?? [];
+  },
+
+  async getDeliveryHistory(): Promise<Order[]> {
+    const { data } = await api.get<{ orders: Order[] }>('/rider/deliveries/history');
+    return data.orders ?? [];
+  },
+
+  async getDelivery(orderId: number): Promise<Order> {
+    const { data } = await api.get<{ order: Order }>(`/rider/deliveries/${orderId}`);
+    return data.order;
+  },
+
+  async getRiderProfile(): Promise<RiderProfile> {
+    const { data } = await api.get<RiderProfile>('/rider/profile');
+    return data;
+  },
+
   async acceptDelivery(orderId: number): Promise<any> {
     const { data } = await api.post(`/rider/deliveries/${orderId}/accept`);
     return data;
@@ -768,18 +815,43 @@ export const deliveryApi = {
     return data;
   },
 
+  async arriveDelivery(orderId: number): Promise<any> {
+    const { data } = await api.post(`/rider/deliveries/${orderId}/arrive`);
+    return data;
+  },
+
   async confirmDelivery(orderId: number): Promise<any> {
     const { data } = await api.post(`/rider/deliveries/${orderId}/confirm`);
     return data;
   },
 
-  // Customer confirms they received the delivery
+  async collectCash(orderId: number): Promise<any> {
+    const { data } = await api.post(`/rider/deliveries/${orderId}/collect-cash`);
+    return data;
+  },
+
+  async collectCashAdmin(orderId: number): Promise<any> {
+    const { data } = await api.post(`/admin/orders/${orderId}/collect-cash`);
+    return data;
+  },
+
   async customerConfirmDelivery(orderId: number): Promise<any> {
     const { data } = await api.post(`/orders/${orderId}/confirm-delivery`);
     return data;
   },
 
-  // Admin endpoints
+  async verifyDeliveryQr(orderId: number, qrCode: string): Promise<Order> {
+    const { data } = await api.post<{ order: Order }>(`/orders/${orderId}/verify-delivery-qr`, {
+      qr_code: qrCode,
+    });
+    return data.order;
+  },
+
+  async rateDriver(orderId: number, rating: number, comment?: string): Promise<any> {
+    const { data } = await api.post(`/orders/${orderId}/rate-driver`, { rating, comment });
+    return data;
+  },
+
   async getAvailableDrivers(): Promise<User[]> {
     const { data } = await api.get<{ drivers: User[] }>('/admin/drivers/available');
     return data.drivers ?? [];
@@ -790,7 +862,6 @@ export const deliveryApi = {
     return data;
   },
 
-  // Live tracking snapshot (driver GPS + route polyline + ETA)
   async getOrderTracking(orderId: number): Promise<OrderTracking> {
     const { data } = await api.get<OrderTracking>(`/orders/${orderId}/tracking`);
     return data;
@@ -1051,7 +1122,7 @@ export function handleApiError(error: any): string {
 export interface Notification {
   id: number;
   user_id?: number | null;
-  type: 'order_placed' | 'order_confirmed' | 'order_cancelled' | 'debt_warning_2days' | 'debt_warning_admin_2days' | 'debt_overdue' | 'debt_overdue_admin' | 'payment_received' | 'payment_received_admin' | 'sale_fully_paid' | 'low_stock_alert' | 'refund_processed' | 'new_product_available';
+  type: 'order_placed' | 'order_confirmed' | 'order_cancelled' | 'debt_warning_2days' | 'debt_warning_admin_2days' | 'debt_overdue' | 'debt_overdue_admin' | 'payment_received' | 'payment_received_admin' | 'sale_fully_paid' | 'low_stock_alert' | 'refund_processed' | 'new_product_available' | 'delivery_assigned' | 'delivery_accepted' | 'delivery_assignment_timeout' | 'delivery_needs_reassign' | 'package_on_the_way' | 'driver_arrived' | 'delivery_fulfilled' | 'driver_rated';
   title: string;
   message: string;
   data?: Record<string, any>;

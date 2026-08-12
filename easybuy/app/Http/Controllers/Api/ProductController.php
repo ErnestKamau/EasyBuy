@@ -74,7 +74,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:120|unique:products',
-            'image_url' => 'nullable|string|max:500|url',
+            'image_url' => ['nullable', 'string', 'max:500'],
             'category_id' => 'required|exists:categories,id',
             'description' => 'nullable|string',
             'kilograms_in_stock' => 'nullable|numeric|min:0.001',
@@ -108,7 +108,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|string|max:120|unique:products,name,' . $product->id,
-            'image_url' => 'nullable|string|max:500|url',
+            'image_url' => ['nullable', 'string', 'max:500'],
             'category_id' => 'sometimes|exists:categories,id',
             'description' => 'nullable|string',
             'kilograms_in_stock' => 'nullable|numeric|min:0.001',

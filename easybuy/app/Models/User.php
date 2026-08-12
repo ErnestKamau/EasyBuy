@@ -47,6 +47,7 @@ class User extends Authenticatable implements MustVerifyEmail
         // Rider fields
         'online_status',
         'vehicle_type',
+        'vehicle_model',
         'vehicle_registration',
         'fcm_token',
     ];
@@ -149,7 +150,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function activeDelivery()
     {
         return $this->hasOne(Order::class, 'driver_id')
-            ->whereIn('fulfillment_status', ['assigned', 'driver_accepted', 'en_route']);
+            ->whereIn('fulfillment_status', ['assigned', 'driver_accepted', 'en_route', 'arrived']);
     }
 
     /**
@@ -158,7 +159,16 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isAvailableForDelivery(): bool
     {
         return $this->isRider()
-            && $this->isOnline()
             && $this->activeDelivery()->doesntExist();
+    }
+
+    public function driverRatings()
+    {
+        return $this->hasMany(DriverRating::class, 'driver_id');
+    }
+
+    public function getAverageRatingAttribute(): float
+    {
+        return round((float) $this->driverRatings()->avg('rating'), 1);
     }
 }

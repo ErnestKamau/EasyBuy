@@ -24,6 +24,8 @@ import {
   AlertTriangle,
   Package,
   Trash2,
+  Truck,
+  Star,
 } from "lucide-react-native";
 
 // Helper function to create dynamic styles
@@ -190,6 +192,16 @@ const getNotificationIcon = (type: string) => {
       return CreditCard;
     case "new_product_available":
       return Package;
+    case "delivery_assigned":
+    case "delivery_accepted":
+    case "package_on_the_way":
+    case "driver_arrived":
+    case "delivery_fulfilled":
+    case "delivery_assignment_timeout":
+    case "delivery_needs_reassign":
+      return Truck;
+    case "driver_rated":
+      return Star;
     default:
       return Bell;
   }

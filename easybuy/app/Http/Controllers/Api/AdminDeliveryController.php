@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Actions\Delivery\AssignDriverAction;
 use App\Events\OrderStatusUpdated;
 use App\Models\Order;
@@ -14,34 +13,35 @@ use Illuminate\Support\Facades\Redis;
 class AdminDeliveryController extends Controller
 {
     /**
-     * List available drivers for admin to choose from.
-     * A driver is available when:
-     *   1. They have role = 'rider'.
-     *   2. They are in the Redis 'drivers:online' sorted set (heartbeat < 2 min ago).
-     *   3. They have no active delivery.
+     * List riders available for assignment (online or offline, no active job).
      */
     public function availableDrivers(Request $request): JsonResponse
     {
-        // Get IDs of online drivers from Redis sorted set
-        // Score = Unix timestamp of last heartbeat. Filter out entries older than 2 minutes.
         $minScore = now()->subMinutes(2)->timestamp;
-        $onlineDriverIds = Redis::zrangebyscore('drivers:online', $minScore, '+inf');
-
-        if (empty($onlineDriverIds)) {
-            return response()->json(['drivers' => []]);
-        }
+        $onlineDriverIds = Redis::zrangebyscore('drivers:online', $minScore, '+inf') ?: [];
+        $onlineSet = array_map('intval', $onlineDriverIds);
 
         $drivers = User::where('role', 'rider')
-            ->whereIn('id', $onlineDriverIds)
             ->whereDoesntHave('activeDelivery')
-            ->get(['id', 'first_name', 'last_name', 'vehicle_type', 'vehicle_registration', 'online_status']);
+            ->get([
+                'id',
+                'first_name',
+                'last_name',
+                'phone_number',
+                'vehicle_type',
+                'vehicle_model',
+                'vehicle_registration',
+                'online_status',
+            ])
+            ->map(function (User $driver) use ($onlineSet) {
+                $driver->online_status = in_array((int) $driver->id, $onlineSet, true) ? 'online' : 'offline';
+                $driver->average_rating = $driver->average_rating;
+                return $driver;
+            });
 
         return response()->json(['drivers' => $drivers]);
     }
 
-    /**
-     * Admin assigns a specific driver to a delivery order.
-     */
     public function assignDriver(Request $request, Order $order, AssignDriverAction $action): JsonResponse
     {
         $validated = $request->validate([
@@ -57,10 +57,6 @@ class AdminDeliveryController extends Controller
         ]);
     }
 
-    /**
-     * Admin force-starts a trip (overrides waiting for driver to tap start).
-     * Used when driver starts moving but hasn't tapped the button.
-     */
     public function startTrip(Request $request, Order $order): JsonResponse
     {
         if (!in_array($order->fulfillment_status, ['driver_accepted', 'assigned'])) {

@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
@@ -24,7 +23,7 @@ import {
   ShoppingBag,
   Star,
 } from "lucide-react-native";
-import { GlassSurface } from "@/components/ui";
+import { FloatingGlassBar, MediaContainer } from "@/components/ui";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -501,12 +500,11 @@ export default function ProductDetailScreen() {
       >
         <View style={dynamicStyles.heroSection}>
           <View style={dynamicStyles.imageContainer}>
-            <Image
-              source={{
-                uri: product.image_url || "https://via.placeholder.com/400x400",
-              }}
-              style={dynamicStyles.productImage}
-              resizeMode="contain"
+            <MediaContainer
+              uri={product.image_url}
+              aspectRatio="1:1"
+              borderRadius={24}
+              style={{ width: "100%", height: "100%" }}
             />
           </View>
         </View>
@@ -601,19 +599,7 @@ export default function ProductDetailScreen() {
         </View>
       </ScrollView>
 
-      <GlassSurface
-        level={3}
-        borderRadius={0}
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          borderLeftWidth: 0,
-          borderRightWidth: 0,
-          borderBottomWidth: 0,
-        }}
-      >
+      <FloatingGlassBar level={3}>
         <View
           style={[
             dynamicStyles.bottomBar,
@@ -626,6 +612,7 @@ export default function ProductDetailScreen() {
               borderTopWidth: 0,
               elevation: 0,
               shadowOpacity: 0,
+              paddingBottom: 16,
             },
           ]}
         >
@@ -649,7 +636,7 @@ export default function ProductDetailScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-      </GlassSurface>
+      </FloatingGlassBar>
     </View>
   );
 }

@@ -44,6 +44,7 @@ class OrderStatusUpdated implements ShouldBroadcast
                 'id'                  => $this->order->driver->id,
                 'name'                => $this->order->driver->first_name . ' ' . $this->order->driver->last_name,
                 'vehicle_type'        => $this->order->driver->vehicle_type,
+                'vehicle_model'       => $this->order->driver->vehicle_model,
                 'vehicle_registration'=> $this->order->driver->vehicle_registration,
             ] : null,
             'updated_at' => now()->toISOString(),

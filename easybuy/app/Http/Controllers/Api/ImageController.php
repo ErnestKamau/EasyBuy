@@ -24,19 +24,11 @@ class ImageController extends Controller
             $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
             $path = $file->storeAs('products', $filename, 'public');
 
-            // Use the request's scheme and host to construct the URL
-            // This ensures the URL works from mobile devices
-            $scheme = $request->getScheme();
-            $host = $request->getHost();
-            $port = $request->getPort();
-            $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
-            $url = $baseUrl . '/storage/' . $path;
-
             return response()->json([
                 'success' => true,
                 'message' => 'Image uploaded successfully',
                 'data' => [
-                    'url' => $url,
+                    'url' => url('/storage/' . $path),
                     'path' => $path,
                 ]
             ]);

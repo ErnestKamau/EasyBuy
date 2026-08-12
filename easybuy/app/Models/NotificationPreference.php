@@ -51,6 +51,10 @@ class NotificationPreference extends Model
             'delivery_accepted' => ['enabled' => true, 'push_enabled' => true],
             'delivery_assignment_timeout' => ['enabled' => $role === 'rider', 'push_enabled' => $role === 'rider'],
             'delivery_needs_reassign' => ['enabled' => $role === 'admin', 'push_enabled' => $role === 'admin'],
+            'package_on_the_way' => ['enabled' => true, 'push_enabled' => true],
+            'driver_arrived' => ['enabled' => true, 'push_enabled' => true],
+            'delivery_fulfilled' => ['enabled' => true, 'push_enabled' => true],
+            'driver_rated' => ['enabled' => $role === 'rider', 'push_enabled' => $role === 'rider'],
         ];
 
         return $defaults;

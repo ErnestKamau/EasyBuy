@@ -8,16 +8,20 @@ import {
   Dimensions,
   Platform,
   Linking,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
-import { ArrowLeft, Phone, Navigation, Package, CheckCircle2 } from "lucide-react-native";
-import { useTheme } from "@/contexts/ThemeContext";
-import { ordersApi, Order, deliveryApi, OrderTracking } from "@/services/api";
+import { ArrowLeft, Phone, Navigation, Package, Star } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme, useAppTheme } from "@/contexts/ThemeContext";
+import { ordersApi, Order, deliveryApi, OrderTracking, mpesaApi, stripeApi } from "@/services/api";
 import { websocketService } from "@/services/websocket";
 import { ToastService } from "@/utils/toastService";
 import { decodePolyline } from "@/utils/polyline";
-import { TrackStepper, GlassSurface, Text as UIText, Button } from "@/components/ui";
+import { TrackStepper, GlassSurface, Text as UIText, Button, SheetStatus, BottomSheet, Input } from "@/components/ui";
+import { useAuth } from "@/contexts/AuthContext";
+import { useStripe } from "@/components/stripeNative";
 
 const { width } = Dimensions.get("window");
 
@@ -27,11 +31,22 @@ const SHOP_FALLBACK_LNG = Number(process.env.EXPO_PUBLIC_SHOP_LNG) || 36.817223;
 export default function OrderTrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentTheme, themeName } = useTheme();
+  const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const isDark = themeName === 'dark';
   const [order, setOrder] = useState<Order | null>(null);
   const [tracking, setTracking] = useState<OrderTracking | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
+  const [qrCode, setQrCode] = useState('');
+  const [showScan, setShowScan] = useState(false);
+  const [showRate, setShowRate] = useState(false);
+  const [sheetStatus, setSheetStatus] = useState<'success' | null>(null);
+  const [rating, setRating] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [paying, setPaying] = useState(false);
   const [driverLocation, setDriverLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -42,6 +57,17 @@ export default function OrderTrackingScreen() {
 
   const applyTracking = useCallback((data: OrderTracking) => {
     setTracking(data);
+    setOrder((prev) =>
+      prev
+        ? {
+            ...prev,
+            fulfillment_status: data.fulfillment_status ?? prev.fulfillment_status,
+            payment_status: data.payment_status ?? prev.payment_status,
+            payment_method: data.payment_method ?? prev.payment_method,
+            payment_timing: data.payment_timing ?? prev.payment_timing,
+          }
+        : prev
+    );
     if (data.driver_location?.lat != null && data.driver_location?.lng != null) {
       setDriverLocation({
         latitude: data.driver_location.lat,
@@ -140,7 +166,9 @@ export default function OrderTrackingScreen() {
       case 'driver_accepted':
         return "Driver confirmed — heading to shop";
       case 'en_route':
-        return "Driver is on the way to you";
+        return "Out for delivery";
+      case 'arrived':
+        return "Your rider has arrived";
       case 'delivered':
         return "Order delivered";
       default:
@@ -148,17 +176,85 @@ export default function OrderTrackingScreen() {
     }
   };
 
-  const handleConfirmDelivery = async () => {
-    if (!order) return;
+  const handleScanQr = async () => {
+    if (!order || !qrCode.trim()) {
+      ToastService.showError('QR required', 'Enter or scan the code from the rider');
+      return;
+    }
     try {
       setConfirming(true);
-      await deliveryApi.customerConfirmDelivery(order.id);
-      ToastService.showSuccess("Delivered", "Thanks for confirming your delivery");
+      await deliveryApi.verifyDeliveryQr(order.id, qrCode.trim());
+      setShowScan(false);
+      setSheetStatus('success');
       await loadOrderDetails();
     } catch (error) {
-      ToastService.showApiError(error, "Failed to confirm delivery");
+      ToastService.showApiError(error, 'Could not verify QR');
     } finally {
       setConfirming(false);
+    }
+  };
+
+  const handleRate = async () => {
+    if (!order) return;
+    try {
+      await deliveryApi.rateDriver(order.id, rating, ratingComment.trim() || undefined);
+      ToastService.showSuccess('Thanks', 'Your rating was submitted');
+      setShowRate(false);
+    } catch (error) {
+      ToastService.showApiError(error, 'Could not submit rating');
+    }
+  };
+
+  const handlePayOnDelivery = async () => {
+    if (!order) return;
+    const method = order.payment_method || tracking?.payment_method;
+    const amountDue = (order.total_amount || 0) + (order.delivery_fee || 0);
+    try {
+      setPaying(true);
+      if (method === 'mpesa') {
+        const phone = user?.phone_number;
+        if (!phone) {
+          ToastService.showError('Phone required', 'Add a phone number for M-Pesa');
+          return;
+        }
+        const res = await mpesaApi.initiateStkPush({ orderId: order.id, phoneNumber: phone, amount: amountDue });
+        if (!res.success) {
+          ToastService.showError('M-Pesa failed', res.message);
+          return;
+        }
+        ToastService.showSuccess('Prompt sent', 'Enter your PIN on your phone');
+      } else if (method === 'card') {
+        const intent = await stripeApi.createIntent({ orderId: order.id, amount: amountDue });
+        if (!intent.success || !intent.data?.client_secret) {
+          ToastService.showError('Card failed', intent.message || 'Could not start payment');
+          return;
+        }
+        const { error: initError } = await initPaymentSheet({
+          merchantDisplayName: 'EasyBuy',
+          paymentIntentClientSecret: intent.data.client_secret,
+          returnURL: 'easybuy://stripe-redirect',
+        });
+        if (initError) {
+          ToastService.showError('Card failed', initError.message);
+          return;
+        }
+        const { error: presentError } = await presentPaymentSheet();
+        if (presentError && presentError.code !== 'Canceled') {
+          ToastService.showError('Card failed', presentError.message);
+          return;
+        }
+        if (!presentError) {
+          await stripeApi.confirmPayment(intent.data.payment_intent_id);
+          ToastService.showSuccess('Paid', 'Card payment complete');
+        }
+      } else {
+        ToastService.showInfo('Cash', 'Hand cash to the rider. They will confirm on their app.');
+      }
+      await loadOrderDetails();
+    } catch (error) {
+      ToastService.showApiError(error, 'Payment failed');
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -197,9 +293,13 @@ export default function OrderTrackingScreen() {
   const driverName = tracking?.driver?.name
     || (order.driver ? `${order.driver.first_name} ${order.driver.last_name}` : null);
   const vehicleInfo = tracking?.driver
-    ? `${tracking.driver.vehicle_type || 'Rider'} • ${tracking.driver.vehicle_registration || 'No Plate'}`
+    ? [tracking.driver.vehicle_type, tracking.driver.vehicle_model, tracking.driver.vehicle_registration]
+        .filter(Boolean)
+        .join(' · ') || 'Rider'
     : order.driver
-      ? `${order.driver.vehicle_type || 'Rider'} • ${order.driver.vehicle_registration || 'No Plate'}`
+      ? [order.driver.vehicle_type, order.driver.vehicle_model, order.driver.vehicle_registration]
+          .filter(Boolean)
+          .join(' · ') || 'Rider'
       : null;
 
   const polylinePoints =
@@ -269,87 +369,173 @@ export default function OrderTrackingScreen() {
         </MapView>
       </View>
 
-      <View style={[styles.infoCard, { backgroundColor: currentTheme.surface }]}>
-        <TrackStepper
-          current={
-            fulfillmentStatus === 'delivered'
-              ? 3
-              : fulfillmentStatus === 'en_route'
-                ? 2
-                : fulfillmentStatus === 'preparing' || fulfillmentStatus === 'ready'
-                  ? 1
-                  : 0
-          }
-        />
-        <View style={styles.statusRow}>
-          <View style={[styles.statusIndicator, { backgroundColor: currentTheme.primary }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.statusText, { color: currentTheme.text }]}>{getStatusText()}</Text>
-            {(etaLabel || distanceLabel) && fulfillmentStatus === 'en_route' && (
-              <Text style={[styles.etaText, { color: currentTheme.textSecondary }]}>
-                {[etaLabel && `ETA ${etaLabel}`, distanceLabel].filter(Boolean).join(' • ')}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {(driverName || order.driver) && (
-          <View style={styles.driverInfo}>
-            <View style={[styles.driverAvatar, { backgroundColor: currentTheme.border }]}>
-               <Text style={{ fontWeight: '700', color: currentTheme.text }}>
-                 {(driverName || order.driver?.first_name || 'D')[0]}
-               </Text>
-            </View>
-            <View style={styles.driverDetails}>
-              <Text style={[styles.driverName, { color: currentTheme.text }]}>
-                {driverName || `${order.driver?.first_name} ${order.driver?.last_name}`}
-              </Text>
-              {vehicleInfo && (
-                <Text style={[styles.vehicleInfo, { color: currentTheme.textSecondary }]}>
-                  {vehicleInfo}
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity
-              style={[styles.callButton, { backgroundColor: currentTheme.primary }]}
-              onPress={() => {
-                const phone = order.driver?.phone_number;
-                if (phone) {
-                  Linking.openURL(`tel:${phone}`);
-                } else {
-                  ToastService.showWarning("No Phone", "Driver phone number is unavailable.");
-                }
-              }}
-            >
-              <Phone size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={[styles.addressBox, { backgroundColor: currentTheme.background }]}>
-          <Text style={[styles.addressLabel, { color: currentTheme.textSecondary }]}>Delivery Address</Text>
-          <Text style={[styles.addressText, { color: currentTheme.text }]} numberOfLines={2}>
-            {order.delivery_address || tracking?.destination?.address || "No address provided"}
-          </Text>
-        </View>
-
-        {fulfillmentStatus === 'en_route' && (
-          <TouchableOpacity
-            style={[styles.confirmButton, { backgroundColor: currentTheme.primary, opacity: confirming ? 0.7 : 1 }]}
-            onPress={handleConfirmDelivery}
-            disabled={confirming}
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: 'absolute',
+          left: theme.spacing[4],
+          right: theme.spacing[4],
+          bottom: Math.max(insets.bottom, theme.spacing[3]),
+        }}
+      >
+        <GlassSurface level={3} borderRadius={theme.radius.xl}>
+          <ScrollView
+            style={{ maxHeight: 440 }}
+            contentContainerStyle={{ padding: 20 }}
+            showsVerticalScrollIndicator={false}
           >
-            {confirming ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <CheckCircle2 size={18} color="#FFFFFF" />
-                <Text style={styles.confirmButtonText}>Confirm Delivery Received</Text>
-              </>
+            <TrackStepper
+              current={
+                fulfillmentStatus === 'delivered'
+                  ? 3
+                  : fulfillmentStatus === 'en_route' || fulfillmentStatus === 'arrived'
+                    ? 2
+                    : fulfillmentStatus === 'preparing' || fulfillmentStatus === 'ready' || fulfillmentStatus === 'assigned' || fulfillmentStatus === 'driver_accepted'
+                      ? 1
+                      : 0
+              }
+            />
+            <View style={styles.statusRow}>
+              <View style={[styles.statusIndicator, { backgroundColor: currentTheme.primary }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.statusText, { color: currentTheme.text }]}>{getStatusText()}</Text>
+                {(etaLabel || distanceLabel) && fulfillmentStatus === 'en_route' && (
+                  <Text style={[styles.etaText, { color: currentTheme.textSecondary }]}>
+                    {[etaLabel && `ETA ${etaLabel}`, distanceLabel].filter(Boolean).join(' • ')}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {(driverName || order.driver) && (
+              <View style={styles.driverInfo}>
+                <View style={[styles.driverAvatar, { backgroundColor: currentTheme.border }]}>
+                   <Text style={{ fontWeight: '700', color: currentTheme.text }}>
+                     {(driverName || order.driver?.first_name || 'D')[0]}
+                   </Text>
+                </View>
+                <View style={styles.driverDetails}>
+                  <Text style={[styles.driverName, { color: currentTheme.text }]}>
+                    {driverName || `${order.driver?.first_name} ${order.driver?.last_name}`}
+                  </Text>
+                  {vehicleInfo && (
+                    <Text style={[styles.vehicleInfo, { color: currentTheme.textSecondary }]}>
+                      {vehicleInfo}
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={[styles.callButton, { backgroundColor: currentTheme.primary }]}
+                  onPress={() => {
+                    const phone = order.driver?.phone_number;
+                    if (phone) {
+                      Linking.openURL(`tel:${phone}`);
+                    } else {
+                      ToastService.showWarning("No Phone", "Driver phone number is unavailable.");
+                    }
+                  }}
+                >
+                  <Phone size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             )}
-          </TouchableOpacity>
-        )}
+
+            <View style={[styles.addressBox, { backgroundColor: currentTheme.background }]}>
+              <Text style={[styles.addressLabel, { color: currentTheme.textSecondary }]}>Delivery Address</Text>
+              <Text style={[styles.addressText, { color: currentTheme.text }]} numberOfLines={2}>
+                {order.delivery_address || tracking?.destination?.address || "No address provided"}
+              </Text>
+            </View>
+
+            {order.payment_timing === 'on_delivery' &&
+              order.payment_status !== 'fully-paid' &&
+              (fulfillmentStatus === 'arrived' || fulfillmentStatus === 'en_route') && (
+                <Button
+                  title={
+                    order.payment_method === 'mpesa'
+                      ? 'Pay with M-Pesa'
+                      : order.payment_method === 'card'
+                        ? 'Pay with card'
+                        : 'Pay cash to rider'
+                  }
+                  loading={paying}
+                  onPress={handlePayOnDelivery}
+                  style={{ marginTop: 16 }}
+                  fullWidth
+                />
+              )}
+
+            {fulfillmentStatus === 'arrived' &&
+              (order.payment_timing !== 'on_delivery' || order.payment_status === 'fully-paid') && (
+                <Button
+                  title="Scan rider QR"
+                  onPress={() => setShowScan(true)}
+                  style={{ marginTop: 12 }}
+                  fullWidth
+                />
+              )}
+          </ScrollView>
+        </GlassSurface>
       </View>
+
+      <BottomSheet visible={showScan} onClose={() => setShowScan(false)} snap={0.45}>
+        <UIText variant="h3" style={{ textAlign: 'center', marginBottom: 8 }}>
+          Scan receipt QR
+        </UIText>
+        <UIText variant="body" color="secondary" style={{ textAlign: 'center', marginBottom: 16 }}>
+          Point at the rider’s code, or type it below.
+        </UIText>
+        <Input
+          value={qrCode}
+          onChangeText={setQrCode}
+          placeholder="DELIVER-…"
+          autoCapitalize="characters"
+        />
+        <Button
+          title="Verify"
+          loading={confirming}
+          onPress={handleScanQr}
+          fullWidth
+          style={{ marginTop: 16 }}
+        />
+      </BottomSheet>
+
+      <SheetStatus
+        visible={sheetStatus === 'success'}
+        status="success"
+        title="Delivery complete"
+        message="Your receipt is ready. Rate your rider?"
+        actionLabel="Rate driver"
+        onClose={() => {
+          setSheetStatus(null);
+          setShowRate(true);
+        }}
+        onAction={() => {
+          setSheetStatus(null);
+          setShowRate(true);
+        }}
+      />
+
+      <BottomSheet visible={showRate} onClose={() => setShowRate(false)} snap={0.52}>
+        <UIText variant="h3" style={{ textAlign: 'center' }}>Rate your rider</UIText>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginVertical: 16 }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <TouchableOpacity key={n} onPress={() => setRating(n)}>
+              <Star
+                size={32}
+                color={theme.colors.warning}
+                fill={n <= rating ? theme.colors.warning : 'transparent'}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Input
+          value={ratingComment}
+          onChangeText={setRatingComment}
+          placeholder="Optional comment"
+        />
+        <Button title="Submit rating" onPress={handleRate} fullWidth style={{ marginTop: 16 }} />
+      </BottomSheet>
     </View>
   );
 }

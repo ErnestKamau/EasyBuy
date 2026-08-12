@@ -22,6 +22,8 @@ class Product extends Model
         'is_active',
     ];
 
+    protected $appends = ['profit_margin', 'is_low_stock', 'category_name'];
+
     protected $casts = [
         'kilograms_in_stock' => 'decimal:3',
         'cost_price' => 'decimal:2',
@@ -30,6 +32,45 @@ class Product extends Model
         'minimum_stock' => 'decimal:3',
         'is_active' => 'boolean',
     ];
+
+    public function getImageUrlAttribute(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            $appUrl = rtrim((string) config('app.url'), '/');
+            return preg_replace('#^https?://(localhost|127\.0\.0\.1)(:\d+)?#', $appUrl, $value);
+        }
+        $path = ltrim($value, '/');
+        if (str_starts_with($path, 'storage/')) {
+            return rtrim((string) config('app.url'), '/') . '/' . $path;
+        }
+        return rtrim((string) config('app.url'), '/') . '/storage/' . $path;
+    }
+
+    public function setImageUrlAttribute(?string $value): void
+    {
+        if (!$value) {
+            $this->attributes['image_url'] = null;
+            return;
+        }
+        if (preg_match('#/storage/(.+)$#', $value, $m)) {
+            $this->attributes['image_url'] = $m[1];
+            return;
+        }
+        $this->attributes['image_url'] = $value;
+    }
+
+    public function getIsLowStockAttribute(): bool
+    {
+        return $this->isLowStock();
+    }
+
+    public function getCategoryNameAttribute(): ?string
+    {
+        return $this->category?->name;
+    }
 
     /**
      * Get the category that owns the product

@@ -47,6 +47,7 @@ import {
   Modal as UIModal,
   SheetStatus,
   ReceiptTicket,
+  FloatingGlassBar,
 } from "@/components/ui";
 
 type PaymentMethod = "cash" | "mpesa" | "card";
@@ -60,12 +61,14 @@ export default function CheckoutScreen() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const params = useLocalSearchParams();
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>("cash");
+  const [paymentTiming, setPaymentTiming] = useState<"now" | "on_delivery">("now");
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryType>(
     (params.deliveryType as DeliveryType) || "pickup",
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [placedOrderNumber, setPlacedOrderNumber] = useState<string | null>(null);
+  const [placedOrderId, setPlacedOrderId] = useState<number | null>(null);
   const [sheetStatus, setSheetStatus] = useState<'processing' | 'success' | 'error' | null>(null);
   const [selectedPickupTime, setSelectedPickupTime] = useState<string | null>(
     null,
@@ -281,10 +284,6 @@ export default function CheckoutScreen() {
             "Payment Successful",
             "Your payment has been processed",
           );
-          // Payment is captured in callback, order is ready
-          setTimeout(() => {
-            router.replace("/(tabs)");
-          }, 2000);
           return;
         } else if (status === "failed") {
           setPaymentStatus("failed");
@@ -376,10 +375,13 @@ export default function CheckoutScreen() {
               delivery_fee: deliveryFee,
             }
           : undefined,
+        paymentTiming,
       );
 
-      // Trigger STK Push if M-Pesa
-      if (selectedPayment === "mpesa" && phoneNumber) {
+      const chargeNow = paymentTiming === "now";
+
+      // Trigger STK Push if M-Pesa (pay now only)
+      if (chargeNow && selectedPayment === "mpesa" && phoneNumber) {
         // Calculate amount due (accounting for wallet credit)
         const amountDue = Math.max(
           0,
@@ -428,8 +430,8 @@ export default function CheckoutScreen() {
         }
       }
 
-      // Card: Stripe Payment Sheet
-      if (selectedPayment === "card") {
+      // Card: Stripe Payment Sheet (pay now only)
+      if (chargeNow && selectedPayment === "card") {
         const amountDue = Math.max(
           0,
           state.totalAmount - (user?.wallet_balance || 0),
@@ -498,31 +500,26 @@ export default function CheckoutScreen() {
       clearCart();
       setOrderPlaced(true);
       setPlacedOrderNumber(order.order_number || `#${order.id}`);
-      setSheetStatus(selectedPayment === "mpesa" ? "processing" : "success");
+      setPlacedOrderId(order.id);
+      const waitingOnMpesa = chargeNow && selectedPayment === "mpesa";
+      setSheetStatus(waitingOnMpesa ? "processing" : "success");
 
-      // Determine success message based on payment method
-      const successTitle =
-        selectedPayment === "mpesa"
+      const successTitle = !chargeNow
+        ? "Order Placed!"
+        : selectedPayment === "mpesa"
           ? "Order Placed - Check Phone"
           : selectedPayment === "card"
             ? "Order Paid!"
             : "Order Placed!";
-      const successMsg =
-        selectedPayment === "mpesa"
+      const successMsg = !chargeNow
+        ? `Order ${order.order_number || `#${order.id}`} placed. Pay on delivery with ${selectedPayment.toUpperCase()}.`
+        : selectedPayment === "mpesa"
           ? `Order ${order.order_number} created. Please complete payment on your phone.`
           : selectedPayment === "card"
             ? `Order ${order.order_number || `#${order.id}`} paid successfully`
             : `Your order ${order.order_number || `#${order.id}`} has been placed successfully`;
 
       ToastService.showSuccess(successTitle, successMsg);
-
-      // Navigate to success screen or back to home
-      setTimeout(
-        () => {
-          router.replace("/(tabs)");
-        },
-        selectedPayment === "mpesa" ? 5000 : 3000,
-      ); // Give more time to read M-Pesa msg
     } catch (error) {
       console.error("Order creation failed:", error);
       ToastService.showError(
@@ -556,10 +553,21 @@ export default function CheckoutScreen() {
           barcodeValue={placedOrderNumber || undefined}
         />
         <Button
-          title="Back to home"
-          onPress={() => router.replace("/(tabs)")}
+          title="View order"
+          onPress={() =>
+            placedOrderId
+              ? router.replace(`/order/${placedOrderId}` as any)
+              : router.replace("/(tabs)/orders")
+          }
           fullWidth
           style={{ marginTop: theme.spacing[4] }}
+        />
+        <Button
+          title="Continue shopping"
+          variant="secondary"
+          onPress={() => router.replace("/(tabs)")}
+          fullWidth
+          style={{ marginTop: theme.spacing[3] }}
         />
         <SheetStatus
           visible={sheetStatus != null}
@@ -572,13 +580,13 @@ export default function CheckoutScreen() {
           message={
             paymentPolling
               ? "Complete the payment on your phone"
-              : "Your order was placed successfully"
+              : paymentTiming === "on_delivery"
+                ? "Pay when your order arrives"
+                : "Your order was placed successfully"
           }
+          actionLabel="Nice one!"
           onClose={() => setSheetStatus(null)}
-          onAction={() => {
-            setSheetStatus(null);
-            router.replace("/(tabs)");
-          }}
+          onAction={() => setSheetStatus(null)}
         />
       </View>
     );
@@ -616,6 +624,7 @@ export default function CheckoutScreen() {
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 140 }}
       >
         {/* Order Summary */}
         <Surface
@@ -826,6 +835,28 @@ export default function CheckoutScreen() {
           style={{ marginHorizontal: theme.spacing[6], marginBottom: theme.spacing[6] }}
         >
           <Text variant="title" style={{ marginBottom: theme.spacing[2] }}>
+            When to pay
+          </Text>
+          <SegmentedControl
+            options={[
+              { value: "now", label: "Pay now" },
+              {
+                value: "on_delivery",
+                label: selectedDelivery === "delivery" ? "Pay on delivery" : "Pay at pickup",
+              },
+            ]}
+            value={paymentTiming}
+            onChange={(v) => setPaymentTiming(v as "now" | "on_delivery")}
+          />
+          <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing[3], marginBottom: theme.spacing[4] }}>
+            {paymentTiming === "on_delivery"
+              ? selectedDelivery === "delivery"
+                ? "You'll pay the driver when they arrive, using the method below."
+                : "You'll pay when you collect the order, using the method below."
+              : "Pay now with your selected method."}
+          </Text>
+
+          <Text variant="title" style={{ marginBottom: theme.spacing[2] }}>
             Payment Method
           </Text>
           <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing[4] }}>
@@ -901,33 +932,31 @@ export default function CheckoutScreen() {
       </ScrollView>
 
       {/* Bottom Action */}
-      <View
-        style={[
-          styles.bottomBar,
-          {
-            backgroundColor: theme.colors.surface,
-            paddingHorizontal: theme.spacing[6],
-            paddingTop: theme.spacing[4],
-            paddingBottom: theme.spacing[9],
-            borderTopWidth: StyleSheet.hairlineWidth * 2,
-            borderTopColor: theme.colors.border,
-          },
-          theme.getElevation("elv400"),
-        ]}
-      >
-        <View style={{ flex: 1, marginRight: theme.spacing[4] }}>
-          <Text variant="bodySmall" color="secondary">Total Amount</Text>
-          <Text variant="h3">Ksh {state.totalAmount.toLocaleString()}</Text>
-        </View>
+      <FloatingGlassBar level={3}>
+        <View
+          style={[
+            styles.bottomBar,
+            {
+              paddingHorizontal: theme.spacing[4],
+              paddingTop: theme.spacing[3],
+              paddingBottom: theme.spacing[3],
+            },
+          ]}
+        >
+          <View style={{ flex: 1, marginRight: theme.spacing[4] }}>
+            <Text variant="bodySmall" color="secondary">Total Amount</Text>
+            <Text variant="h3">Ksh {state.totalAmount.toLocaleString()}</Text>
+          </View>
 
-        <Button
-          title="Place Order"
-          onPress={handlePlaceOrder}
-          loading={isProcessing}
-          disabled={state.items.length === 0}
-          leftIcon={<CheckCircle size={18} color={theme.colors.textOnPrimary} />}
-        />
-      </View>
+          <Button
+            title="Place Order"
+            onPress={handlePlaceOrder}
+            loading={isProcessing}
+            disabled={state.items.length === 0}
+            leftIcon={<CheckCircle size={18} color={theme.colors.textOnPrimary} />}
+          />
+        </View>
+      </FloatingGlassBar>
 
       {/* Map Picker Modal */}
       <Modal

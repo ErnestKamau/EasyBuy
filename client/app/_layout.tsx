@@ -35,10 +35,7 @@ import Toast from "react-native-toast-message";
 
 import { useColorScheme } from "@/components/useColorScheme";
 import { toastConfig } from "@/components/ToastConfig";
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { CartProvider } from "@/contexts/CartContext";
 import {
   ThemeProvider as CustomThemeProvider,
@@ -105,21 +102,10 @@ export default function RootLayout() {
   );
 }
 
-// Safe Area Wrapper Component
+// Safe Area Wrapper — no extra chrome. Screens and GlassTabBar own their insets
+// so the home indicator is not eaten (see GlassTabBar bottom clearance).
 function SafeAreaWrapper({ children }: { readonly children: React.ReactNode }) {
-  const insets = useSafeAreaInsets();
-
-  return (
-    <View
-      style={{
-        flex: 1,
-        paddingTop: insets.top - 50,
-        paddingBottom: insets.bottom - 40,
-      }}
-    >
-      {children}
-    </View>
-  );
+  return <View style={{ flex: 1 }}>{children}</View>;
 }
 
 function RootLayoutNav() {
@@ -250,7 +236,7 @@ function RootLayoutNav() {
               ),
 
               isAuthenticated && (
-                <Stack.Screen key="rider" name="rider" options={{ gestureEnabled: false }} />
+                <Stack.Screen key="rider" name="(rider)" options={{ gestureEnabled: false }} />
               ),
               isAuthenticated && <Stack.Screen key="(tabs)" name="(tabs)" />,
               isAuthenticated && (

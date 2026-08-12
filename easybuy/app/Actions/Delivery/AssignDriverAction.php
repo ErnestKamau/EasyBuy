@@ -25,7 +25,7 @@ class AssignDriverAction
     public function execute(Order $order, User $driver): Order
     {
         // Guard: ensure order is in a state that can be assigned
-        if (!in_array($order->fulfillment_status, ['pending', 'preparing'])) {
+        if (!in_array($order->fulfillment_status, ['pending', 'preparing', 'assigned'])) {
             throw ValidationException::withMessages([
                 'order' => 'This order cannot be assigned in its current status: ' . $order->fulfillment_status,
             ]);

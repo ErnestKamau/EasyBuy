@@ -9,7 +9,6 @@ import {
   ScrollView,
   TextInput,
   Dimensions,
-  Image,
   FlatList,
   RefreshControl,
 } from "react-native";
@@ -43,6 +42,7 @@ import {
   SkeletonProductCard,
   Text as UIText,
   Screen,
+  MediaContainer,
 } from "@/components/ui";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -453,10 +453,10 @@ export default function HomeScreen() {
         onPress={() => navigateToProduct(item.id)}
       >
         <View style={styles.productImageContainer}>
-          <Image
-            source={{
-              uri: item.image_url || "https://via.placeholder.com/300x300",
-            }}
+          <MediaContainer
+            uri={item.image_url}
+            aspectRatio="1:1"
+            borderRadius={0}
             style={styles.productImage}
           />
           <TouchableOpacity
@@ -779,6 +779,7 @@ const styles = StyleSheet.create({
     height: 140,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
+    overflow: "hidden",
   },
   favoriteButton: {
     position: "absolute",

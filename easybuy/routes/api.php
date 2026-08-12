@@ -167,8 +167,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('orders/{order}')->group(function () {
         // Live tracking data (driver GPS + route polyline + ETA)
         Route::get('/tracking', [\App\Http\Controllers\Api\DeliveryController::class, 'tracking']);
-        // Customer confirms they received the delivery
         Route::post('/confirm-delivery', [\App\Http\Controllers\Api\DeliveryController::class, 'confirmDelivery']);
+        Route::post('/verify-delivery-qr', [\App\Http\Controllers\Api\DeliveryController::class, 'verifyDeliveryQr']);
+        Route::post('/rate-driver', [\App\Http\Controllers\Api\DeliveryController::class, 'rateDriver']);
     });
 });
 
@@ -182,12 +183,15 @@ Route::middleware(['auth:sanctum', 'role:rider'])->prefix('rider')->group(functi
     Route::post('/status', [\App\Http\Controllers\Api\DriverLocationController::class, 'setStatus']);
     // Rider's active delivery
     Route::get('/deliveries/active', [\App\Http\Controllers\Api\DeliveryController::class, 'active']);
-    // Accept an assigned delivery (3-minute window from assignment time)
+    Route::get('/deliveries/history', [\App\Http\Controllers\Api\DeliveryController::class, 'history']);
+    Route::get('/profile', [\App\Http\Controllers\Api\DeliveryController::class, 'profile']);
+    Route::get('/deliveries', [\App\Http\Controllers\Api\DeliveryController::class, 'index']);
+    Route::get('/deliveries/{order}', [\App\Http\Controllers\Api\DeliveryController::class, 'show']);
     Route::post('/deliveries/{order}/accept', [\App\Http\Controllers\Api\DeliveryController::class, 'accept']);
-    // Mark trip as started (en_route)
     Route::post('/deliveries/{order}/start', [\App\Http\Controllers\Api\DeliveryController::class, 'start']);
-    // Rider confirms delivery (backup for when customer can't tap)
+    Route::post('/deliveries/{order}/arrive', [\App\Http\Controllers\Api\DeliveryController::class, 'arrive']);
     Route::post('/deliveries/{order}/confirm', [\App\Http\Controllers\Api\DeliveryController::class, 'riderConfirm']);
+    Route::post('/deliveries/{order}/collect-cash', [\App\Http\Controllers\Api\DeliveryController::class, 'collectCash']);
 });
 
 // -------------------------------------------------------------------------
@@ -200,6 +204,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::post('/orders/{order}/assign-driver', [\App\Http\Controllers\Api\AdminDeliveryController::class, 'assignDriver']);
     // Admin force-starts the trip (override waiting for driver tap)
     Route::post('/orders/{order}/start-trip', [\App\Http\Controllers\Api\AdminDeliveryController::class, 'startTrip']);
+    Route::post('/orders/{order}/collect-cash', [\App\Http\Controllers\Api\DeliveryController::class, 'collectCash']);
 
     // Dashboard Statistics
     Route::get('/dashboard/stats', [\App\Http\Controllers\Api\AdminDashboardController::class, 'stats']);

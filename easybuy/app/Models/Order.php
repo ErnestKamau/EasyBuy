@@ -17,6 +17,8 @@ class Order extends Model
         'user_id',
         'order_status',
         'payment_status',
+        'payment_method',
+        'payment_timing',
         'order_date',
         'order_time',
         'notes',
@@ -37,7 +39,10 @@ class Order extends Model
         'driver_assigned_at',
         'driver_accepted_at',
         'trip_started_at',
+        'arrived_at',
         'delivered_at',
+        'delivery_qr_code',
+        'delivery_verification_code',
     ];
 
     protected $casts = [
@@ -50,6 +55,7 @@ class Order extends Model
         'driver_assigned_at'  => 'datetime',
         'driver_accepted_at'  => 'datetime',
         'trip_started_at'     => 'datetime',
+        'arrived_at'          => 'datetime',
         'delivered_at'        => 'datetime',
     ];
 
@@ -227,6 +233,28 @@ class Order extends Model
         return self::where('id', $orderId)
             ->where('pickup_verification_code', $code)
             ->where('fulfillment_status', 'ready')
+            ->first();
+    }
+
+    public function generateDeliveryQrCode(): string
+    {
+        $verificationCode = Str::upper(Str::random(8));
+        $qrCode = "DELIVER-{$this->id}-{$verificationCode}";
+        $this->delivery_verification_code = $verificationCode;
+        $this->delivery_qr_code = $qrCode;
+        $this->save();
+        return $qrCode;
+    }
+
+    public static function verifyDeliveryQrCode(string $qrCode): ?self
+    {
+        $parts = explode('-', $qrCode);
+        if (count($parts) !== 3 || $parts[0] !== 'DELIVER') {
+            return null;
+        }
+        return self::where('id', $parts[1])
+            ->where('delivery_verification_code', $parts[2])
+            ->where('fulfillment_status', 'arrived')
             ->first();
     }
 

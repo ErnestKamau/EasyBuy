@@ -81,6 +81,8 @@ class OrderController extends Controller
             'items.*.kilogram' => 'nullable|numeric|min:0.001',
             'items.*.weight' => 'nullable|numeric|min:0.001', // Frontend sends 'weight', backend uses 'kilogram'
             'payment_status' => 'sometimes|in:pending,fully-paid,partially-paid,debt,failed',
+            'payment_method' => 'nullable|in:cash,mpesa,card',
+            'payment_timing' => 'sometimes|in:now,on_delivery',
             'notes' => 'nullable|string',
             'pickup_time' => 'nullable|date|after:now',
             'delivery_address' => 'required_if:type,delivery|string|nullable',
@@ -95,6 +97,8 @@ class OrderController extends Controller
                 'user_id' => $validated['user_id'] ?? $request->user()->id ?? null,
                 'type' => $validated['type'] ?? 'pickup',
                 'payment_status' => $validated['payment_status'] ?? 'pending',
+                'payment_method' => $validated['payment_method'] ?? null,
+                'payment_timing' => $validated['payment_timing'] ?? 'now',
                 'notes' => $validated['notes'] ?? null,
                 'pickup_time' => $validated['pickup_time'] ?? null,
                 'delivery_address' => $validated['delivery_address'] ?? null,

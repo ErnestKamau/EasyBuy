@@ -45,7 +45,7 @@ import {
 import { ToastService } from "@/utils/toastService";
 import { useStripe } from "@/components/stripeNative";
 import { useAppTheme } from "@/contexts/ThemeContext";
-import { Text as UIText, Surface, Button as UIButton, IconButton, StatusPill, Spinner, Modal as UIModal, ListItem, Avatar } from "@/components/ui";
+import { Text as UIText, Surface, Button as UIButton, IconButton, StatusPill, Spinner, Modal as UIModal, ListItem, Avatar, MediaContainer, OrderCard } from "@/components/ui";
 import {
   ArrowLeft,
   Plus,
@@ -365,7 +365,6 @@ export default function AdminScreen() {
       setProductForm({
         ...productForm,
         image_uri: result.assets[0].uri,
-        image_url: result.assets[0].uri, // For now, use local URI. In production, upload to server
       });
     }
   };
@@ -1110,6 +1109,16 @@ export default function AdminScreen() {
     }
   };
 
+  const collectOrderCash = async (item: Order) => {
+    try {
+      await deliveryApi.collectCashAdmin(item.id);
+      ToastService.showSuccess("Success", "Cash recorded as fully paid");
+      loadAdminData();
+    } catch (error) {
+      ToastService.showApiError(error, "Failed to record cash");
+    }
+  };
+
   const renderOrderItem = ({ item }: { item: Order }) => {
     const customerName = item.user
       ? `${item.user.first_name || ""} ${item.user.last_name || ""}`.trim() ||
@@ -1127,83 +1136,28 @@ export default function AdminScreen() {
             : "Pending";
 
     return (
-      <View style={styles.orderCard}>
-        <View style={styles.orderHeader}>
-          <View style={styles.orderInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.orderNumber}>
-                Order {item.order_number || `#${item.id}`}
-              </Text>
-              <View
-                style={[
-                  styles.deliveryTypeBadge,
-                  {
-                    backgroundColor: item.type === 'delivery' ? '#F5F3FF' : '#F1F5F9',
-                    borderColor: item.type === 'delivery' ? '#8B5CF6' : '#94A3B8',
-                    borderWidth: 1,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.deliveryTypeText,
-                    { color: item.type === 'delivery' ? '#8B5CF6' : '#64748B' },
-                  ]}
-                >
-                  {item.type || 'Pickup'}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.orderCustomer}>{customerName}</Text>
-            <Text style={styles.orderDate}>
-              {(() => {
-                if (item.order_date) {
-                  const dateStr = String(item.order_date);
-                  const parsedDate = new Date(dateStr);
-                  console.log("Order date debug:", {
-                    raw: item.order_date,
-                    string: dateStr,
-                    parsed: parsedDate.toString(),
-                    isValid: !isNaN(parsedDate.getTime()),
-                  });
-                  return parsedDate.toLocaleString();
-                } else if (item.updated_at) {
-                  return new Date(item.updated_at).toLocaleString();
-                } else {
-                  return "Date unavailable";
-                }
-              })()}
-            </Text>
-          </View>
-          <View style={styles.orderAmount}>
-            <Text style={styles.orderTotal}>
-              Ksh{" "}
-              {item.total_amount && item.total_amount > 0
-                ? item.total_amount.toLocaleString()
-                : "0"}
-            </Text>
-            <View
+      <View style={{ marginBottom: 16 }}>
+        <OrderCard order={item} pressable={false}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <Text style={styles.orderCustomer}>{customerName}</Text>
+          <View
+            style={[
+              styles.deliveryTypeBadge,
+              {
+                backgroundColor: item.type === 'delivery' ? '#F5F3FF' : '#F1F5F9',
+                borderColor: item.type === 'delivery' ? '#8B5CF6' : '#94A3B8',
+                borderWidth: 1,
+              },
+            ]}
+          >
+            <Text
               style={[
-                styles.statusBadge,
-                {
-                  backgroundColor:
-                    item.order_status === "pending" ? "#FEF3C7" : "#F0FDF4",
-                },
+                styles.deliveryTypeText,
+                { color: item.type === 'delivery' ? '#8B5CF6' : '#64748B' },
               ]}
             >
-              <Text
-                style={[
-                  styles.statusText,
-                  {
-                    color:
-                      item.order_status === "pending" ? "#D97706" : "#22C55E",
-                  },
-                ]}
-              >
-                {item.order_status.charAt(0).toUpperCase() +
-                  item.order_status.slice(1)}
-              </Text>
-            </View>
+              {item.type || 'Pickup'}
+            </Text>
           </View>
         </View>
 
@@ -1220,6 +1174,15 @@ export default function AdminScreen() {
             <Text style={styles.orderDetailLabel}>Payment Status:</Text>
             <Text style={styles.orderDetailValue}>{paymentStatus}</Text>
           </View>
+          {item.payment_timing && (
+            <View style={styles.orderDetailsRow}>
+              <Text style={styles.orderDetailLabel}>When to pay:</Text>
+              <Text style={styles.orderDetailValue}>
+                {item.payment_timing === "on_delivery" ? "On delivery" : "Paid at checkout"}
+                {item.payment_method ? ` · ${item.payment_method.toUpperCase()}` : ""}
+              </Text>
+            </View>
+          )}
           {item.sale && (
             <>
               <View style={styles.orderDetailsRow}>
@@ -1288,7 +1251,8 @@ export default function AdminScreen() {
         {(item.order_status === "pending" ||
           (item.type === "delivery" &&
             (item.order_status === "confirmed" ||
-              item.fulfillment_status === "assigned"))) && (
+              item.fulfillment_status === "assigned" ||
+              item.fulfillment_status === "arrived"))) && (
           <View style={styles.orderActions}>
             {/* Pending State Actions */}
             {item.order_status === "pending" && (
@@ -1371,8 +1335,24 @@ export default function AdminScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
+
+            {item.payment_timing === "on_delivery" &&
+              item.payment_method === "cash" &&
+              item.payment_status !== "fully-paid" &&
+              item.fulfillment_status === "arrived" && (
+                <TouchableOpacity
+                  style={[styles.confirmButton, { borderColor: "#22C55E", marginLeft: 8 }]}
+                  onPress={() => collectOrderCash(item)}
+                >
+                  <DollarSign size={16} color="#22C55E" />
+                  <Text style={[styles.confirmButtonText, { color: "#22C55E" }]}>
+                    Confirm cash
+                  </Text>
+                </TouchableOpacity>
+              )}
           </View>
         )}
+        </OrderCard>
       </View>
     );
   };
@@ -1429,27 +1409,11 @@ export default function AdminScreen() {
         radius="lg"
         style={{ flexDirection: "row", alignItems: "center", marginBottom: theme.spacing[3] }}
       >
-        {item.image_url ? (
-          <Image
-            source={{ uri: item.image_url }}
-            style={{ width: 60, height: 60, borderRadius: theme.radius.sm, marginRight: theme.spacing[3] }}
-            resizeMode="cover"
-          />
-        ) : (
-          <View
-            style={{
-              width: 60,
-              height: 60,
-              borderRadius: theme.radius.sm,
-              marginRight: theme.spacing[3],
-              backgroundColor: theme.colors.backgroundSecondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Package size={24} color={theme.colors.textMuted} />
-          </View>
-        )}
+        <MediaContainer
+          uri={item.image_url}
+          aspectRatio="1:1"
+          style={{ width: 60, height: 60, marginRight: theme.spacing[3] }}
+        />
         <View style={{ flex: 1, gap: theme.spacing[1] }}>
           <UIText variant="label">{item.name}</UIText>
           <UIText variant="caption" color="secondary">
@@ -3661,7 +3625,7 @@ export default function AdminScreen() {
         onClose={() => setShowAssignModal(false)}
         title="Assign Driver"
       >
-        <UIText variant="label" color="secondary">Available Drivers Near Shop</UIText>
+        <UIText variant="label" color="secondary">Riders with no active job (online or offline)</UIText>
         <ScrollView style={{ maxHeight: 340 }}>
           {availableDrivers.length === 0 ? (
             <UIText variant="body" color="secondary" style={{ paddingVertical: theme.spacing[5], textAlign: 'center' }}>
@@ -3672,9 +3636,23 @@ export default function AdminScreen() {
               <ListItem
                 key={driver.id}
                 title={`${driver.first_name} ${driver.last_name}`}
-                subtitle={`${driver.vehicle_type || 'Rider'} • ${driver.vehicle_registration || 'Available'}`}
+                subtitle={`${driver.vehicle_type || 'Rider'}${driver.vehicle_model ? ' ' + driver.vehicle_model : ''} · ${driver.vehicle_registration || 'No plate'}${typeof driver.average_rating === 'number' && driver.average_rating > 0 ? ` · ★ ${driver.average_rating.toFixed(1)}` : ''}`}
                 icon={<Avatar name={`${driver.first_name} ${driver.last_name}`} size="md" />}
-                trailing={isAssigning ? <Spinner /> : <Truck size={20} color={theme.colors.primary} />}
+                trailing={
+                  isAssigning ? (
+                    <Spinner />
+                  ) : (
+                    <UIText
+                      variant="caption"
+                      style={{
+                        color: driver.online_status === 'online' ? theme.colors.success : theme.colors.textMuted,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {driver.online_status === 'online' ? 'Online' : 'Offline'}
+                    </UIText>
+                  )
+                }
                 showChevron={false}
                 onPress={isAssigning ? undefined : () => handleAssignDriver(driver.id)}
               />
