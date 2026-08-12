@@ -24,7 +24,7 @@ import {
   ChevronRight,
   Calendar,
 } from "lucide-react-native";
-import { StatusPill, OrderCard, EmptyState } from "@/components/ui";
+import { StatusPill, OrderCard, EmptyState, useFloatingTabBarInset } from "@/components/ui";
 
 // Helper function to create dynamic styles
 const createDynamicStyles = (currentTheme: any, themeName: string) =>
@@ -72,7 +72,6 @@ const createDynamicStyles = (currentTheme: any, themeName: string) =>
     },
     ordersList: {
       flex: 1,
-      paddingBottom: 100,
     },
     orderCard: {
       backgroundColor: currentTheme.surface,
@@ -182,6 +181,7 @@ type TabType = "ongoing" | "completed" | "cancelled";
 export default function OrdersScreen(): React.ReactElement {
   const { currentTheme, themeName } = useTheme();
   const { user } = useAuth();
+  const tabBarInset = useFloatingTabBarInset();
   const [activeTab, setActiveTab] = useState<TabType>("ongoing");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -437,7 +437,7 @@ export default function OrdersScreen(): React.ReactElement {
           data={orders}
           renderItem={renderOrderCard}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ paddingVertical: 8, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingVertical: 8, paddingBottom: tabBarInset }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

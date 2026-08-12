@@ -25,8 +25,8 @@ class CreatePaymentReceivedNotification implements ShouldQueue
             NotificationService::create(
                 $order->user_id,
                 'payment_received',
-                'Payment Received',
-                "Payment of Ksh {$payment->amount} has been received for sale {$sale->sale_number}",
+                'That landed. Thank you.',
+                "KES {$payment->amount} is in for {$sale->sale_number}. Open the app for the quiet receipt.",
                 [
                     'payment_id' => $payment->id,
                     'sale_id' => $sale->id,

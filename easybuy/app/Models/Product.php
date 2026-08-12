@@ -38,15 +38,25 @@ class Product extends Model
         if (!$value) {
             return null;
         }
-        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
-            $appUrl = rtrim((string) config('app.url'), '/');
-            return preg_replace('#^https?://(localhost|127\.0\.0\.1)(:\d+)?#', $appUrl, $value);
+
+        $relative = $value;
+        if (preg_match('#/(?:api/media|storage)/(.+)$#', $value, $m)) {
+            $relative = $m[1];
+        } else {
+            $relative = ltrim($value, '/');
+            $relative = preg_replace('#^storage/#', '', $relative);
         }
-        $path = ltrim($value, '/');
-        if (str_starts_with($path, 'storage/')) {
-            return rtrim((string) config('app.url'), '/') . '/' . $path;
+
+        $host = rtrim((string) config('app.url'), '/');
+        try {
+            if (request()) {
+                $host = rtrim(request()->getSchemeAndHttpHost(), '/');
+            }
+        } catch (\Throwable $e) {
+            // keep configured APP_URL
         }
-        return rtrim((string) config('app.url'), '/') . '/storage/' . $path;
+
+        return $host . '/api/media/' . ltrim($relative, '/');
     }
 
     public function setImageUrlAttribute(?string $value): void
@@ -55,7 +65,7 @@ class Product extends Model
             $this->attributes['image_url'] = null;
             return;
         }
-        if (preg_match('#/storage/(.+)$#', $value, $m)) {
+        if (preg_match('#/(?:api/media|storage)/(.+)$#', $value, $m)) {
             $this->attributes['image_url'] = $m[1];
             return;
         }

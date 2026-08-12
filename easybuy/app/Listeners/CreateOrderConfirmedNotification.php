@@ -26,8 +26,8 @@ class CreateOrderConfirmedNotification implements ShouldQueue
         NotificationService::create(
             $order->user_id,
             'order_confirmed',
-            'Order Confirmed',
-            "Your order {$order->order_number} has been confirmed and is ready for pickup",
+            'You’re on the list.',
+            "Order {$order->order_number} is confirmed. Track it from Orders whenever you’re ready.",
             [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,

@@ -26,8 +26,8 @@ class CreateOrderCancelledNotification implements ShouldQueue
         NotificationService::create(
             $order->user_id,
             'order_cancelled',
-            'Order Cancelled',
-            "Your order {$order->order_number} has been cancelled",
+            'This order was cancelled.',
+            "Order {$order->order_number} is no longer active. If that wasn’t you, reach us from Help.",
             [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,

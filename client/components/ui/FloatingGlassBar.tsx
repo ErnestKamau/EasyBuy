@@ -12,6 +12,18 @@ type Props = {
 };
 
 /**
+ * Space to leave at the bottom of tab-screen content so it sits just above
+ * the floating GlassTabBar (same clearance as the cart checkout bar).
+ */
+export function useFloatingTabBarInset(): number {
+  const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const barBody = theme.touchTarget + theme.spacing[2] + 14;
+  const barLift = Math.max(insets.bottom, theme.spacing[3]);
+  return barLift + barBody + theme.spacing[2];
+}
+
+/**
  * Floating glass action bar — same position as the homepage tab bar:
  * inset from the sides, sitting above the home indicator.
  */

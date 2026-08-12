@@ -77,8 +77,8 @@ class DeliveryController extends Controller
             NotificationService::create(
                 $order->user_id,
                 'driver_arrived',
-                'Your rider has arrived',
-                "Your rider is at the delivery location for order #{$order->order_number}.",
+                'Your rider is here.',
+                "They’re at the door for {$order->order_number}. Head out when you’re ready.",
                 ['type' => 'driver_arrived', 'order_id' => $order->id],
                 'high'
             );
@@ -271,8 +271,8 @@ class DeliveryController extends Controller
             NotificationService::create(
                 $order->user_id,
                 'delivery_fulfilled',
-                'Delivery complete',
-                "Order #{$order->order_number} has been fulfilled. Your receipt is ready.",
+                'Delivered. You’re all set.',
+                "{$order->order_number} is fulfilled. Your receipt is waiting in Orders.",
                 ['type' => 'delivery_fulfilled', 'order_id' => $order->id],
                 'high'
             );
@@ -385,8 +385,8 @@ class DeliveryController extends Controller
         NotificationService::create(
             $order->user_id,
             'package_on_the_way',
-            'Package on the way',
-            "{$driverName} is on the way with order #{$order->order_number}.",
+            'Your package left the shop.',
+            "{$driverName} is heading to you with {$order->order_number}. Track it live in Orders.",
             ['type' => 'package_on_the_way', 'order_id' => $order->id],
             'high'
         );

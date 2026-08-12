@@ -420,14 +420,10 @@ export const productsApi = {
 
   async uploadImage(imageUri: string): Promise<string> {
     const formData = new FormData();
-    const filename = imageUri.split('/').pop() || 'image.jpg';
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : 'image/jpeg';
-
     formData.append('image', {
       uri: imageUri,
-      name: filename,
-      type: type,
+      name: 'upload.jpg',
+      type: 'image/jpeg',
     } as any);
 
     const { data } = await api.post<{ success: boolean; data: { url: string } }>('/images/upload', formData, {

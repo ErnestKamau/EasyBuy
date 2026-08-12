@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext"; // Import theme hook
 import { ToastService } from "@/utils/toastService";
+import { useFloatingTabBarInset } from "@/components/ui";
 import {
   User,
   Settings,
@@ -29,6 +30,7 @@ import {
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { currentTheme, themeName, isSystemTheme } = useTheme(); // Use theme system
+  const tabBarInset = useFloatingTabBarInset();
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -112,7 +114,7 @@ export default function ProfileScreen() {
 
   return (
     <View
-      style={[styles.container, { backgroundColor: currentTheme.background, paddingBottom: 88 }]}
+      style={[styles.container, { backgroundColor: currentTheme.background }]}
     >
       <StatusBar
         barStyle={
@@ -125,7 +127,7 @@ export default function ProfileScreen() {
 
       <ScrollView
         style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Header */}
@@ -356,8 +358,6 @@ export default function ProfileScreen() {
             <Text style={styles.logoutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
   );
@@ -370,9 +370,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
-  scrollContent: {
-    paddingBottom: 40,
-  },
+  scrollContent: {},
 
   // Profile Header
   profileHeader: {
@@ -586,9 +584,5 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
-  },
-
-  bottomSpacing: {
-    height: 20,
   },
 });

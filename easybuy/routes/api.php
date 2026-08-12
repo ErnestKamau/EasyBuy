@@ -55,6 +55,9 @@ Route::prefix('mpesa')->group(function () {
 // Stripe webhook (public — verified via Stripe-Signature)
 Route::post('/stripe/webhook', [StripeController::class, 'webhook']);
 
+// Product images — same host as the API so the app can load them
+Route::get('/media/{path}', [ImageController::class, 'show'])->where('path', '.*');
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {

@@ -38,11 +38,10 @@ import { useCart } from "@/contexts/CartContext";
 import {
   SearchBar,
   Chip,
-  ProductCard,
   SkeletonProductCard,
   Text as UIText,
-  Screen,
   MediaContainer,
+  useFloatingTabBarInset,
 } from "@/components/ui";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -67,6 +66,7 @@ export default function HomeScreen() {
   const [authChecked, setAuthChecked] = useState(false);
   const { currentTheme, themeName } = useTheme();
   const theme = useAppTheme();
+  const tabBarInset = useFloatingTabBarInset();
   const { addItem } = useCart();
 
   const getColorsForCategory = (_categoryName: string) => ({
@@ -150,6 +150,7 @@ export default function HomeScreen() {
       borderRadius: 12,
       marginHorizontal: 6,
       marginBottom: 12,
+      overflow: 'hidden',
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: themeName === "dark" ? 0.3 : 0.05,
@@ -574,7 +575,7 @@ export default function HomeScreen() {
     <View style={{ flex: 1 }}>
     <ScrollView
       style={dynamicStyles.container}
-      contentContainerStyle={styles.contentContainer}
+      contentContainerStyle={[styles.contentContainer, { paddingBottom: tabBarInset }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -707,8 +708,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       )}
-
-      <View style={styles.bottomSpacing} />
     </ScrollView>
     </View>
   );
@@ -723,7 +722,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 20,
   },
   welcomeSection: {
     marginTop: 20,
@@ -772,14 +770,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   productImageContainer: {
-    position: "relative",
+    position: 'relative',
+    width: '100%',
+    aspectRatio: 1,
+    overflow: 'hidden',
   },
   productImage: {
-    width: "100%",
-    height: 140,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    overflow: "hidden",
+    width: '100%',
+    height: '100%',
   },
   favoriteButton: {
     position: "absolute",
@@ -826,9 +824,6 @@ const styles = StyleSheet.create({
   },
   adminSection: {
     marginTop: 20,
-    marginBottom: 24,
-  },
-  bottomSpacing: {
-    height: 100,
+    marginBottom: 8,
   },
 });

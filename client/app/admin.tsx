@@ -21,7 +21,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Theme } from "@/constants/Themes";
 import * as ImagePicker from "expo-image-picker";
-import { Image } from "react-native";
 import {
   productsApi,
   Category,
@@ -431,8 +430,8 @@ export default function AdminScreen() {
       let imageUrl = productForm.image_url;
       if (
         productForm.image_uri &&
-        (productForm.image_uri.startsWith("file://") ||
-          productForm.image_uri.startsWith("content://"))
+        !productForm.image_uri.startsWith('http://') &&
+        !productForm.image_uri.startsWith('https://')
       ) {
         try {
           imageUrl = await productsApi.uploadImage(productForm.image_uri);
@@ -3080,10 +3079,10 @@ export default function AdminScreen() {
                 <View style={styles.imagePickerContainer}>
                   {productForm.image_uri || productForm.image_url ? (
                     <View style={styles.imagePreviewContainer}>
-                      <Image
-                        source={{
-                          uri: productForm.image_uri || productForm.image_url,
-                        }}
+                      <MediaContainer
+                        uri={productForm.image_uri || productForm.image_url}
+                        aspectRatio="1:1"
+                        borderRadius={12}
                         style={styles.imagePreview}
                       />
                       <TouchableOpacity

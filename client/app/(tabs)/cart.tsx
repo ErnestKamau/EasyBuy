@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Alert,
   Dimensions,
   StatusBar,
@@ -27,7 +26,7 @@ import {
   Clock,
   Truck,
 } from "lucide-react-native";
-import { EmptyState, CartItemRow, SegmentedControl, SummaryCard, Button } from "@/components/ui";
+import { EmptyState, CartItemRow, SegmentedControl, SummaryCard, Button, MediaContainer, useFloatingTabBarInset } from "@/components/ui";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -249,9 +248,6 @@ const createDynamicStyles = (currentTheme: any, themeName: string) =>
       backgroundColor: currentTheme.surface,
       paddingHorizontal: 20,
       paddingVertical: 16,
-      // Extra bottom clearance so the floating GlassTabBar (absolutely
-      // positioned, not reserved space) doesn't sit on top of this bar.
-      marginBottom: 90,
       borderTopWidth: 1,
       borderTopColor: currentTheme.border,
       shadowColor: "#000",
@@ -437,6 +433,7 @@ export default function CartScreen(): React.ReactElement {
     "pickup",
   );
   const { currentTheme, themeName } = useTheme();
+  const tabBarInset = useFloatingTabBarInset();
 
   // Dynamic styles based on theme
   const dynamicStyles = createDynamicStyles(currentTheme, themeName);
@@ -484,11 +481,10 @@ export default function CartScreen(): React.ReactElement {
     return (
       <View key={item.id} style={dynamicStyles.cartItem}>
         <View style={styles.itemImageContainer}>
-          <Image
-            source={{
-              uri:
-                item.product.image_url || "https://via.placeholder.com/80x80",
-            }}
+          <MediaContainer
+            uri={item.product.image_url}
+            aspectRatio="1:1"
+            borderRadius={8}
             style={dynamicStyles.itemImage}
           />
         </View>
@@ -824,7 +820,7 @@ export default function CartScreen(): React.ReactElement {
             <View style={styles.bottomSpacing} />
           </ScrollView>
 
-          <View style={dynamicStyles.checkoutBar}>
+          <View style={[dynamicStyles.checkoutBar, { marginBottom: tabBarInset }]}>
             <View style={styles.totalContainer}>
               <Text style={dynamicStyles.totalLabelSmall}>Total</Text>
               <Text style={dynamicStyles.totalAmountLarge}>

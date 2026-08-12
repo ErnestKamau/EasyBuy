@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Image, ImageStyle, StyleProp, ViewStyle, StyleSheet } from 'react-native';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { Skeleton } from './Skeleton';
 import { ImageOff } from 'lucide-react-native';
+import { resolveMediaUrl } from '@/utils/mediaUrl';
 
 type Aspect = '1:1' | '4:3' | '16:9' | '3:4' | number;
 
@@ -29,15 +30,22 @@ export function MediaContainer({
   imageStyle,
 }: MediaContainerProps) {
   const theme = useAppTheme();
-  const [loading, setLoading] = useState(true);
+  const resolved = resolveMediaUrl(uri);
+  const [loading, setLoading] = useState(!!resolved);
   const [error, setError] = useState(false);
   const rad = borderRadius ?? theme.radius.md;
   const ratio = resolveAspect(aspectRatio);
+
+  useEffect(() => {
+    setError(false);
+    setLoading(!!resolved);
+  }, [resolved]);
 
   return (
     <View
       style={[
         {
+          width: '100%',
           aspectRatio: ratio,
           borderRadius: rad,
           overflow: 'hidden',
@@ -46,11 +54,12 @@ export function MediaContainer({
         style,
       ]}
     >
-      {uri && !error ? (
+      {resolved && !error ? (
         <>
           <Image
-            source={{ uri }}
-            style={[{ width: '100%', height: '100%' }, imageStyle]}
+            key={resolved}
+            source={{ uri: resolved }}
+            style={[StyleSheet.absoluteFillObject, imageStyle]}
             onLoadStart={() => setLoading(true)}
             onLoadEnd={() => setLoading(false)}
             onError={() => {
@@ -60,7 +69,7 @@ export function MediaContainer({
             resizeMode="cover"
           />
           {loading && (
-            <View style={StyleSheet.absoluteFill}>
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
               <Skeleton width="100%" height={400} borderRadius={0} />
             </View>
           )}

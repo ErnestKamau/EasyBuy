@@ -24,8 +24,8 @@ class CreateSaleFullyPaidNotification implements ShouldQueue
             NotificationService::create(
                 $order->user_id,
                 'sale_fully_paid',
-                'Payment Complete',
-                "Your sale {$sale->sale_number} has been fully paid. Thank you!",
+                'Fully settled.',
+                "{$sale->sale_number} is paid in full. Nothing else is due — thank you.",
                 [
                     'sale_id' => $sale->id,
                     'order_id' => $order->id,

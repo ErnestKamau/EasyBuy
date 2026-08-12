@@ -25,8 +25,8 @@ class CreateRefundProcessedNotification implements ShouldQueue
             NotificationService::create(
                 $order->user_id,
                 'refund_processed',
-                'Refund Processed',
-                "A refund of Ksh {$payment->refund_amount} has been processed for payment {$payment->payment_number}",
+            'It’s on its way back.',
+            "A refund of KES {$payment->refund_amount} is processing for {$payment->payment_number}. Banks usually take 3–5 days.",
                 [
                     'payment_id' => $payment->id,
                     'sale_id' => $sale->id,
