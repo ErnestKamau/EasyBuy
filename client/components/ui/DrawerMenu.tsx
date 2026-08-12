@@ -5,6 +5,8 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   runOnJS,
+  interpolate,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
@@ -19,6 +21,9 @@ import {
   HelpCircle,
   Wallet,
   Receipt,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   LucideIcon,
 } from 'lucide-react-native';
 import { useAppTheme, useTheme } from '@/contexts/ThemeContext';
@@ -29,7 +34,8 @@ import { Divider } from './Divider';
 import { Badge } from './Badge';
 import { BackdropPressable } from './BackdropPressable';
 
-const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.82);
+const DRAWER_EXPANDED = Math.min(300, Dimensions.get('window').width * 0.78);
+const DRAWER_COLLAPSED = 76;
 
 type DrawerMenuProps = {
   open: boolean;
@@ -47,9 +53,13 @@ type NavItem = {
   Icon: LucideIcon;
   tone: Tone;
   href: string;
-  /** Pathname (no route-group segments) this item is considered active on. */
   match: string;
   badge?: number;
+};
+
+type NavSection = {
+  title: string;
+  items: NavItem[];
 };
 
 export function DrawerMenu({
@@ -61,13 +71,16 @@ export function DrawerMenu({
   onLogout,
 }: DrawerMenuProps) {
   const theme = useAppTheme();
+  const glass = theme.glass[3];
   const { themeName, changeTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
   const { state: cartState } = useCart();
   const progress = useSharedValue(0);
+  const collapsed = useSharedValue(0);
   const [mounted, setMounted] = React.useState(open);
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
 
   useEffect(() => {
     if (open) {
@@ -77,11 +90,34 @@ export function DrawerMenu({
       progress.value = withTiming(0, { duration: theme.duration.normal }, (finished) => {
         if (finished) runOnJS(setMounted)(false);
       });
+      collapsed.value = withTiming(0, { duration: theme.duration.fast });
+      setIsCollapsed(false);
     }
   }, [open]);
 
-  const drawerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: (1 - progress.value) * -DRAWER_WIDTH }],
+  const toggleCollapsed = () => {
+    const next = !isCollapsed;
+    if (!next) setIsCollapsed(false);
+    collapsed.value = withTiming(next ? 1 : 0, { duration: theme.duration.glass }, (finished) => {
+      if (finished && next) runOnJS(setIsCollapsed)(true);
+    });
+  };
+
+  const drawerStyle = useAnimatedStyle(() => {
+    const width = interpolate(
+      collapsed.value,
+      [0, 1],
+      [DRAWER_EXPANDED, DRAWER_COLLAPSED],
+      Extrapolation.CLAMP,
+    );
+    return {
+      width,
+      transform: [{ translateX: (1 - progress.value) * -DRAWER_EXPANDED }],
+    };
+  });
+
+  const labelOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(collapsed.value, [0, 0.4], [1, 0], Extrapolation.CLAMP),
   }));
 
   if (!mounted) return null;
@@ -99,25 +135,109 @@ export function DrawerMenu({
     muted: { fg: theme.colors.textSecondary, bg: theme.colors.backgroundSecondary },
   };
 
-  const items: NavItem[] = [
-    { label: 'Home', Icon: Home, tone: 'brand', href: '/(tabs)/', match: '/' },
+  const sections: NavSection[] = [
     {
-      label: 'Cart',
-      Icon: ShoppingBag,
-      tone: 'info',
-      href: '/(tabs)/cart',
-      match: '/cart',
-      badge: cartState.totalItems,
+      title: 'Menu',
+      items: [
+        { label: 'Home', Icon: Home, tone: 'brand', href: '/(tabs)/', match: '/' },
+        {
+          label: 'Cart',
+          Icon: ShoppingBag,
+          tone: 'info',
+          href: '/(tabs)/cart',
+          match: '/cart',
+          badge: cartState.totalItems,
+        },
+        { label: 'Orders', Icon: Package, tone: 'warning', href: '/(tabs)/orders', match: '/orders' },
+        { label: 'History', Icon: Receipt, tone: 'info', href: '/history', match: '/history' },
+      ],
     },
-    { label: 'Orders', Icon: Package, tone: 'warning', href: '/(tabs)/orders', match: '/orders' },
-    { label: 'History', Icon: Receipt, tone: 'info', href: '/history', match: '/history' },
-    { label: 'Wallet', Icon: Wallet, tone: 'success', href: '/wallet/history', match: '/wallet/history' },
-    { label: 'Profile', Icon: User, tone: 'brand', href: '/(tabs)/profile', match: '/profile' },
-    { label: 'Help', Icon: HelpCircle, tone: 'muted', href: '/help-support', match: '/help-support' },
+    {
+      title: 'Account',
+      items: [
+        { label: 'Wallet', Icon: Wallet, tone: 'success', href: '/wallet/history', match: '/wallet/history' },
+        { label: 'Profile', Icon: User, tone: 'brand', href: '/(tabs)/profile', match: '/profile' },
+      ],
+    },
+    {
+      title: 'Support',
+      items: [
+        { label: 'Help', Icon: HelpCircle, tone: 'muted', href: '/help-support', match: '/help-support' },
+      ],
+    },
   ];
 
   const isActive = (item: NavItem) =>
-    item.match === '/' ? pathname === '/' : pathname === item.match || pathname.startsWith(`${item.match}/`);
+    item.match === '/'
+      ? pathname === '/'
+      : pathname === item.match || pathname.startsWith(`${item.match}/`);
+
+  const renderNavItem = (item: NavItem) => {
+    const active = isActive(item);
+    const { fg, bg } = toneStyles[item.tone];
+    const { Icon } = item;
+
+    return (
+      <Pressable
+        key={item.label}
+        onPress={() => navigate(item.href)}
+        accessibilityLabel={item.label}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: isCollapsed ? 0 : theme.spacing[3],
+          paddingVertical: theme.spacing[2],
+          paddingHorizontal: isCollapsed ? theme.spacing[2] : theme.spacing[3],
+          borderRadius: theme.radius.lg,
+          backgroundColor: active ? bg : pressed ? theme.colors.primaryMuted : 'transparent',
+          minHeight: theme.touchTarget,
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
+        })}
+      >
+        <View
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: theme.radius.md,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon size={20} color={active ? fg : theme.colors.textMuted} />
+          {isCollapsed && !!item.badge && (
+            <View style={{ position: 'absolute', top: 2, right: 2 }}>
+              <Badge dot color={fg} />
+            </View>
+          )}
+        </View>
+
+        {!isCollapsed && (
+          <Animated.View
+            style={[{ flex: 1, flexDirection: 'row', alignItems: 'center' }, labelOpacity]}
+          >
+            <Text
+              variant="body"
+              color={(active ? item.tone : 'primary') as TextColor}
+              style={{
+                flex: 1,
+                fontFamily: active
+                  ? theme.fontFamily.body.semiBold
+                  : theme.fontFamily.body.regular,
+              }}
+            >
+              {item.label}
+            </Text>
+            {!!item.badge && <Badge count={item.badge} color={fg} />}
+            <ChevronRight
+              size={16}
+              color={theme.colors.textMuted}
+              style={{ marginLeft: theme.spacing[1] }}
+            />
+          </Animated.View>
+        )}
+      </Pressable>
+    );
+  };
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -125,33 +245,29 @@ export function DrawerMenu({
       <Animated.View
         style={[
           {
+            // Full-height only change vs floating inset panel
             position: 'absolute',
             top: 0,
             bottom: 0,
             left: 0,
-            width: DRAWER_WIDTH,
             zIndex: theme.zIndex.drawer,
+            overflow: 'hidden',
           },
           drawerStyle,
         ]}
       >
         {/*
-          Solid panel, not GlassSurface: BlurView nested inside a Reanimated
-          transform (the slide-in translateX above) corrupts/ghosts on Android,
-          duplicating sibling content into the blurred layer. A drawer needs to
-          stay legible while animating, so it skips the glass treatment.
-
-          Safe-area insets are padding on the CONTENT below, not this box —
-          padding here would leave a transparent gap at the top/bottom where
-          the dimmed backdrop shows through instead of the panel itself.
+          Glass tint without BlurView — blur nested inside a Reanimated
+          transform corrupts on Android. Tint + border still reads as glass.
+          Safe-area is padding on content so the panel fills the screen edge.
         */}
         <View
           style={[
             {
               flex: 1,
-              backgroundColor: theme.colors.surface,
+              backgroundColor: glass.tint,
               borderRightWidth: StyleSheet.hairlineWidth * 2,
-              borderRightColor: theme.colors.border,
+              borderRightColor: glass.borderColor,
             },
             theme.getElevation('elv600'),
           ]}
@@ -161,84 +277,116 @@ export function DrawerMenu({
               flex: 1,
               paddingTop: insets.top + theme.spacing[4],
               paddingBottom: insets.bottom + theme.spacing[4],
-              paddingHorizontal: theme.spacing[5],
-              gap: theme.spacing[5],
+              paddingHorizontal: isCollapsed ? theme.spacing[2] : theme.spacing[4],
+              gap: theme.spacing[4],
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[4] }}>
-              <Avatar uri={avatarUri} name={userName} size="lg" />
-              <View style={{ flex: 1 }}>
-                <Text variant="title" numberOfLines={1}>
-                  {userName || 'Guest'}
-                </Text>
-                {userEmail && (
-                  <Text variant="caption" color="muted" numberOfLines={1}>
-                    {userEmail}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing[3],
+                justifyContent: isCollapsed ? 'center' : 'flex-start',
+              }}
+            >
+              <Avatar uri={avatarUri} name={userName} size={isCollapsed ? 'md' : 'lg'} />
+              {!isCollapsed && (
+                <Animated.View style={[{ flex: 1 }, labelOpacity]}>
+                  <Text variant="title" numberOfLines={1}>
+                    {userName || 'Guest'}
                   </Text>
-                )}
-              </View>
+                  {userEmail && (
+                    <Text variant="caption" color="muted" numberOfLines={1}>
+                      {userEmail}
+                    </Text>
+                  )}
+                </Animated.View>
+              )}
+              {!isCollapsed && (
+                <Pressable
+                  onPress={toggleCollapsed}
+                  accessibilityLabel="Collapse menu"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: theme.radius.sm,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: theme.colors.backgroundSecondary,
+                  }}
+                >
+                  <ChevronsLeft size={16} color={theme.colors.textMuted} />
+                </Pressable>
+              )}
             </View>
+
+            {isCollapsed && (
+              <Pressable
+                onPress={toggleCollapsed}
+                accessibilityLabel="Expand menu"
+                style={{
+                  alignSelf: 'center',
+                  width: 36,
+                  height: 36,
+                  borderRadius: theme.radius.md,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: theme.colors.backgroundSecondary,
+                }}
+              >
+                <ChevronsRight size={16} color={theme.colors.textMuted} />
+              </Pressable>
+            )}
 
             <Divider />
 
-            <View style={{ gap: theme.spacing[1] }}>
-              {items.map((item) => {
-                const active = isActive(item);
-                const { fg, bg } = toneStyles[item.tone];
-                const { Icon } = item;
-                return (
-                  <Pressable
-                    key={item.label}
-                    onPress={() => navigate(item.href)}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: theme.spacing[3],
-                      paddingVertical: theme.spacing[2],
-                      paddingHorizontal: theme.spacing[3],
-                      borderRadius: theme.radius.md,
-                      backgroundColor: pressed ? theme.colors.primaryMuted : 'transparent',
-                      minHeight: theme.touchTarget,
-                    })}
-                  >
+            <View style={{ flex: 1, gap: theme.spacing[4] }}>
+              {sections.map((section) => (
+                <View key={section.title} style={{ gap: theme.spacing[1] }}>
+                  {!isCollapsed ? (
+                    <Animated.View style={labelOpacity}>
+                      <Text
+                        variant="caption"
+                        color="muted"
+                        style={{
+                          paddingHorizontal: theme.spacing[3],
+                          marginBottom: theme.spacing[1],
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.6,
+                          fontFamily: theme.fontFamily.body.medium,
+                          fontSize: 10,
+                        }}
+                      >
+                        {section.title}
+                      </Text>
+                    </Animated.View>
+                  ) : (
                     <View
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: theme.radius.md,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: active ? bg : 'transparent',
+                        height: StyleSheet.hairlineWidth,
+                        backgroundColor: theme.colors.borderSubtle,
+                        marginHorizontal: theme.spacing[2],
+                        marginVertical: theme.spacing[1],
                       }}
-                    >
-                      <Icon size={20} color={active ? fg : theme.colors.textMuted} />
-                    </View>
-                    <Text
-                      variant="body"
-                      color={(active ? item.tone : 'primary') as TextColor}
-                      style={{
-                        flex: 1,
-                        fontFamily: active ? theme.fontFamily.body.semiBold : theme.fontFamily.body.regular,
-                      }}
-                    >
-                      {item.label}
-                    </Text>
-                    {!!item.badge && <Badge count={item.badge} color={fg} />}
-                  </Pressable>
-                );
-              })}
+                    />
+                  )}
+                  {section.items.map(renderNavItem)}
+                </View>
+              ))}
             </View>
 
-            <View style={{ flex: 1 }} />
-
+            <Divider />
             <Pressable
               onPress={() => changeTheme(themeName === 'dark' ? 'light' : 'dark')}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: theme.spacing[4],
-                paddingVertical: theme.spacing[3],
+                gap: isCollapsed ? 0 : theme.spacing[3],
+                paddingVertical: theme.spacing[2],
+                paddingHorizontal: isCollapsed ? theme.spacing[2] : theme.spacing[3],
+                borderRadius: theme.radius.lg,
                 minHeight: theme.touchTarget,
+                justifyContent: isCollapsed ? 'center' : 'flex-start',
               }}
             >
               {themeName === 'dark' ? (
@@ -246,9 +394,13 @@ export function DrawerMenu({
               ) : (
                 <Moon size={20} color={theme.colors.text} />
               )}
-              <Text variant="body">
-                {themeName === 'dark' ? 'Light mode' : 'Dark mode'}
-              </Text>
+              {!isCollapsed && (
+                <Animated.View style={labelOpacity}>
+                  <Text variant="body">
+                    {themeName === 'dark' ? 'Light mode' : 'Dark mode'}
+                  </Text>
+                </Animated.View>
+              )}
             </Pressable>
 
             {onLogout && (
@@ -260,15 +412,22 @@ export function DrawerMenu({
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: theme.spacing[4],
-                  paddingVertical: theme.spacing[3],
+                  gap: isCollapsed ? 0 : theme.spacing[3],
+                  paddingVertical: theme.spacing[2],
+                  paddingHorizontal: isCollapsed ? theme.spacing[2] : theme.spacing[3],
+                  borderRadius: theme.radius.lg,
                   minHeight: theme.touchTarget,
+                  justifyContent: isCollapsed ? 'center' : 'flex-start',
                 }}
               >
                 <LogOut size={20} color={theme.colors.error} />
-                <Text variant="body" color="error">
-                  Log out
-                </Text>
+                {!isCollapsed && (
+                  <Animated.View style={labelOpacity}>
+                    <Text variant="body" color="error">
+                      Log out
+                    </Text>
+                  </Animated.View>
+                )}
               </Pressable>
             )}
           </View>

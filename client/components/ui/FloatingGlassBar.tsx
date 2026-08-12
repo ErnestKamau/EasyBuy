@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { GlassLevel } from '@/design';
 import { GlassSurface } from './GlassSurface';
+import { tabBarBodyHeight } from './tabBarTokens';
 
 type Props = {
   children: React.ReactNode;
@@ -18,9 +19,8 @@ type Props = {
 export function useFloatingTabBarInset(): number {
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
-  const barBody = theme.touchTarget + theme.spacing[2] + 14;
-  const barLift = Math.max(insets.bottom, theme.spacing[3]);
-  return barLift + barBody + theme.spacing[2];
+  const floatBottom = Math.max(insets.bottom, theme.spacing[3]);
+  return tabBarBodyHeight() + floatBottom + theme.spacing[2];
 }
 
 /**

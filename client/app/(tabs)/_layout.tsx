@@ -2,19 +2,19 @@
 import React, { useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Tabs } from 'expo-router';
-import { Menu } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme, useAppTheme } from '@/contexts/ThemeContext';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { GlassTabBar, Badge, IconButton, DrawerMenu } from '@/components/ui';
+import { GlassTabBar, Badge, DrawerMenu, HamburgerButton } from '@/components/ui';
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
+  size?: number;
 }) {
-  return <FontAwesome size={22} style={{ marginBottom: -2 }} {...props} />;
+  return <FontAwesome size={props.size ?? 22} {...props} />;
 }
 
 export default function TabLayout() {
@@ -52,12 +52,12 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
           headerLeft: () => (
-            <IconButton
-              icon={<Menu size={22} color={currentTheme.text} />}
-              onPress={() => setDrawerOpen((o) => !o)}
-              accessibilityLabel={drawerOpen ? 'Close menu' : 'Open menu'}
-              style={{ marginLeft: 8 }}
-            />
+            <View style={{ marginLeft: 4 }}>
+              <HamburgerButton
+                open={drawerOpen}
+                onPress={() => setDrawerOpen((o) => !o)}
+              />
+            </View>
           ),
           headerRight: () => (
             <Link href="/modal" asChild>
