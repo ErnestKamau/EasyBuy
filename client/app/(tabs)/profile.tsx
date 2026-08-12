@@ -25,6 +25,7 @@ import {
   Info,
   ChevronRight,
   Wallet,
+  Receipt,
 } from "lucide-react-native";
 
 export default function ProfileScreen() {
@@ -62,6 +63,13 @@ export default function ProfileScreen() {
   };
 
   const menuItems = [
+    {
+      icon: Receipt,
+      title: "Transaction History",
+      subtitle: "Payments, refunds, and receipts",
+      onPress: () => router.push("/history" as any),
+      color: currentTheme.primary,
+    },
     {
       icon: Palette,
       title: "Appearance",

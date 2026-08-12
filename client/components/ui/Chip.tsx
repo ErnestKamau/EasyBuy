@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
+import { X } from 'lucide-react-native';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { Text } from './Text';
 import { GlassSurface } from './GlassSurface';
@@ -8,10 +9,11 @@ type ChipProps = {
   label: string;
   selected?: boolean;
   onPress?: () => void;
+  onClear?: () => void;
   icon?: React.ReactNode;
 };
 
-export function Chip({ label, selected, onPress, icon }: ChipProps) {
+export function Chip({ label, selected, onPress, onClear, icon }: ChipProps) {
   const theme = useAppTheme();
 
   const inner = (
@@ -25,41 +27,57 @@ export function Chip({ label, selected, onPress, icon }: ChipProps) {
         minHeight: 36,
       }}
     >
-      {icon}
-      <Text
-        variant="label"
-        color={selected ? 'brand' : 'secondary'}
-        style={{ fontFamily: selected ? theme.fontFamily.body.semiBold : theme.fontFamily.body.medium }}
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing[2],
+          opacity: pressed ? 0.8 : 1,
+        })}
       >
-        {label}
-      </Text>
+        {icon}
+        <Text
+          variant="label"
+          color={selected ? 'brand' : 'secondary'}
+          style={{ fontFamily: selected ? theme.fontFamily.body.semiBold : theme.fontFamily.body.medium }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+      {selected && onClear ? (
+        <Pressable
+          onPress={onClear}
+          hitSlop={8}
+          accessibilityLabel={`Clear ${label}`}
+        >
+          <X size={14} color={theme.colors.primary} />
+        </Pressable>
+      ) : null}
     </View>
   );
 
+  if (selected) {
+    return (
+      <GlassSurface level={1} borderRadius={theme.radius.pill}>
+        {inner}
+      </GlassSurface>
+    );
+  }
+
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+    <View
+      style={{
+        borderRadius: theme.radius.pill,
+        backgroundColor: theme.colors.backgroundSecondary,
+        borderWidth: StyleSheet.hairlineWidth * 2,
+        borderColor: theme.colors.border,
+      }}
     >
-      {selected ? (
-        <GlassSurface level={1} borderRadius={theme.radius.pill}>
-          {inner}
-        </GlassSurface>
-      ) : (
-        <View
-          style={{
-            borderRadius: theme.radius.pill,
-            backgroundColor: theme.colors.backgroundSecondary,
-            borderWidth: StyleSheet.hairlineWidth * 2,
-            borderColor: theme.colors.border,
-          }}
-        >
-          {inner}
-        </View>
-      )}
-    </Pressable>
+      {inner}
+    </View>
   );
 }
 

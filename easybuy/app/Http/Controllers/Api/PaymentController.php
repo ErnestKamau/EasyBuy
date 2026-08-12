@@ -21,7 +21,16 @@ class PaymentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Payment::with(['sale.order.user', 'mpesaTransaction']);
+        $query = Payment::with(['sale.order.user', 'order', 'mpesaTransaction']);
+
+        $user = $request->user();
+        if ($user && !$user->isAdmin()) {
+            $userId = $user->id;
+            $query->where(function ($q) use ($userId) {
+                $q->whereHas('sale.order', fn ($o) => $o->where('user_id', $userId))
+                    ->orWhereHas('order', fn ($o) => $o->where('user_id', $userId));
+            });
+        }
 
         // Sale filter
         if ($request->has('sale_id')) {
@@ -33,12 +42,7 @@ class PaymentController extends Controller
             $query->where('payment_method', $request->payment_method);
         }
 
-        // Status filter
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Date range
+        // Date range (applied before status so summary stays meaningful)
         if ($request->has('date_from')) {
             $query->where('paid_at', '>=', $request->date_from);
         }
@@ -46,12 +50,27 @@ class PaymentController extends Controller
             $query->where('paid_at', '<=', $request->date_to);
         }
 
+        $spent = (clone $query)->where('status', 'completed')->sum('amount');
+        $refunded = (clone $query)->where('status', 'refunded')->sum('amount');
+        $pending = (clone $query)->where('status', 'pending')->sum('amount');
+
+        // Status filter
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
         $perPage = $request->get('per_page', 15);
         $payments = $query->latest('paid_at')->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $payments
+            'data' => $payments,
+            'summary' => [
+                'spent' => (float) $spent,
+                'refunded' => (float) $refunded,
+                'pending' => (float) $pending,
+                'count' => $payments->total(),
+            ],
         ]);
     }
 

@@ -465,6 +465,7 @@ export interface Order {
   notes?: string;
   items?: OrderItem[];
   sale?: Sale;
+  payments?: Payment[];
   driver_id?: number | null;
   driver?: User;
   delivery_lat?: number;
@@ -587,7 +588,8 @@ export interface SaleItem {
 export interface Payment {
   id: number;
   payment_number: string;
-  sale_id: number;
+  sale_id?: number | null;
+  order_id?: number | null;
   payment_method: 'mpesa' | 'cash' | 'card';
   amount: number;
   mpesa_transaction_id?: string;
@@ -600,7 +602,15 @@ export interface Payment {
   refund_amount?: number;
   created_at: string;
   updated_at: string;
-  sale?: Sale; // Include sale in payment response
+  sale?: Sale;
+  order?: Pick<Order, 'id' | 'order_number'>;
+}
+
+export interface PaymentHistorySummary {
+  spent: number;
+  refunded: number;
+  pending: number;
+  count: number;
 }
 
 export interface Sale {
@@ -872,16 +882,51 @@ export const paymentsApi = {
     status?: string;
     date_from?: string;
     date_to?: string;
+    page?: number;
+    per_page?: number;
   }): Promise<Payment[]> {
+    const result = await this.getHistory(filters);
+    return result.data;
+  },
+
+  async getHistory(filters?: {
+    sale_id?: number;
+    payment_method?: string;
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<{
+    data: Payment[];
+    current_page: number;
+    last_page: number;
+    summary: PaymentHistorySummary;
+  }> {
     const params = new URLSearchParams();
     if (filters?.sale_id) params.append('sale_id', filters.sale_id.toString());
     if (filters?.payment_method) params.append('payment_method', filters.payment_method);
     if (filters?.status) params.append('status', filters.status);
     if (filters?.date_from) params.append('date_from', filters.date_from);
     if (filters?.date_to) params.append('date_to', filters.date_to);
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.per_page) params.append('per_page', filters.per_page.toString());
 
-    const { data } = await api.get<{ success: boolean; data: { data: Payment[] } }>(`/payments?${params.toString()}`);
-    return Array.isArray(data.data) ? data.data : data.data.data || [];
+    const { data } = await api.get<{
+      success: boolean;
+      data: { data: Payment[]; current_page: number; last_page: number };
+      summary?: PaymentHistorySummary;
+    }>(`/payments?${params.toString()}`);
+
+    const page = Array.isArray(data.data)
+      ? { data: data.data, current_page: 1, last_page: 1 }
+      : data.data;
+    return {
+      data: page.data || [],
+      current_page: page.current_page ?? 1,
+      last_page: page.last_page ?? 1,
+      summary: data.summary ?? { spent: 0, refunded: 0, pending: 0, count: 0 },
+    };
   },
 
   async getPaymentDetails(paymentId: number): Promise<Payment> {

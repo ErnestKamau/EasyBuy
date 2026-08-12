@@ -18,6 +18,7 @@ import {
   LogOut,
   HelpCircle,
   Wallet,
+  Receipt,
   LucideIcon,
 } from 'lucide-react-native';
 import { useAppTheme, useTheme } from '@/contexts/ThemeContext';
@@ -109,6 +110,7 @@ export function DrawerMenu({
       badge: cartState.totalItems,
     },
     { label: 'Orders', Icon: Package, tone: 'warning', href: '/(tabs)/orders', match: '/orders' },
+    { label: 'History', Icon: Receipt, tone: 'info', href: '/history', match: '/history' },
     { label: 'Wallet', Icon: Wallet, tone: 'success', href: '/wallet/history', match: '/wallet/history' },
     { label: 'Profile', Icon: User, tone: 'brand', href: '/(tabs)/profile', match: '/profile' },
     { label: 'Help', Icon: HelpCircle, tone: 'muted', href: '/help-support', match: '/help-support' },

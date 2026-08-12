@@ -34,6 +34,7 @@ export { SheetStatus } from './SheetStatus';
 export { Banner, InlineAlert } from './Banner';
 export { ProgressBar, Spinner } from './Progress';
 export { TrackStepper } from './TrackStepper';
+export type { TrackStep } from './TrackStepper';
 export { WizardStepper, WizardContainer } from './Wizard';
 export { ProgressDots } from './ProgressDots';
 export { ListItem, SettingsRow } from './ListItem';

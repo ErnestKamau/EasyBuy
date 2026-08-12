@@ -57,9 +57,18 @@ class OrderController extends Controller
     /**
      * Get single order
      */
-    public function show(Order $order): JsonResponse
+    public function show(Request $request, Order $order): JsonResponse
     {
-        $order->load(['user', 'items.product']);
+        $user = $request->user();
+        $isOwner = $user && $order->user_id === $user->id;
+        $isDriver = $user && $order->driver_id === $user->id;
+        $isAdmin = $user && $user->isAdmin();
+
+        if (!$isOwner && !$isDriver && !$isAdmin) {
+            abort(403, 'You are not authorized to view this order.');
+        }
+
+        $order->load(['user', 'items.product', 'sale.payments', 'payments', 'driver']);
 
         return response()->json([
             'success' => true,

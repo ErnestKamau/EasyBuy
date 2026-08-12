@@ -304,6 +304,16 @@ function RootLayoutNav() {
               ),
               isAuthenticated && (
                 <Stack.Screen
+                  key="history"
+                  name="history"
+                  options={{
+                    title: "History",
+                    presentation: "card",
+                  }}
+                />
+              ),
+              isAuthenticated && (
+                <Stack.Screen
                   key="order-details"
                   name="order/[id]"
                   options={{

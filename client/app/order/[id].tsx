@@ -1,771 +1,649 @@
-// app/order/[id].tsx - Order detail page
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  StatusBar,
-  Alert,
-  Linking,
-} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Linking, Pressable } from 'react-native';
+import Animated, {
+  FadeInDown,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useNotifications } from '@/contexts/NotificationContext';
-import { ordersApi, Order, Payment } from '@/services/api';
-import { ToastService } from '@/utils/toastService';
 import {
-  ArrowLeft,
-  Clock,
   MapPin,
   Phone,
   Mail,
+  Truck,
+  Store,
+  Package,
+  ChefHat,
+  Home,
+  ShoppingBag,
+  CheckCircle2,
   XCircle,
+  LucideIcon,
 } from 'lucide-react-native';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { ordersApi, Order, Payment } from '@/services/api';
+import { ToastService } from '@/utils/toastService';
+import { getReducedMotion, subscribeReducedMotion } from '@/design/tokens/motion';
+import {
+  Screen,
+  AppHeader,
+  Text,
+  TrackStepper,
+  TrackStep,
+  StatusPill,
+  MediaContainer,
+  SummaryCard,
+  KeyValueRow,
+  Button,
+  FloatingGlassBar,
+  ActionSheet,
+  EmptyState,
+  SkeletonList,
+  GlassSurface,
+  Divider,
+} from '@/components/ui';
 
-// Helper function to create dynamic styles
-const createDynamicStyles = (currentTheme: any, themeName: string) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: currentTheme.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: currentTheme.background,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: currentTheme.textSecondary,
-    marginTop: 12,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 60,
-    backgroundColor: currentTheme.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: currentTheme.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: themeName === 'dark' ? 0.3 : 0.05,
-    shadowRadius: 4,
-    elevation: themeName === 'dark' ? 8 : 2,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: currentTheme.text,
-    flex: 1,
-    marginLeft: 12,
-  },
-  section: {
-    backgroundColor: currentTheme.surface,
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: currentTheme.border,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: currentTheme.text,
-    marginBottom: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: currentTheme.textSecondary,
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: currentTheme.text,
-    flex: 1,
-    textAlign: 'right',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  orderItem: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: currentTheme.border + '40',
-  },
-  itemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: currentTheme.border + '40',
-    marginRight: 12,
-  },
-  itemDetails: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: currentTheme.text,
-    marginBottom: 4,
-  },
-  itemInfo: {
-    fontSize: 13,
-    color: currentTheme.textSecondary,
-    marginBottom: 2,
-  },
-  itemPrice: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: currentTheme.primary,
-    marginTop: 4,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  summaryLabel: {
-    fontSize: 15,
-    color: currentTheme.textSecondary,
-  },
-  summaryValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: currentTheme.text,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: currentTheme.border,
-  },
-  totalLabel: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: currentTheme.text,
-  },
-  totalValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: currentTheme.primary,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: currentTheme.surface,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: currentTheme.border,
-  },
-  cancelButton: {
-    backgroundColor: currentTheme.error + '15',
-    borderColor: currentTheme.error + '40',
-  },
-  supportButton: {
-    backgroundColor: currentTheme.primary + '15',
-    borderColor: currentTheme.primary + '40',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  cancelButtonText: {
-    color: currentTheme.error,
-  },
-  supportButtonText: {
-    color: currentTheme.primary,
-  },
-  paymentItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: currentTheme.border + '40',
-  },
-  paymentMethod: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: currentTheme.text,
-  },
-  paymentAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: currentTheme.primary,
-  },
-  paymentDate: {
-    fontSize: 12,
-    color: currentTheme.textSecondary,
-    marginTop: 2,
-  },
-  contactCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: currentTheme.surface,
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: currentTheme.border,
-  },
-  contactIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: currentTheme.primary + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  contactInfo: {
-    flex: 1,
-  },
-  contactLabel: {
-    fontSize: 12,
-    color: currentTheme.textSecondary,
-    marginBottom: 2,
-  },
-  contactValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: currentTheme.text,
-  },
-});
+type HeroKey = 'pending' | 'preparing' | 'delivering' | 'delivered' | 'cancelled';
+
+const HERO_ICON: Record<HeroKey, LucideIcon> = {
+  pending: Package,
+  preparing: ChefHat,
+  delivering: Truck,
+  delivered: CheckCircle2,
+  cancelled: XCircle,
+};
+
+function formatKes(amount: number) {
+  return `KES ${Number(amount || 0).toLocaleString()}`;
+}
+
+function formatWeight(weight: number | null | undefined): string {
+  if (!weight) return '';
+  const whole = Math.floor(weight);
+  const decimal = weight - whole;
+  if (decimal === 0) return `${whole}KG`;
+  if (decimal === 0.5) return whole === 0 ? '1/2KG' : `${whole} 1/2KG`;
+  return `${weight}KG`;
+}
+
+function itemSubtotal(item: NonNullable<Order['items']>[number]): number {
+  if (item.subtotal && item.subtotal > 0) return item.subtotal;
+  const unit = item.unit_price || 0;
+  if (item.kilogram && item.kilogram > 0) return unit * item.kilogram;
+  if (item.quantity && item.quantity > 0) return unit * item.quantity;
+  return 0;
+}
+
+function orderSubtotal(order: Order): number {
+  if (order.total_amount && order.total_amount > 0) return order.total_amount;
+  return (order.items ?? []).reduce((sum, item) => sum + itemSubtotal(item), 0);
+}
+
+function uniquePayments(order: Order): Payment[] {
+  const all = [...(order.sale?.payments ?? []), ...(order.payments ?? [])];
+  const seen = new Set<number>();
+  return all.filter((p) => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+}
+
+function heroFor(order: Order): {
+  key: HeroKey;
+  title: string;
+  body: string;
+  step: number;
+  steps: TrackStep[];
+} {
+  const deliverySteps: TrackStep[] = [
+    { key: 'placed', label: 'Placed', Icon: Package },
+    { key: 'preparing', label: 'Preparing', Icon: ChefHat },
+    { key: 'delivering', label: 'On the way', Icon: Truck },
+    { key: 'delivered', label: 'Delivered', Icon: Home },
+  ];
+  const pickupSteps: TrackStep[] = [
+    { key: 'placed', label: 'Placed', Icon: Package },
+    { key: 'preparing', label: 'Preparing', Icon: ChefHat },
+    { key: 'ready', label: 'Ready', Icon: ShoppingBag },
+    { key: 'picked', label: 'Picked up', Icon: Store },
+  ];
+  const steps = order.type === 'delivery' ? deliverySteps : pickupSteps;
+
+  if (order.order_status === 'cancelled') {
+    return {
+      key: 'cancelled',
+      title: 'Cancelled',
+      body: 'This order was cancelled. Need a hand? Support is a tap away.',
+      step: 0,
+      steps,
+    };
+  }
+
+  const f = order.fulfillment_status;
+  if (f === 'delivered' || f === 'picked_up') {
+    return {
+      key: 'delivered',
+      title: f === 'picked_up' ? 'Picked up' : 'Delivered',
+      body: 'All done — thanks for shopping with EasyBuy.',
+      step: 4,
+      steps,
+    };
+  }
+  if (f === 'assigned' || f === 'driver_accepted' || f === 'en_route' || f === 'arrived') {
+    return {
+      key: 'delivering',
+      title: f === 'arrived' ? 'Driver arrived' : 'On the way',
+      body:
+        f === 'arrived'
+          ? 'Your rider is at the door. Have your code ready.'
+          : 'Your order is heading to you right now.',
+      step: 2,
+      steps,
+    };
+  }
+  if (f === 'ready') {
+    return {
+      key: 'preparing',
+      title: 'Ready for pickup',
+      body: 'Your order is waiting at the shop.',
+      step: 2,
+      steps,
+    };
+  }
+  if (f === 'preparing' || order.order_status === 'confirmed') {
+    return {
+      key: 'preparing',
+      title: 'Preparing',
+      body: 'We are packing your items with care.',
+      step: 1,
+      steps,
+    };
+  }
+  return {
+    key: 'pending',
+    title: 'Order placed',
+    body: 'Hang tight — we will confirm this shortly.',
+    step: 0,
+    steps,
+  };
+}
+
+function canTrack(order: Order) {
+  if (order.type !== 'delivery') return false;
+  if (order.order_status === 'pending' || order.order_status === 'cancelled') return false;
+  const f = order.fulfillment_status;
+  return f !== 'delivered' && f !== 'picked_up';
+}
 
 export default function OrderDetailScreen(): React.ReactNode {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { currentTheme, themeName } = useTheme();
+  const theme = useAppTheme();
   const { markOrderNotificationsAsRead } = useNotifications();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const dynamicStyles = createDynamicStyles(currentTheme, themeName);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
-    fetchOrderDetails();
-  }, [id]);
+    getReducedMotion().then(setReduceMotion);
+    return subscribeReducedMotion(setReduceMotion);
+  }, []);
 
-  const fetchOrderDetails = async () => {
+  const fetchOrder = useCallback(async () => {
     if (!id) return;
-
     try {
       setLoading(true);
-      const orderData = await ordersApi.getOrderDetails(Number.parseInt(id, 10));
-      setOrder(orderData);
-      
-      // Mark related notifications as read when viewing order
-      await markOrderNotificationsAsRead(orderData.id);
-    } catch (error) {
-      console.error('Error fetching order details:', error);
+      const data = await ordersApi.getOrderDetails(Number.parseInt(id, 10));
+      setOrder(data);
+      await markOrderNotificationsAsRead(data.id);
+    } catch {
       ToastService.showError('Error', 'Failed to load order details');
       router.back();
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, markOrderNotificationsAsRead]);
 
-  const handleCancelOrder = () => {
+  useEffect(() => {
+    fetchOrder();
+  }, [fetchOrder]);
+
+  const handleCancel = async () => {
     if (!order) return;
-
-    Alert.alert(
-      'Cancel Order',
-      `Are you sure you want to cancel order ${order.order_number}? This action cannot be undone.`,
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await ordersApi.cancelOrder(order.id);
-              ToastService.showSuccess('Order Cancelled', 'Your order has been cancelled successfully');
-              router.back();
-            } catch (error: unknown) {
-              const errorMessage = error instanceof Error ? error.message : 'Failed to cancel order';
-              ToastService.showError('Error', errorMessage);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleCallSupport = () => {
-    Linking.openURL('tel:+254700000000');
-  };
-
-  const handleEmailSupport = () => {
-    Linking.openURL('mailto:support@easybuy.com?subject=Order Inquiry - ' + (order?.order_number || ''));
-  };
-
-  const getStatusBadgeStyle = (status: string) => {
-    if (status === 'pending') {
-      return {
-        backgroundColor: currentTheme.warning + '20',
-        color: currentTheme.warning,
-      };
-    } else if (status === 'confirmed') {
-      return {
-        backgroundColor: currentTheme.success + '20',
-        color: currentTheme.success,
-      };
-    } else if (status === 'assigned' || status === 'accepted' || status === 'picked_up') {
-      return {
-        backgroundColor: currentTheme.primary + '20',
-        color: currentTheme.primary,
-      };
-    } else if (status === 'delivered') {
-      return {
-        backgroundColor: currentTheme.success + '20',
-        color: currentTheme.success,
-      };
-    } else {
-      return {
-        backgroundColor: currentTheme.error + '20',
-        color: currentTheme.error,
-      };
+    try {
+      setCancelling(true);
+      await ordersApi.cancelOrder(order.id);
+      ToastService.showSuccess('Order cancelled', 'Your order has been cancelled');
+      router.back();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to cancel order';
+      ToastService.showError('Error', message);
+    } finally {
+      setCancelling(false);
     }
   };
 
-  const getPaymentStatusBadgeStyle = (status: string) => {
-    if (status === 'fully-paid') {
-      return {
-        backgroundColor: currentTheme.success + '20',
-        color: currentTheme.success,
-      };
-    } else if (status === 'partially-paid') {
-      return {
-        backgroundColor: currentTheme.warning + '20',
-        color: currentTheme.warning,
-      };
-    } else if (status === 'pending') {
-      return {
-        backgroundColor: currentTheme.warning + '20',
-        color: currentTheme.warning,
-      };
-    } else if (status === 'debt') {
-      return {
-        backgroundColor: currentTheme.info + '20',
-        color: currentTheme.info,
-      };
-    } else {
-      return {
-        backgroundColor: currentTheme.error + '20',
-        color: currentTheme.error,
-      };
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatTime = (timeString: string) => {
-    return timeString.substring(0, 5);
-  };
-
-  const formatWeight = (weight: number | null | undefined): string => {
-    if (!weight) return '';
-    if (weight === 0) return '0KG';
-    
-    const whole = Math.floor(weight);
-    const decimal = weight - whole;
-    
-    if (decimal === 0) {
-      return `${whole}KG`;
-    } else if (decimal === 0.5) {
-      if (whole === 0) {
-        return '1/2KG';
-      } else {
-        return `${whole} 1/2KG`;
-      }
-    }
-    
-    return `${weight}KG`;
-  };
+  const enter = (delay: number) =>
+    reduceMotion ? undefined : FadeInDown.delay(delay).duration(theme.duration.slow);
 
   if (loading) {
     return (
-      <View style={dynamicStyles.loadingContainer}>
-        <StatusBar 
-          barStyle={themeName === 'dark' ? "light-content" : "dark-content"} 
-          backgroundColor={currentTheme.surface} 
-        />
-        <ActivityIndicator size="large" color={currentTheme.primary} />
-        <Text style={dynamicStyles.loadingText}>Loading order details...</Text>
-      </View>
+      <Screen>
+        <AppHeader title="Order" showBack />
+        <View style={{ padding: theme.spacing[6] }}>
+          <SkeletonList count={5} />
+        </View>
+      </Screen>
     );
   }
 
   if (!order) {
-    return null;
+    return (
+      <Screen>
+        <AppHeader title="Order" showBack />
+        <EmptyState
+          illustration="error"
+          title="Order not found"
+          message="This order may have been removed."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
+      </Screen>
+    );
   }
 
-  // Calculate total from order items if total_amount is not available
-  const calculateOrderTotal = () => {
-    if (order.total_amount && order.total_amount > 0) {
-      return order.total_amount;
-    }
-    // Calculate from items
-    if (order.items && order.items.length > 0) {
-      return order.items.reduce((sum, item) => {
-        // Use subtotal if available, otherwise calculate it
-        if (item.subtotal && item.subtotal > 0) {
-          return sum + item.subtotal;
-        }
-        // Calculate subtotal from unit_price and quantity/kilogram
-        if (item.kilogram) {
-          return sum + (item.unit_price * item.kilogram);
-        } else {
-          return sum + (item.unit_price * item.quantity);
-        }
-      }, 0);
-    }
-    return 0;
-  };
-
-  const orderTotal = calculateOrderTotal();
-
-  const statusStyle = getStatusBadgeStyle(order.order_status);
-  const paymentStyle = getPaymentStatusBadgeStyle(order.payment_status);
+  const hero = heroFor(order);
+  const subtotal = orderSubtotal(order);
+  const deliveryFee = order.type === 'delivery' ? Number(order.delivery_fee || 0) : 0;
+  const total = subtotal + deliveryFee;
+  const payments = uniquePayments(order);
+  const showTrack = canTrack(order);
+  const showCancelBtn = order.order_status === 'pending';
+  const bottomInset = showTrack || showCancelBtn ? 108 : theme.spacing[8];
 
   return (
-    <View style={dynamicStyles.container}>
-      <StatusBar 
-        barStyle={themeName === 'dark' ? "light-content" : "dark-content"} 
-        backgroundColor={currentTheme.surface} 
-      />
+    <Screen>
+      <AppHeader title={order.order_number} subtitle="Order details" showBack glass />
 
-      {/* Header */}
-      <View style={dynamicStyles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <ArrowLeft size={24} color={currentTheme.text} />
-        </TouchableOpacity>
-        <Text style={dynamicStyles.headerTitle}>Order Details</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing[5],
+          paddingTop: theme.spacing[5],
+          paddingBottom: bottomInset,
+          gap: theme.spacing[5],
+        }}
+      >
+        <Animated.View entering={enter(40)}>
+          <StatusHero order={order} hero={hero} />
+        </Animated.View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Order Information */}
-        <View style={dynamicStyles.section}>
-          <Text style={dynamicStyles.sectionTitle}>Order Information</Text>
-          
-          <View style={dynamicStyles.infoRow}>
-            <Text style={dynamicStyles.infoLabel}>Order Number</Text>
-            <Text style={dynamicStyles.infoValue}>{order.order_number}</Text>
-          </View>
-
-          <View style={dynamicStyles.infoRow}>
-            <Text style={dynamicStyles.infoLabel}>Date</Text>
-            <Text style={dynamicStyles.infoValue}>
-              {formatDate(order.order_date)} • {formatTime(order.order_time)}
-            </Text>
-          </View>
-
-          <View style={dynamicStyles.infoRow}>
-            <Text style={dynamicStyles.infoLabel}>Status</Text>
-            <View style={[dynamicStyles.statusBadge, { backgroundColor: statusStyle.backgroundColor }]}>
-              <Text style={[dynamicStyles.statusBadgeText, { color: statusStyle.color }]}>
-                {order.order_status}
-              </Text>
-            </View>
-          </View>
-
-          <View style={dynamicStyles.infoRow}>
-            <Text style={dynamicStyles.infoLabel}>Payment Status</Text>
-            <View style={[dynamicStyles.statusBadge, { backgroundColor: paymentStyle.backgroundColor }]}>
-              <Text style={[dynamicStyles.statusBadgeText, { color: paymentStyle.color }]}>
-                {order.payment_status}
-              </Text>
-            </View>
-          </View>
-
-          {order.order_status === 'pending' && (
-            <View style={[dynamicStyles.infoRow, { marginTop: 8 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Clock size={14} color={currentTheme.warning} />
-                <Text style={[dynamicStyles.infoLabel, { marginLeft: 6 }]}>Awaiting Approval</Text>
-              </View>
-            </View>
-          )}
-
-          {order.notes && (
-            <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: currentTheme.border + '40' }}>
-              <Text style={[dynamicStyles.infoLabel, { marginBottom: 4 }]}>Notes</Text>
-              <Text style={[dynamicStyles.infoValue, { textAlign: 'left' }]}>{order.notes}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Order Items */}
         {order.items && order.items.length > 0 && (
-          <View style={dynamicStyles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Order Items</Text>
-            {order.items.map((item) => (
-              <View key={item.id} style={dynamicStyles.orderItem}>
-                <Image
-                  source={{ uri: item.product?.image_url || 'https://via.placeholder.com/60x60' }}
-                  style={dynamicStyles.itemImage}
+          <Animated.View entering={enter(80)}>
+            <GlassSurface level={1} borderRadius={theme.radius.lg}>
+              <View style={{ padding: theme.spacing[5], gap: theme.spacing[4] }}>
+                <Text variant="title">Items</Text>
+                {order.items.map((item, i) => (
+                  <View key={item.id}>
+                    {i > 0 && <Divider style={{ marginBottom: theme.spacing[4] }} />}
+                    <View style={{ flexDirection: 'row', gap: theme.spacing[4] }}>
+                      <MediaContainer
+                        uri={item.product?.image_url}
+                        aspectRatio="1:1"
+                        style={{ width: 64, height: 64 }}
+                        borderRadius={theme.radius.md}
+                      />
+                      <View style={{ flex: 1, gap: 2, justifyContent: 'center' }}>
+                        <Text variant="body" numberOfLines={2} style={{ fontFamily: theme.fontFamily.body.semiBold }}>
+                          {item.product?.name || 'Product'}
+                        </Text>
+                        <Text variant="caption" color="muted">
+                          {item.kilogram
+                            ? `${formatWeight(item.kilogram)} · ${formatKes(item.unit_price)}/kg`
+                            : `Qty ${item.quantity} · ${formatKes(item.unit_price)}`}
+                        </Text>
+                      </View>
+                      <Text variant="label">{formatKes(itemSubtotal(item))}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </GlassSurface>
+          </Animated.View>
+        )}
+
+        <Animated.View entering={enter(120)}>
+          <SummaryCard
+            title="Summary"
+            rows={[
+              { label: 'Subtotal', value: formatKes(subtotal) },
+              ...(order.type === 'delivery'
+                ? [{ label: 'Delivery', value: formatKes(deliveryFee) }]
+                : []),
+            ]}
+            total={{ label: 'Total', value: formatKes(total) }}
+          />
+        </Animated.View>
+
+        {order.sale && (
+          <Animated.View entering={enter(160)}>
+            <GlassSurface level={1} borderRadius={theme.radius.lg}>
+              <View style={{ padding: theme.spacing[5], gap: theme.spacing[2] }}>
+                <Text variant="title" style={{ marginBottom: theme.spacing[2] }}>
+                  Payment
+                </Text>
+                <KeyValueRow label="Sale" value={order.sale.sale_number} />
+                <KeyValueRow
+                  label="Status"
+                  value={(order.sale.payment_status || order.payment_status).replace(/-/g, ' ')}
                 />
-                <View style={dynamicStyles.itemDetails}>
-                  <Text style={dynamicStyles.itemName}>{item.product?.name || 'Product'}</Text>
-                  {item.kilogram ? (
-                    <Text style={dynamicStyles.itemInfo}>
-                      {formatWeight(item.kilogram)} • Ksh {item.unit_price?.toLocaleString()}/kg
-                    </Text>
-                  ) : (
-                    <Text style={dynamicStyles.itemInfo}>
-                      Qty: {item.quantity} • Ksh {item.unit_price?.toLocaleString()}/unit
-                    </Text>
-                  )}
-                  <Text style={dynamicStyles.itemPrice}>
-                    Ksh {(() => {
-                      // Calculate item subtotal if not available
-                      if (item.subtotal && item.subtotal > 0) {
-                        return item.subtotal.toLocaleString();
-                      }
-                      // Calculate from unit_price and quantity/kilogram
-                      const unitPrice = item.unit_price || 0;
-                      if (item.kilogram && item.kilogram > 0) {
-                        return (unitPrice * item.kilogram).toLocaleString();
-                      } else if (item.quantity && item.quantity > 0) {
-                        return (unitPrice * item.quantity).toLocaleString();
-                      }
-                      return '0';
-                    })()}
-                  </Text>
-                </View>
+                {order.sale.total_paid > 0 && (
+                  <KeyValueRow label="Paid" value={formatKes(order.sale.total_paid)} />
+                )}
+                {order.sale.balance > 0 && (
+                  <KeyValueRow label="Balance" value={formatKes(order.sale.balance)} />
+                )}
               </View>
-            ))}
-          </View>
+            </GlassSurface>
+          </Animated.View>
         )}
 
-        {/* Order Summary */}
-        <View style={dynamicStyles.section}>
-          <Text style={dynamicStyles.sectionTitle}>Order Summary</Text>
-          
-          <View style={dynamicStyles.summaryRow}>
-            <Text style={dynamicStyles.summaryLabel}>Subtotal</Text>
-            <Text style={dynamicStyles.summaryValue}>
-              Ksh {orderTotal.toLocaleString()}
-            </Text>
-          </View>
+        {payments.length > 0 && (
+          <Animated.View entering={enter(200)}>
+            <GlassSurface level={1} borderRadius={theme.radius.lg}>
+              <View style={{ padding: theme.spacing[5], gap: theme.spacing[3] }}>
+                <Text variant="title">Transactions</Text>
+                {payments.map((payment, i) => (
+                  <View key={payment.id}>
+                    {i > 0 && <Divider style={{ marginBottom: theme.spacing[3] }} />}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[3] }}>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text variant="body" style={{ fontFamily: theme.fontFamily.body.semiBold }}>
+                          {(payment.payment_method || 'payment').toUpperCase()}
+                        </Text>
+                        <Text variant="caption" color="muted">
+                          {new Date(payment.paid_at).toLocaleDateString()} · {payment.status}
+                        </Text>
+                      </View>
+                      <Text
+                        variant="label"
+                        color={payment.status === 'refunded' ? 'success' : 'primary'}
+                      >
+                        {payment.status === 'refunded' ? '+' : ''}
+                        {formatKes(Number(payment.amount))}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </GlassSurface>
+          </Animated.View>
+        )}
 
-          {order.type === 'delivery' && (
-            <View style={dynamicStyles.summaryRow}>
-              <Text style={dynamicStyles.summaryLabel}>Delivery Fee</Text>
-              <Text style={dynamicStyles.summaryValue}>
-                Ksh {order.delivery_fee?.toLocaleString() || '150'}
+        <Animated.View entering={enter(240)}>
+          <GlassSurface level={1} borderRadius={theme.radius.lg}>
+            <View style={{ padding: theme.spacing[5], gap: theme.spacing[3] }}>
+              <Text variant="title">
+                {order.type === 'delivery' ? 'Delivery' : 'Pickup'}
               </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing[3] }}>
+                {order.type === 'delivery' ? (
+                  <MapPin size={18} color={theme.colors.primary} />
+                ) : (
+                  <Store size={18} color={theme.colors.primary} />
+                )}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text variant="body" style={{ fontFamily: theme.fontFamily.body.semiBold }}>
+                    {order.type === 'delivery' ? 'Home delivery' : 'Pickup at shop'}
+                  </Text>
+                  {order.type === 'delivery' && order.delivery_address ? (
+                    <Text variant="caption" color="muted">
+                      {order.delivery_address}
+                    </Text>
+                  ) : null}
+                  {order.pickup_time ? (
+                    <Text variant="caption" color="muted">
+                      Slot {new Date(order.pickup_time).toLocaleString()}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
             </View>
-          )}
+          </GlassSurface>
+        </Animated.View>
 
-          <View style={dynamicStyles.totalRow}>
-            <Text style={dynamicStyles.totalLabel}>Total</Text>
-            <Text style={dynamicStyles.totalValue}>
-              Ksh {(orderTotal + (order.type === 'delivery' ? (order.delivery_fee || 150) : 0)).toLocaleString()}
-            </Text>
+        {order.notes ? (
+          <Animated.View entering={enter(260)}>
+            <GlassSurface level={1} borderRadius={theme.radius.lg}>
+              <View style={{ padding: theme.spacing[5], gap: theme.spacing[2] }}>
+                <Text variant="title">Notes</Text>
+                <Text variant="body" color="secondary">
+                  {order.notes}
+                </Text>
+              </View>
+            </GlassSurface>
+          </Animated.View>
+        ) : null}
+
+        <Animated.View entering={enter(280)}>
+          <GlassSurface level={1} borderRadius={theme.radius.lg}>
+            <View style={{ padding: theme.spacing[5], gap: theme.spacing[3] }}>
+              <Text variant="title">Need help?</Text>
+              <Pressable
+                onPress={() => Linking.openURL('tel:+254700000000')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[4], minHeight: theme.touchTarget }}
+              >
+                <Phone size={18} color={theme.colors.primary} />
+                <View>
+                  <Text variant="caption" color="muted">
+                    Phone
+                  </Text>
+                  <Text variant="body">+254 700 000 000</Text>
+                </View>
+              </Pressable>
+              <Divider />
+              <Pressable
+                onPress={() =>
+                  Linking.openURL(
+                    `mailto:support@easybuy.com?subject=Order Inquiry - ${order.order_number}`,
+                  )
+                }
+                style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[4], minHeight: theme.touchTarget }}
+              >
+                <Mail size={18} color={theme.colors.primary} />
+                <View>
+                  <Text variant="caption" color="muted">
+                    Email
+                  </Text>
+                  <Text variant="body">support@easybuy.com</Text>
+                </View>
+              </Pressable>
+            </View>
+          </GlassSurface>
+        </Animated.View>
+      </Animated.ScrollView>
+
+      {(showTrack || showCancelBtn) && (
+        <FloatingGlassBar>
+          <View
+            style={{
+              padding: theme.spacing[3],
+              gap: theme.spacing[2],
+            }}
+          >
+            {showTrack && (
+              <Button
+                title="Track live delivery"
+                fullWidth
+                leftIcon={<MapPin size={18} color={theme.colors.textOnPrimary} />}
+                onPress={() => router.push(`/order/track?id=${order.id}` as any)}
+              />
+            )}
+            {showCancelBtn && (
+              <Button
+                title="Cancel order"
+                variant={showTrack ? 'ghost' : 'danger'}
+                fullWidth
+                loading={cancelling}
+                onPress={() => setShowCancel(true)}
+              />
+            )}
           </View>
+        </FloatingGlassBar>
+      )}
+
+      <ActionSheet
+        visible={showCancel}
+        onClose={() => setShowCancel(false)}
+        title={`Cancel ${order.order_number}? This cannot be undone.`}
+        actions={[
+          {
+            label: 'Yes, cancel order',
+            destructive: true,
+            onPress: handleCancel,
+          },
+        ]}
+      />
+    </Screen>
+  );
+}
+
+function StatusHero({
+  order,
+  hero,
+}: {
+  order: Order;
+  hero: ReturnType<typeof heroFor>;
+}) {
+  const theme = useAppTheme();
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const pulse = useSharedValue(1);
+  const Icon = HERO_ICON[hero.key];
+
+  const tone =
+    hero.key === 'cancelled'
+      ? { bg: theme.colors.dangerMuted, fg: theme.colors.error, ring: theme.colors.error }
+      : hero.key === 'delivered'
+        ? { bg: theme.colors.successMuted, fg: theme.colors.success, ring: theme.colors.success }
+        : hero.key === 'delivering'
+          ? { bg: theme.colors.infoMuted, fg: theme.colors.info, ring: theme.colors.info }
+          : { bg: theme.colors.primaryMuted, fg: theme.colors.primary, ring: theme.colors.primary };
+
+  useEffect(() => {
+    getReducedMotion().then(setReduceMotion);
+    return subscribeReducedMotion(setReduceMotion);
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion || hero.key === 'delivered' || hero.key === 'cancelled') {
+      pulse.value = 1;
+      return;
+    }
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1.06, { duration: theme.duration.slow }),
+        withTiming(1, { duration: theme.duration.slow }),
+      ),
+      -1,
+      false,
+    );
+  }, [reduceMotion, hero.key, pulse, theme.duration.slow]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+
+  return (
+    <GlassSurface level={2} borderRadius={theme.radius.xl}>
+      <View style={{ padding: theme.spacing[6], alignItems: 'center', gap: theme.spacing[4] }}>
+        <View style={{ flexDirection: 'row', gap: theme.spacing[2], alignSelf: 'stretch', justifyContent: 'center' }}>
+          <StatusPill
+            status={
+              order.order_status === 'cancelled'
+                ? 'cancelled'
+                : hero.key === 'delivering'
+                  ? 'delivering'
+                  : hero.key === 'delivered'
+                    ? 'delivered'
+                    : hero.key === 'preparing'
+                      ? 'preparing'
+                      : 'pending'
+            }
+          />
+          <StatusPill
+            status={
+              order.payment_status === 'fully-paid'
+                ? 'delivered'
+                : order.payment_status === 'failed'
+                  ? 'cancelled'
+                  : 'pending'
+            }
+            label={order.payment_status.replace(/-/g, ' ')}
+          />
         </View>
 
-        {/* Sale Information (if confirmed) */}
-        {order.sale && order.order_status === 'confirmed' && (
-          <View style={dynamicStyles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Sale Information</Text>
-            
-            <View style={dynamicStyles.infoRow}>
-              <Text style={dynamicStyles.infoLabel}>Sale Number</Text>
-              <Text style={dynamicStyles.infoValue}>{order.sale.sale_number}</Text>
-            </View>
-
-            <View style={dynamicStyles.infoRow}>
-              <Text style={dynamicStyles.infoLabel}>Total Amount</Text>
-              <Text style={dynamicStyles.infoValue}>
-                Ksh {order.sale.total_amount?.toLocaleString()}
-              </Text>
-            </View>
-
-            <View style={dynamicStyles.infoRow}>
-              <Text style={dynamicStyles.infoLabel}>Payment Status</Text>
-              <Text style={dynamicStyles.infoValue}>
-                {order.sale.payment_status?.replace('-', ' ').toUpperCase()}
-              </Text>
-            </View>
-
-            {order.sale.total_paid > 0 && (
-              <View style={dynamicStyles.infoRow}>
-                <Text style={dynamicStyles.infoLabel}>Total Paid</Text>
-                <Text style={dynamicStyles.infoValue}>
-                  Ksh {order.sale.total_paid?.toLocaleString()}
-                </Text>
-              </View>
-            )}
-
-            {order.sale.balance > 0 && (
-              <View style={dynamicStyles.infoRow}>
-                <Text style={dynamicStyles.infoLabel}>Balance</Text>
-                <Text style={[dynamicStyles.infoValue, { color: currentTheme.warning }]}>
-                  Ksh {order.sale.balance?.toLocaleString()}
-                </Text>
-              </View>
-            )}
+        {hero.key !== 'cancelled' && (
+          <View style={{ alignSelf: 'stretch' }}>
+            <TrackStepper steps={hero.steps} current={hero.step} />
           </View>
         )}
 
-        {/* Payment History */}
-        {order.sale?.payments && order.sale.payments.length > 0 && (
-          <View style={dynamicStyles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Payment History</Text>
-            {order.sale.payments.map((payment: Payment) => (
-              <View key={payment.id} style={dynamicStyles.paymentItem}>
-                <View style={{ flex: 1 }}>
-                  <Text style={dynamicStyles.paymentMethod}>
-                    {payment.payment_method?.toUpperCase()} Payment
-                  </Text>
-                  <Text style={dynamicStyles.paymentDate}>
-                    {new Date(payment.paid_at).toLocaleDateString()} • {payment.status}
-                  </Text>
-                </View>
-                <Text style={dynamicStyles.paymentAmount}>
-                  Ksh {payment.amount?.toLocaleString()}
-                </Text>
-              </View>
-            ))}
+        <Animated.View style={pulseStyle}>
+          <View
+            style={{
+              width: 112,
+              height: 112,
+              borderRadius: 56,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: tone.bg,
+              borderWidth: 1.5,
+              borderColor: tone.ring + '55',
+            }}
+          >
+            <View
+              style={{
+                width: 88,
+                height: 88,
+                borderRadius: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme.colors.surface,
+                borderWidth: 1,
+                borderColor: tone.ring + '33',
+              }}
+            >
+              <Icon size={40} color={tone.fg} strokeWidth={1.75} />
+            </View>
           </View>
-        )}
+        </Animated.View>
 
-        {/* Delivery/Pickup Information */}
-        <View style={dynamicStyles.section}>
-          <Text style={dynamicStyles.sectionTitle}>
-            {order.type === 'delivery' ? 'Delivery Information' : 'Pickup Information'}
+        <View style={{ alignItems: 'center', gap: theme.spacing[2] }}>
+          <Text
+            variant="h3"
+            style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1 }}
+          >
+            {hero.title}
           </Text>
-          
-          <View style={dynamicStyles.infoRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <MapPin size={16} color={currentTheme.textSecondary} />
-              <Text style={[dynamicStyles.infoLabel, { marginLeft: 8 }]}>Type</Text>
-            </View>
-            <Text style={dynamicStyles.infoValue}>
-              {order.type === 'delivery' ? 'Home Delivery' : 'Pickup at Shop'}
-            </Text>
-          </View>
-
-          {order.type === 'delivery' && order.delivery_address && (
-            <View style={[dynamicStyles.infoRow, { marginTop: 4, alignItems: 'flex-start' }]}>
-              <Text style={[dynamicStyles.infoLabel, { flex: 0, width: 80 }]}>Address</Text>
-              <Text style={[dynamicStyles.infoValue, { textAlign: 'left', flex: 1 }]}>
-                {order.delivery_address}
-              </Text>
-            </View>
-          )}
-
-          <View style={[dynamicStyles.infoRow, { marginTop: 8 }]}>
-            <Text style={dynamicStyles.infoLabel}>Status</Text>
-            <Text style={[dynamicStyles.infoValue, { textTransform: 'capitalize' }]}>
-              {order.order_status.replace('_', ' ')}
-            </Text>
-          </View>
-
-          {order.type === 'delivery' && order.order_status !== 'pending' && order.order_status !== 'cancelled' && order.order_status !== 'delivered' && (
-            <TouchableOpacity
-              style={[dynamicStyles.actionButton, { marginTop: 16, backgroundColor: currentTheme.primary }]}
-              onPress={() => router.push(`/order/track?id=${order.id}` as any)}
-            >
-              <MapPin size={20} color="#FFFFFF" />
-              <Text style={[dynamicStyles.actionButtonText, { color: '#FFFFFF' }]}>
-                Track Live Delivery
-              </Text>
-            </TouchableOpacity>
-          )}
+          <Text variant="body" color="secondary" style={{ textAlign: 'center', maxWidth: 280 }}>
+            {hero.body}
+          </Text>
+          <Text variant="caption" color="muted">
+            {new Date(order.order_date).toLocaleDateString('en-GB', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'short',
+            })}
+            {order.order_time ? ` · ${String(order.order_time).slice(0, 5)}` : ''}
+          </Text>
         </View>
-
-        {/* Contact Support */}
-        <View style={dynamicStyles.section}>
-          <Text style={dynamicStyles.sectionTitle}>Need Help?</Text>
-          
-          <TouchableOpacity
-            style={[dynamicStyles.contactCard, dynamicStyles.supportButton]}
-            onPress={handleCallSupport}
-          >
-            <View style={dynamicStyles.contactIcon}>
-              <Phone size={20} color={currentTheme.primary} />
-            </View>
-            <View style={dynamicStyles.contactInfo}>
-              <Text style={dynamicStyles.contactLabel}>Phone</Text>
-              <Text style={dynamicStyles.contactValue}>+254 700 000 000</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[dynamicStyles.contactCard, dynamicStyles.supportButton]}
-            onPress={handleEmailSupport}
-          >
-            <View style={dynamicStyles.contactIcon}>
-              <Mail size={20} color={currentTheme.primary} />
-            </View>
-            <View style={dynamicStyles.contactInfo}>
-              <Text style={dynamicStyles.contactLabel}>Email</Text>
-              <Text style={dynamicStyles.contactValue}>support@easybuy.com</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Cancel Order Button (only for pending orders) */}
-        {order.order_status === 'pending' && (
-          <View style={{ paddingHorizontal: 20, paddingBottom: 32 }}>
-            <TouchableOpacity
-              style={[dynamicStyles.actionButton, dynamicStyles.cancelButton]}
-              onPress={handleCancelOrder}
-            >
-              <XCircle size={20} color={currentTheme.error} />
-              <Text style={[dynamicStyles.actionButtonText, dynamicStyles.cancelButtonText]}>
-                Cancel Order
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={{ height: 20 }} />
-      </ScrollView>
-    </View>
+      </View>
+    </GlassSurface>
   );
 }

@@ -95,10 +95,10 @@ export function AppHeader({
   const content = (
     <View
       style={{
-        paddingTop: glass ? theme.spacing[3] : insets.top + theme.spacing[2],
-        paddingBottom: theme.spacing[3],
+        paddingTop: glass ? theme.spacing[2] : insets.top + theme.spacing[2],
+        paddingBottom: theme.spacing[2],
         paddingHorizontal: theme.spacing[4],
-        gap: large ? theme.spacing[2] : 0,
+        gap: large ? theme.spacing[1] : 0,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: theme.touchTarget }}>
@@ -119,10 +119,25 @@ export function AppHeader({
               style={{
                 textAlign: left || showBack ? 'left' : 'center',
                 marginHorizontal: theme.spacing[2],
+                letterSpacing: -0.3,
               }}
             >
               {title}
             </Text>
+            {subtitle && !large ? (
+              <Text
+                variant="caption"
+                color="muted"
+                numberOfLines={1}
+                style={{
+                  textAlign: left || showBack ? 'left' : 'center',
+                  marginHorizontal: theme.spacing[2],
+                  marginTop: 1,
+                }}
+              >
+                {subtitle}
+              </Text>
+            ) : null}
           </Animated.View>
         )}
         {large && !collapsible && <View style={{ flex: 1 }} />}
@@ -133,11 +148,11 @@ export function AppHeader({
         <Animated.View
           style={[{ paddingHorizontal: theme.spacing[2], overflow: 'hidden' }, largeTitleStyle]}
         >
-          <Text variant="h1" numberOfLines={1}>
+          <Text variant="h2" numberOfLines={1} style={{ letterSpacing: -0.4 }}>
             {title}
           </Text>
           {subtitle && (
-            <Text variant="body" color="secondary" style={{ marginTop: theme.spacing[1] }}>
+            <Text variant="caption" color="muted" style={{ marginTop: theme.spacing[1] }}>
               {subtitle}
             </Text>
           )}

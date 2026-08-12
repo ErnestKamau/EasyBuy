@@ -124,6 +124,14 @@ class Order extends Model
     }
 
     /**
+     * Payments made against this order (including pre-sale)
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
      * Get the assigned driver for this order
      */
     public function driver(): BelongsTo
